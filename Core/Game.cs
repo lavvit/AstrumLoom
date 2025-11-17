@@ -30,7 +30,7 @@ public sealed class GameRunner
             _game.Update(_platform.Time.DeltaTime);
 
             _platform.Graphics.BeginFrame();
-            _platform.Graphics.Clear(Color.Black);
+            _platform.Graphics.Clear(Color.CornflowerBlue);
             _game.Draw();
             _platform.Graphics.EndFrame();
 

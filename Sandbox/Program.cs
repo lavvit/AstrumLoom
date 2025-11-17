@@ -6,22 +6,29 @@ namespace Sandbox;
 internal sealed class SimpleTestGame : IGame
 {
     private readonly IGamePlatform _platform;
+    private ITexture? _tex;
 
-    public SimpleTestGame(IGamePlatform platform) => _platform = platform;
+    public SimpleTestGame(IGamePlatform platform)
+        => _platform = platform;
 
-    public void Initialize()
-    {
-        // TODO: テクスチャ読み込みとか
-    }
+    public void Initialize() =>
+        // 実行ファイルからの相対パスになる
+        _tex = _platform.Graphics.LoadTexture("Assets/test.png");
 
     public void Update(float deltaTime)
     {
-        // TODO: 入力テストとかをそのうち入れる
+        // とりあえず何もしない
     }
 
     public void Draw()
     {
-        // TODO: DXLib 実装が入ったら描画処理を書く
+        if (_tex is null) return;
+
+        // 画面中央あたりに描く（適当に）
+        float x = 640 - _tex.Width / 2f;
+        float y = 360 - _tex.Height / 2f;
+
+        _platform.Graphics.DrawTexture(_tex, x, y);
     }
 }
 
@@ -34,6 +41,6 @@ internal static class Program
         var game = new SimpleTestGame(platform);
         var runner = new GameRunner(platform, game);
 
-        runner.Run(); // いまは 5秒で自動終了
+        runner.Run();
     }
 }
