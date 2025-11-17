@@ -1,5 +1,6 @@
 ﻿using AstrumLoom;
 using AstrumLoom.DXLib;
+using AstrumLoom.RayLib;
 
 namespace Sandbox;
 
@@ -44,10 +45,10 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
-            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
+            GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
         };
 
-        using var platform = PlatformFactory.Create(config);
+        var platform = PlatformFactory.Create(config);
         var game = new SimpleTestGame(platform);
         using var host = new GameHost(config, platform, game);
 
@@ -61,7 +62,7 @@ internal static class PlatformFactory
         => config.GraphicsBackend switch
         {
             GraphicsBackendKind.DxLib => new DxLibPlatform(config),
-            //GraphicsBackendKind.RayLib => new RayLibPlatform(config),
+            GraphicsBackendKind.RayLib => new RayLibPlatform(config),
             _ => throw new NotSupportedException()
         };
 }
