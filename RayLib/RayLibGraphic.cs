@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Numerics;
-using System.Text;
+﻿using System.Numerics;
 
 using Raylib_cs;
 
@@ -115,26 +111,32 @@ internal sealed class RayLibGraphics : IGraphics
     public void Line(double x, double y, double dx, double dy,
         DrawOptions options)
     {
-        var col = ToRay(options.Color ?? Color.White, options.Opacity);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var col = ToRay(options.Color ?? Color.White, opacity);
         var a = new Vector2((float)x, (float)y);
         var b = new Vector2((float)(x + dx), (float)(y + dy));
-        DrawLineEx(a, b, Math.Max(1, options.Thickness), col);
+        DrawLineEx(a, b, thickness, col);
     }
 
     public void Box(double x, double y, double width, double height,
         DrawOptions options)
     {
-        var col = ToRay(options.Color ?? Color.White, options.Opacity);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var col = ToRay(options.Color ?? Color.White, opacity);
         var rect = new Raylib_cs.Rectangle((float)x, (float)y, (float)width, (float)height);
 
         if (options.Fill) DrawRectangleRec(rect, col);
-        else DrawRectangleLinesEx(rect, Math.Max(1, options.Thickness), col);
+        else DrawRectangleLinesEx(rect, thickness, col);
     }
 
     public void Circle(double x, double y, double radius,
         DrawOptions options, int segments = 64)
     {
-        var col = ToRay(options.Color ?? Color.White, options.Opacity);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var col = ToRay(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawCircleV(new Vector2((float)x, (float)y), (float)radius, col);
         else DrawCircleLines((int)Math.Round(x), (int)Math.Round(y), (float)radius, col);
     }
@@ -142,7 +144,9 @@ internal sealed class RayLibGraphics : IGraphics
     public void Oval(double x, double y, double rx, double ry,
         DrawOptions options, int segments = 64)
     {
-        var col = ToRay(options.Color ?? Color.White, options.Opacity);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var col = ToRay(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawEllipse((int)x, (int)y, (int)rx, (int)ry, col);
         else DrawEllipseLines((int)x, (int)y, (int)rx, (int)ry, col);
     }
@@ -150,7 +154,9 @@ internal sealed class RayLibGraphics : IGraphics
     public void Triangle(double x1, double y1, double x2, double y2, double x3, double y3,
         DrawOptions options)
     {
-        var col = ToRay(options.Color ?? Color.White, options.Opacity);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var col = ToRay(options.Color ?? Color.White, opacity);
         if (options.Fill)
         {
             DrawTriangle(
@@ -160,30 +166,9 @@ internal sealed class RayLibGraphics : IGraphics
                 col);
         }
         // 枠線はおまけ
-        DrawLineEx(new((float)x1, (float)y1), new((float)x2, (float)y2), Math.Max(1, options.Thickness), col);
-        DrawLineEx(new((float)x2, (float)y2), new((float)x3, (float)y3), Math.Max(1, options.Thickness), col);
-        DrawLineEx(new((float)x3, (float)y3), new((float)x1, (float)y1), Math.Max(1, options.Thickness), col);
-    }
-
-    public void Cross(double x, double y, double size = 20, Color? color = null,
-        double opacity = 1.0, int thickness = 1, BlendMode blend = BlendMode.None)
-    {
-        Box(x - size / 2, y - (thickness - 1) / 2.0, size, thickness, new DrawOptions
-        {
-            Color = color,
-            Opacity = opacity,
-            Fill = true,
-            Thickness = thickness,
-            Blend = blend
-        });
-        Box(x - (thickness - 1) / 2.0, y - size / 2.0, thickness, size, new DrawOptions
-        {
-            Color = color,
-            Opacity = opacity,
-            Fill = true,
-            Thickness = thickness,
-            Blend = blend
-        });
+        DrawLineEx(new((float)x1, (float)y1), new((float)x2, (float)y2), thickness, col);
+        DrawLineEx(new((float)x2, (float)y2), new((float)x3, (float)y3), thickness, col);
+        DrawLineEx(new((float)x3, (float)y3), new((float)x1, (float)y1), thickness, col);
     }
 
     public void Text(double x, double y, string text,
@@ -192,7 +177,8 @@ internal sealed class RayLibGraphics : IGraphics
     {
         if (string.IsNullOrEmpty(text)) return;
 
-        var fg = ToRay(options.Color ?? Color.White, options.Opacity);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var fg = ToRay(options.Color ?? Color.White, opacity);
 
         var size = MeasureTextInternal(text, fontSize);
         var anchorOffset = AnchorOffset(options.Point, size);

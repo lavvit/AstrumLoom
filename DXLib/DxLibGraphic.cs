@@ -113,7 +113,8 @@ internal sealed class DxLibGraphics : IGraphics
 
     public void Blackout(double opacity = 1.0, Color? color = null)
     {
-        Box(0, 0, 1280, 720, new()
+        GetWindowSize(out int w, out int h);
+        Box(0, 0, w, h, new()
         {
             Color = color ?? Color.Black,
             Opacity = opacity,
@@ -126,8 +127,10 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
-        DrawLineAA((float)x, (float)y, (float)(x + dx), (float)(y + dy), (uint)c, options.Thickness);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
+        DrawLineAA((float)x, (float)y, (float)(x + dx), (float)(y + dy), (uint)c, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 
@@ -136,9 +139,11 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawBoxAA((float)x, (float)y, (float)(x + width), (float)(y + height),
-                  (uint)c, options.Fill ? TRUE : FALSE, options.Thickness);
+                  (uint)c, options.Fill ? TRUE : FALSE, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 
@@ -147,9 +152,11 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawCircleAA((float)x, (float)y, (float)radius, segments,
-                (uint)c, options.Fill ? TRUE : FALSE, options.Thickness);
+                (uint)c, options.Fill ? TRUE : FALSE, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 
@@ -158,9 +165,11 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawOvalAA((float)x, (float)y, (float)rx, (float)ry, segments,
-            (uint)c, options.Fill ? TRUE : FALSE);
+            (uint)c, options.Fill ? TRUE : FALSE, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 
@@ -169,9 +178,11 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawTriangleAA((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3,
-                       (uint)c, options.Fill ? TRUE : FALSE);
+                       (uint)c, options.Fill ? TRUE : FALSE, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 
@@ -181,6 +192,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
+        var thickness = Math.Max(1, options.Thickness);
+        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
 
         var (w, h) = MeasureText(text, fontSize);
         var offset = AnchorToOffset(options.Point, w, h);
@@ -188,12 +201,16 @@ internal sealed class DxLibGraphics : IGraphics
         float y1 = (float)(y - offset.Y);
 
         SetFontSize(fontSize);
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, (int)(255.0 * options.Opacity));
+        SetFontThickness(thickness);
+        SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
 
         // 縁取りは「ずらし描き」で実装してもいいし、最初はナシでもOK
         DrawString((int)x1, (int)y1, text, (uint)c);
 
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+
+        SetFontThickness(1); // リセット
+        SetFontSize(16);
     }
 
     public (int Width, int Height) MeasureText(string text, int fontSize = 20)
@@ -219,6 +236,14 @@ internal sealed class DxLibGraphics : IGraphics
             _ => new(0, 0),
         };
     }
+
+    private static int GetBlendMode(BlendMode mode) => mode switch
+    {
+        BlendMode.None or BlendMode.Alpha => DX_BLENDMODE_ALPHA,
+        BlendMode.Add => DX_BLENDMODE_ADD,
+        BlendMode.Multiply => DX_BLENDMODE_MUL,
+        _ => DX_BLENDMODE_NOBLEND,
+    };
 
     // ToDxColor は MultiBeat のやつをそのまま持ってきてOK
     private static int ToDxColor(Color col)

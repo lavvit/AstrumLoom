@@ -31,13 +31,7 @@ internal sealed class SimpleTestGame : IGame
 
         var g = _platform.Graphics;
 
-        //g.DrawTexture(_tex, x, y);
-
-        g.Box(100, 100, 300, 200, Color.White, fill: false, thickness: 3);
-        g.Circle(640, 360, 80, Color.Red, fill: false, thickness: 4);
-        g.Text(640, 80, "DXLib / Raylib", 32, Color.White, ReferencePoint.TopCenter);
-        g.Cross(640, 360, 40, Color.Lime);
-
+        g.DrawTexture(_tex, x, y);
     }
 }
 
@@ -53,11 +47,13 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
+            ShowFpsOverlay = true,
             GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
         };
 
         var platform = PlatformFactory.Create(config);
         var game = new SimpleTestGame(platform);
+        Overlay.Set(new SandboxOverlay());
         using var host = new GameHost(config, platform, game);
 
         host.Run();

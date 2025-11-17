@@ -7,34 +7,30 @@ public interface IGame
     void Draw();
 }
 
-public sealed class GameRunner
+public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true)
 {
-    private readonly IGamePlatform _platform;
-    private readonly IGame _game;
-
-    public GameRunner(IGamePlatform platform, IGame game)
-    {
-        _platform = platform;
-        _game = game;
-    }
-
     public void Run()
     {
-        _game.Initialize();
+        game.Initialize();
 
-        while (!_platform.ShouldClose)
+        while (!platform.ShouldClose)
         {
-            _platform.Time.BeginFrame();
-            _platform.PollEvents();
+            platform.Time.BeginFrame();
+            platform.PollEvents();
 
-            _game.Update(_platform.Time.DeltaTime);
+            game.Update(platform.Time.DeltaTime);
 
-            _platform.Graphics.BeginFrame();
-            _platform.Graphics.Clear(Color.CornflowerBlue);
-            _game.Draw();
-            _platform.Graphics.EndFrame();
+            platform.Graphics.BeginFrame();
+            platform.Graphics.Clear(Color.CornflowerBlue);
+            game.Draw();
+            // ★ ここでオーバーレイ
+            if (showOverlay)
+            {
+                Overlay.Current.Draw(platform);
+            }
+            platform.Graphics.EndFrame();
 
-            _platform.Time.EndFrame();
+            platform.Time.EndFrame();
         }
     }
 }

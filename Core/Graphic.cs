@@ -99,12 +99,13 @@ public static class GraphicsExtensions
         double x1, double y1, double dx, double dy,
         Color? color = null,
         int thickness = 1,
-        BlendMode blend = BlendMode.None)
+        BlendMode blend = BlendMode.None, double opacity = 1)
         => g.Line(x1, y1, dx, dy, new DrawOptions
         {
             Color = color,
             Thickness = thickness,
-            Blend = blend
+            Blend = blend,
+            Opacity = opacity
         });
 
     public static void LineZ(
@@ -112,13 +113,8 @@ public static class GraphicsExtensions
     double x1, double y1, double x2, double y2,
     Color? color = null,
     int thickness = 1,
-    BlendMode blend = BlendMode.None)
-    => g.Line(x1, y1, x2 - x1, y2 - y1, new DrawOptions
-    {
-        Color = color,
-        Thickness = thickness,
-        Blend = blend
-    });
+    BlendMode blend = BlendMode.None, double opacity = 1)
+    => Line(g, x1, y1, x2 - x1, y2 - y1, color, thickness, blend, opacity);
 
     public static void Box(
         this IGraphics g,
@@ -126,13 +122,14 @@ public static class GraphicsExtensions
         Color? color = null,
         bool fill = true,
         int thickness = 1,
-        BlendMode blend = BlendMode.None)
+        BlendMode blend = BlendMode.None, double opacity = 1)
         => g.Box(x, y, width, height, new DrawOptions
         {
             Color = color,
             Fill = fill,
             Thickness = thickness,
-            Blend = blend
+            Blend = blend,
+            Opacity = opacity
         });
 
     public static void BoxZ(
@@ -141,14 +138,8 @@ public static class GraphicsExtensions
         Color? color = null,
         bool fill = true,
         int thickness = 1,
-        BlendMode blend = BlendMode.None)
-        => g.Box(x1, y1, x2 - x1, y2 - y1, new DrawOptions
-        {
-            Color = color,
-            Fill = fill,
-            Thickness = thickness,
-            Blend = blend
-        });
+        BlendMode blend = BlendMode.None, double opacity = 1)
+        => Box(g, x1, y1, x2 - x1, y2 - y1, color, fill, thickness, blend, opacity);
 
     public static void Circle(
     this IGraphics g,
@@ -157,13 +148,15 @@ public static class GraphicsExtensions
     bool fill = true,
     int thickness = 1,
     BlendMode blend = BlendMode.None,
+    double opacity = 1,
     int segments = 64)
     => g.Circle(x, y, radius, new DrawOptions
     {
         Color = color,
         Fill = fill,
         Thickness = thickness,
-        Blend = blend
+        Blend = blend,
+        Opacity = opacity
     }, segments);
 
     public static void Oval(
@@ -173,13 +166,15 @@ public static class GraphicsExtensions
         bool fill = true,
         int thickness = 1,
         BlendMode blend = BlendMode.None,
+        double opacity = 1,
         int segments = 64)
         => g.Oval(x, y, rx, ry, new DrawOptions
         {
             Color = color,
             Fill = fill,
             Thickness = thickness,
-            Blend = blend
+            Blend = blend,
+            Opacity = opacity
         }, segments);
 
 
@@ -196,11 +191,13 @@ public static class GraphicsExtensions
     double x, double y,
     double size = 20,
     Color? color = null,
-    int thickness = 1)
+    int thickness = 1,
+    double opacity = 1)
     => g.Cross(x, y, size, new DrawOptions
     {
         Color = color,
-        Thickness = thickness
+        Thickness = thickness,
+        Opacity = opacity
     });
 
 
@@ -210,11 +207,13 @@ public static class GraphicsExtensions
     string text,
     int size = 20,
     Color? color = null,
-    ReferencePoint point = ReferencePoint.TopLeft)
+    ReferencePoint point = ReferencePoint.TopLeft,
+    double opacity = 1)
     => g.Text(x, y, text, size, new DrawOptions
     {
         Color = color,
-        Point = point
+        Point = point,
+        Opacity = opacity
     });
 
 }
