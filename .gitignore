@@ -6,6 +6,6 @@
 /.git
 */obj
 */bin
-*/Debug
-*/Release
+/Debug
+/Release
 *.user

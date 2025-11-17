@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="Core/AstrumLoom.csproj" />
+  <Project Path="DXLib/AstrumLoom.DXLib.csproj" Id="e6f0e9af-f3a4-46a1-b951-df0cb8a088c6" />
+  <Project Path="RayLib/AstrumLoom.RayLib.csproj" Id="ae3bc02f-7f49-452b-9d6d-0e7f89b83473" />
+  <Project Path="Sandbox/Sandbox.csproj" Id="f318636a-4b8e-4814-9cf4-ba90dc17fd67" />
 </Solution>
