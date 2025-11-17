@@ -91,8 +91,8 @@ public struct DrawOptions
 {
     public Color? Color { get; set; } = null;
     public double Opacity { get; set; } = 1.0;
-    public bool Fill { get; set; } = true;
-    public int Thickness { get; set; } = 1;
+    public readonly bool Fill => Thickness <= 0;
+    public int Thickness { get; set; } = 0;
     public BlendMode Blend { get; set; } = BlendMode.None;
     public ReferencePoint Point { get; set; } = ReferencePoint.TopLeft;
 
@@ -127,13 +127,11 @@ public static class GraphicsExtensions
         this IGraphics g,
         double x, double y, double width, double height,
         Color? color = null,
-        bool fill = true,
-        int thickness = 1,
+        int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
         => g.Box(x, y, width, height, new DrawOptions
         {
             Color = color,
-            Fill = fill,
             Thickness = thickness,
             Blend = blend,
             Opacity = opacity
@@ -143,24 +141,21 @@ public static class GraphicsExtensions
         this IGraphics g,
         double x1, double y1, double x2, double y2,
         Color? color = null,
-        bool fill = true,
-        int thickness = 1,
+        int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => Box(g, x1, y1, x2 - x1, y2 - y1, color, fill, thickness, blend, opacity);
+        => Box(g, x1, y1, x2 - x1, y2 - y1, color, thickness, blend, opacity);
 
     public static void Circle(
     this IGraphics g,
     double x, double y, double radius,
     Color? color = null,
-    bool fill = true,
-    int thickness = 1,
+    int thickness = 0,
     BlendMode blend = BlendMode.None,
     double opacity = 1,
     int segments = 64)
     => g.Circle(x, y, radius, new DrawOptions
     {
         Color = color,
-        Fill = fill,
         Thickness = thickness,
         Blend = blend,
         Opacity = opacity
@@ -170,15 +165,13 @@ public static class GraphicsExtensions
         this IGraphics g,
         double x, double y, double rx, double ry,
         Color? color = null,
-        bool fill = true,
-        int thickness = 1,
+        int thickness = 0,
         BlendMode blend = BlendMode.None,
         double opacity = 1,
         int segments = 64)
         => g.Oval(x, y, rx, ry, new DrawOptions
         {
             Color = color,
-            Fill = fill,
             Thickness = thickness,
             Blend = blend,
             Opacity = opacity
@@ -283,6 +276,7 @@ public static class LayoutUtil
             double len = Length();
             return new Point(X / len, Y / len);
         }
+        public (double x, double y) ToTuple() => (X, Y);
 
         public override int GetHashCode() => HashCode.Combine(X, Y);
     }

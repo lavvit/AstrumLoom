@@ -2,13 +2,6 @@
 
 namespace AstrumLoom;
 
-public enum FontSourceKind
-{
-    Default,    // ライブラリ標準
-    SystemName, // "Meiryo", "Yu Gothic UI" みたいな名前指定
-    FilePath    // "fonts/MyFont.ttf"
-}
-
 public readonly record struct FontSpec(
     string NameOrPath,
     int Size,

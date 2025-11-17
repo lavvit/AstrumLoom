@@ -124,8 +124,7 @@ internal sealed class DxLibGraphics : IGraphics
         Box(0, 0, w, h, new()
         {
             Color = color ?? Color.Black,
-            Opacity = opacity,
-            Fill = true
+            Opacity = opacity
         });
     }
 

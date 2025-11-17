@@ -9,6 +9,7 @@ public interface IGame
 
 public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true)
 {
+    private static readonly Color BackgroundColor = new(10, 10, 11);
     public void Run()
     {
         game.Initialize();
@@ -22,7 +23,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             game.Update(platform.Time.DeltaTime);
 
             platform.Graphics.BeginFrame();
-            platform.Graphics.Clear(Color.CornflowerBlue);
+            platform.Graphics.Clear(BackgroundColor);
             game.Draw();
             // ★ ここでオーバーレイ
             if (showOverlay)

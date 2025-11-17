@@ -23,6 +23,7 @@ internal sealed class SimpleTestGame : IGame
 
     public void Draw()
     {
+        Drawing.Fill(Color.CornflowerBlue);
         if (_tex is null) return;
 
         // 画面中央あたりに描く（適当に）
@@ -49,7 +50,7 @@ internal static class Program
             VSync = false,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
-            GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
+            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
         };
 
         var platform = PlatformFactory.Create(config);

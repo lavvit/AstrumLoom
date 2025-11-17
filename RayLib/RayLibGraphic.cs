@@ -160,18 +160,31 @@ internal sealed class RayLibGraphics : IGraphics
         var thickness = Math.Max(1, options.Thickness);
         var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
+
+        var p1 = new Vector2((float)x1, (float)y1);
+        var p2 = new Vector2((float)x2, (float)y2);
+        var p3 = new Vector2((float)x3, (float)y3);
+
+        // 重心を計算
+        var cx = (p1.X + p2.X + p3.X) / 3f;
+        var cy = (p1.Y + p2.Y + p3.Y) / 3f;
+
+        // 各点の角度（重心基準）
+        double Angle(Vector2 p) => Math.Atan2((double)p.Y - cy, (double)p.X - cx);
+
+        var pts = new[] { p1, p2, p3 };
+        // 降順にソートすると時計回りになる
+        Array.Sort(pts, (a, b) => Angle(b).CompareTo(Angle(a)));
+
         if (options.Fill)
         {
-            DrawTriangle(
-                new Vector2((float)x1, (float)y1),
-                new Vector2((float)x2, (float)y2),
-                new Vector2((float)x3, (float)y3),
-                col);
+            DrawTriangle(pts[0], pts[1], pts[2], col);
         }
-        // 枠線はおまけ
-        DrawLineEx(new((float)x1, (float)y1), new((float)x2, (float)y2), thickness, col);
-        DrawLineEx(new((float)x2, (float)y2), new((float)x3, (float)y3), thickness, col);
-        DrawLineEx(new((float)x3, (float)y3), new((float)x1, (float)y1), thickness, col);
+
+        // 枠線は常に描画（おまけ）
+        DrawLineEx(pts[0], pts[1], thickness, col);
+        DrawLineEx(pts[1], pts[2], thickness, col);
+        DrawLineEx(pts[2], pts[0], thickness, col);
     }
 
     public void Text(double x, double y, string text,

@@ -13,6 +13,12 @@ internal sealed class RayLibFont : IFont
         Spec = spec;
 
         string path = GetFont(spec.NameOrPath, spec);
+        if (string.IsNullOrEmpty(path))
+        {
+            // 何も見つからなかったらデフォルトフォント
+            _font = GetFontDefault();
+            return;
+        }
 
         // Raylib: size は "baseSize" として渡す
         _font = LoadFontEx(path, spec.Size, null, 0);
@@ -34,8 +40,9 @@ internal sealed class RayLibFont : IFont
         var drawY = (int)(y + off.Y);
 
         Color color = options.Color ?? Color.White;
-        var c = new Raylib_cs.Color(color.R, color.G, color.B, color.A);
         var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        byte a = (byte)(color.A * opacity);
+        var c = new Raylib_cs.Color(color.R, color.G, color.B, a);
 
         DrawTextEx(_font, text, new System.Numerics.Vector2(drawX, drawY),
                    Spec.Size, 0, c);
