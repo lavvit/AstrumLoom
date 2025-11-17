@@ -15,17 +15,16 @@ public sealed class DxLibPlatform : IGamePlatform
     public ITime Time { get; }
 
     public bool ShouldClose { get; private set; }
-    public DxLibPlatform()
+    public DxLibPlatform(GameConfig config)
     {
         ChangeWindowMode(TRUE);                                 // ウィンドウモード
-        SetGraphMode(1280, 720, 32); // 解像度
+        SetGraphMode(config.Width, config.Height, 32); // 解像度
         SetBackgroundColor(0, 0, 0);                // デフォルト背景
         SetDrawScreen(DX_SCREEN_BACK);                  // 裏画面へ描画
+        SetWindowText(config.Title);                   // ウィンドウタイトル
         // 必要な設定いろいろ…
         if (DxLib_Init() < 0)
-        {
             throw new Exception("DxLib_Init failed");
-        }
 
         Time = new SimpleTime();
         Graphics = new DxLibGraphics(); // DummyGraphics の代わり

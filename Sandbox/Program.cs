@@ -37,10 +37,31 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        using var platform = new DxLibPlatform();
-        var game = new SimpleTestGame(platform);
-        var runner = new GameRunner(platform, game);
+        // ここでゲームごとの設定を書く
+        var config = new GameConfig
+        {
+            Title = "AstrumLoom Sandbox",
+            Width = 1280,
+            Height = 720,
+            VSync = false,
+            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
+        };
 
-        runner.Run();
+        using var platform = PlatformFactory.Create(config);
+        var game = new SimpleTestGame(platform);
+        using var host = new GameHost(config, platform, game);
+
+        host.Run();
+
     }
+}
+internal static class PlatformFactory
+{
+    public static IGamePlatform Create(GameConfig config)
+        => config.GraphicsBackend switch
+        {
+            GraphicsBackendKind.DxLib => new DxLibPlatform(config),
+            //GraphicsBackendKind.RayLib => new RayLibPlatform(config),
+            _ => throw new NotSupportedException()
+        };
 }
