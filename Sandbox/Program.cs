@@ -26,7 +26,7 @@ internal sealed class SimpleTestGame : IGame
         if (_tex is null) return;
 
         // 画面中央あたりに描く（適当に）
-        float x = 640 - _tex.Width / 2f;
+        float x = 640 - _tex.Width / 2f + 160f * (float)Math.Sin(_platform.Time.TotalTime);
         float y = 360 - _tex.Height / 2f;
 
         var g = _platform.Graphics;
@@ -48,12 +48,13 @@ internal static class Program
             Height = 720,
             VSync = false,
             ShowFpsOverlay = true,
+            TargetFps = 0, // 0 にすると無制限
             GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
         };
 
         var platform = PlatformFactory.Create(config);
         var game = new SimpleTestGame(platform);
-        Overlay.Set(new SandboxOverlay());
+        Overlay.Set(new SandboxOverlay(platform.Graphics));
         using var host = new GameHost(config, platform, game);
 
         host.Run();

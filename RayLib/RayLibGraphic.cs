@@ -28,6 +28,11 @@ internal sealed class RayLibTexture : ITexture
 
 internal sealed class RayLibGraphics : IGraphics
 {
+    public RayLibGraphics()
+    {
+        _defaultFont = CreateFont(new FontSpec("", 24));
+    }
+
     public ITexture LoadTexture(string path)
     {
         // 失敗時は Raylib が自前のエラーを出すので、ここではそのまま投げる
@@ -50,9 +55,7 @@ internal sealed class RayLibGraphics : IGraphics
 
     public void Clear(Color color)
     {
-        // AstrumLoom.Color → System.Drawing.Color → Raylib.Color
-        var dc = (System.Drawing.Color)color;
-        var rc = new RColor(dc.R, dc.G, dc.B, dc.A);
+        var rc = ToRay(color);
         ClearBackground(rc);
     }
 
@@ -83,7 +86,7 @@ internal sealed class RayLibGraphics : IGraphics
 
         DrawTextureEx(
             tex.Native,
-            new System.Numerics.Vector2(x, y),
+            new Vector2(x, y),
             rotationDeg,
             scale,
             RColor.White);
@@ -196,6 +199,11 @@ internal sealed class RayLibGraphics : IGraphics
 
     private static Vector2 MeasureTextInternal(string text, int fontSize)
         => MeasureTextEx(GetFontDefault(), text ?? "", fontSize, 1f);
+
+    private readonly IFont _defaultFont;
+    public IFont DefaultFont => _defaultFont;
+    public IFont CreateFont(FontSpec spec)
+        => new RayLibFont(spec);
 
     private static Vector2 AnchorOffset(ReferencePoint anchor, Vector2 size) => anchor switch
     {

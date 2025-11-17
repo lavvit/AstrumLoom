@@ -20,6 +20,12 @@ internal sealed class DxLibTexture : ITexture
 
 internal sealed class DxLibGraphics : IGraphics
 {
+    public DxLibGraphics()
+    {
+        // ここではとりあえず「Default」の 24px ぐらいを作っておく
+        _defaultFont = CreateFont(new FontSpec("", 24));
+    }
+
     public ITexture LoadTexture(string path)
     {
         // 画像読み込み
@@ -54,6 +60,7 @@ internal sealed class DxLibGraphics : IGraphics
 
     public void Clear(Color color)
     {
+        SetDrawScreen(DX_SCREEN_BACK);
         // AstrumLoom.Color → System.Drawing.Color にキャストできるのでそれを使う
         var c = (System.Drawing.Color)color;
         SetBackgroundColor(c.R, c.G, c.B);
@@ -195,12 +202,16 @@ internal sealed class DxLibGraphics : IGraphics
         var thickness = Math.Max(1, options.Thickness);
         var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
 
-        var (w, h) = MeasureText(text, fontSize);
-        var offset = AnchorToOffset(options.Point, w, h);
+        // まずフォントサイズだけ確定
+        EnsureFontSize(fontSize);
+
+        // サイズ計測（SetFontSize はもう中では呼ばない）
+        var (w, h) = MeasureTextInternal(text);
+
+        var offset = LayoutUtil.GetAnchorOffset(options.Point, w, h);
         float x1 = (float)(x - offset.X);
         float y1 = (float)(y - offset.Y);
 
-        SetFontSize(fontSize);
         SetFontThickness(thickness);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
 
@@ -210,34 +221,36 @@ internal sealed class DxLibGraphics : IGraphics
         SetDrawBlendMode((int)BlendMode.None, 255);
 
         SetFontThickness(1); // リセット
-        SetFontSize(16);
     }
 
-    public (int Width, int Height) MeasureText(string text, int fontSize = 20)
+    // ★フォントサイズ変更をしない内部版
+    private static (int Width, int Height) MeasureTextInternal(string text)
     {
-        SetFontSize(fontSize);
         GetDrawStringSize(out int w, out int h, out _, text, text.Length);
         return (w, h);
     }
 
-    private static System.Drawing.Point AnchorToOffset(ReferencePoint anchor, int w, int h)
+    public (int Width, int Height) MeasureText(string text, int fontSize = 16)
     {
-        return anchor switch
-        {
-            ReferencePoint.TopLeft => new(0, 0),
-            ReferencePoint.TopCenter => new(w / 2, 0),
-            ReferencePoint.TopRight => new(w, 0),
-            ReferencePoint.CenterLeft => new(0, h / 2),
-            ReferencePoint.Center => new(w / 2, h / 2),
-            ReferencePoint.CenterRight => new(w, h / 2),
-            ReferencePoint.BottomLeft => new(0, h),
-            ReferencePoint.BottomCenter => new(w / 2, h),
-            ReferencePoint.BottomRight => new(w, h),
-            _ => new(0, 0),
-        };
+        EnsureFontSize(fontSize);
+        return MeasureTextInternal(text);
     }
 
-    private static int GetBlendMode(BlendMode mode) => mode switch
+    private int _currentFontSize = -1;
+    private void EnsureFontSize(int fontSize)
+    {
+        if (_currentFontSize == fontSize) return; // 変わらないなら何もしない
+        SetFontSize(fontSize);
+        _currentFontSize = fontSize;
+    }
+
+    private readonly IFont _defaultFont;
+    public IFont DefaultFont => _defaultFont;
+    public IFont CreateFont(FontSpec spec)
+        => new DxLibFont(spec);
+
+
+    internal static int GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None or BlendMode.Alpha => DX_BLENDMODE_ALPHA,
         BlendMode.Add => DX_BLENDMODE_ADD,
@@ -246,6 +259,6 @@ internal sealed class DxLibGraphics : IGraphics
     };
 
     // ToDxColor は MultiBeat のやつをそのまま持ってきてOK
-    private static int ToDxColor(Color col)
+    internal static int ToDxColor(Color col)
         => (int)GetColor(col.R, col.G, col.B);
 }

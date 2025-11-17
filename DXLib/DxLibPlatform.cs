@@ -15,13 +15,24 @@ public sealed class DxLibPlatform : IGamePlatform
     public ITime Time { get; }
 
     public bool ShouldClose { get; private set; }
+
+    public bool VSync { get; private set; }
     public DxLibPlatform(GameConfig config)
     {
         ChangeWindowMode(TRUE);                                 // ウィンドウモード
+        SetWindowStyleMode(7);
         SetGraphMode(config.Width, config.Height, 32); // 解像度
         SetBackgroundColor(0, 0, 0);                // デフォルト背景
         SetDrawScreen(DX_SCREEN_BACK);                  // 裏画面へ描画
         SetWindowText(config.Title);                   // ウィンドウタイトル
+        SetAlwaysRunFlag(TRUE);                           // 非アクティブでも動かす
+        SetWaitVSyncFlag(0);                             // VSync 無効
+        VSync = config.VSync;
+
+        SetUseDirect3DVersion(DX_DIRECT3D_11);   // 11 を指定
+                                                 // ソフトウェアレンダにしてないか確認
+        SetUseSoftwareRenderModeFlag(0);
+
         // 必要な設定いろいろ…
         if (DxLib_Init() < 0)
             throw new Exception("DxLib_Init failed");
@@ -42,6 +53,7 @@ public sealed class DxLibPlatform : IGamePlatform
             return;
         }
 
+        WaitVSync(VSync ? 1 : 0);
         if (CheckHitKey(KEY_INPUT_ESCAPE) != 0)
         {
             ShouldClose = true;

@@ -12,6 +12,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     public void Run()
     {
         game.Initialize();
+        Drawing.Initialize(platform.Graphics);
 
         while (!platform.ShouldClose)
         {
@@ -28,6 +29,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             {
                 Overlay.Current.Draw(platform);
             }
+            Log.Draw(platform);
             platform.Graphics.EndFrame();
 
             platform.Time.EndFrame();

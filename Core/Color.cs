@@ -58,126 +58,12 @@ public readonly struct Color : IEquatable<Color>
         r = ToByte(v.X); g = ToByte(v.Y); b = ToByte(v.Z); a = ToByte(v.W);
     }
 
-    public Color(HSBColor color, float alpha = 1f)
-    {
-        double percent = color.Hue / 60.0;
-        int max = (int)(255 * color.Brightness);
-        int min = max - (int)(max * color.Saturation);
-        int m = max - min;
-        double d = percent - (int)percent;
-        int R, G, B;
-        switch ((int)percent % 6)
-        {
-            case 0:
-            default:
-                R = max;
-                G = (int)(m * d) + min;
-                B = min;
-                break;
-            case 1:
-                R = (int)(m * (1.0 - d)) + min;
-                G = max;
-                B = min;
-                break;
-            case 2:
-                R = min;
-                G = max;
-                B = (int)(m * d) + min;
-                break;
-            case 3:
-                R = min;
-                G = (int)(m * (1.0 - d)) + min;
-                B = max;
-                break;
-            case 4:
-                R = (int)(m * d) + min;
-                G = min;
-                B = max;
-                break;
-            case 5:
-                R = max;
-                G = min;
-                B = (int)(m * (1.0 - d)) + min;
-                break;
-        }
-
-        r = ClipToByte(R);
-        g = ClipToByte(G);
-        b = ClipToByte(B);
-        a = ClipToByte((int)MathF.Round(alpha * 255f));
-
-    }
-    public Color(Rainbow color, float alpha = 1f)
-        : this(color.Color, alpha) { }
-
     private static byte ToByte(float f) => ClipToByte((int)MathF.Round(f * 255f));
     private static byte ClipToByte(int v) => (byte)(v < 0 ? 0 : (v > 255 ? 255 : v));
 
     public DrawingColor ToDrawingColor() => DrawingColor.FromArgb(a, r, g, b);
 
     public Vector4 ToVector4() => new(r / 255f, g / 255f, b / 255f, a / 255f);
-
-    // HSBColor and Rainbow left mostly unchanged
-    public struct HSBColor
-    {
-        public double Hue, Saturation, Brightness;
-        public HSBColor(double hue, double saturation, double brightness)
-        {
-            Hue = hue % 360;
-            Saturation = saturation;
-            Brightness = brightness;
-        }
-        public HSBColor(Color color)
-        {
-            double r = color.R / 255.0;
-            double g = color.G / 255.0;
-            double b = color.B / 255.0;
-            double max = Math.Max(r, Math.Max(g, b));
-            double min = Math.Min(r, Math.Min(g, b));
-            double delta = max - min;
-            // Hue
-            Hue = delta == 0 ? 0 : max == r ? 60 * ((g - b) / delta % 6) : max == g ? 60 * ((b - r) / delta + 2) : 60 * ((r - g) / delta + 4);
-            if (Hue < 0)
-            {
-                Hue += 360;
-            }
-            // Saturation
-            Saturation = (max == 0) ? 0 : (delta / max);
-            // Brightness
-            Brightness = max;
-        }
-    }
-    public HSBColor ToHSB()
-    {
-        float fr = R / 255f;
-        float fg = G / 255f;
-        float fb = B / 255f;
-        float max = MathF.Max(fr, MathF.Max(fg, fb));
-        float min = MathF.Min(fr, MathF.Min(fg, fb));
-        float delta = max - min;
-        float h = 0f;
-        if (delta != 0f)
-        {
-            if (max == fr)
-            {
-                h = (fg - fb) / delta;
-                if (h < 0f) h += 6f;
-            }
-            else
-            {
-                h = max == fg ? 2f + (fb - fr) / delta : 4f + (fr - fg) / delta;
-            }
-            h *= 60f;
-        }
-        float s = max == 0f ? 0f : delta / max;
-        float b = max;
-        return new HSBColor(h, s, b);
-    }
-
-    public static Color FromHSB(double hue, double saturation, double brightness, float alpha = 1f)
-        => new(new HSBColor(hue, saturation, brightness), alpha);
-    public static Color FromHSB(HSBColor color, float alpha = 1f) => new(color, alpha);
-    public static Color FromRainbow(Rainbow color, float alpha = 1f) => new(color, alpha);
 
     /// <summary>
     /// Return a premultiplied color (RGB multiplied by alpha).
@@ -197,7 +83,8 @@ public readonly struct Color : IEquatable<Color>
     public Color WithAlpha(float alpha) => new(r, g, b, (int)MathF.Round(alpha * 255f));
 
     public static Color FromDrawing(DrawingColor d) => new(d.R, d.G, d.B, d.A);
-    public static Color FromArgb(int r, int g, int b, int a = 255) => new(r, g, b, a);
+    public static Color FromRGB(int r, int g, int b) => new(r, g, b, 255);
+    public static Color FromARGB(int a, int r, int g, int b) => new(r, g, b, a);
     public static Color FromHex(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) throw new ArgumentNullException(nameof(hex));
@@ -264,12 +151,8 @@ public readonly struct Color : IEquatable<Color>
 
         return false;
     }
-    public static Color Parse(string input) => TryParse(input, out var color) ? color : White;
-    public static Color Parse(int hex)
-    {
-        var dc = DrawingColor.FromArgb(hex);
-        return FromDrawing(dc);
-    }
+    public static Color Parse(string? input) => TryParse(input, out var color) ? color : White;
+    public static Color Parse(int hex) => FromDrawing(DrawingColor.FromArgb(hex));
 
     public static Color Lerp(Color a, Color b, float t)
     {
@@ -282,242 +165,112 @@ public readonly struct Color : IEquatable<Color>
         );
     }
 
-    /// <summary>
-    /// HSB空間で補間する。
-    /// - t: 0..1 の補間係数
-    /// - shortest: true の場合は色相を最短回りで補間する（360度ラップを考慮）
-    /// </summary>
-    public static Color LerpHSB(Color a, Color b, float t, bool shortest = true)
+
+
+    // HSBColor and Rainbow left mostly unchanged
+    public struct HSBColor
     {
-        // clamp t
-        t = t < 0f ? 0f : (t > 1f ? 1f : t);
-
-        var ha = a.ToHSB();
-        var hb = b.ToHSB();
-
-        double h1 = ha.Hue;
-        double h2 = hb.Hue;
-        double dh = h2 - h1;
-
-        if (shortest)
+        public double Hue, Saturation, Brightness;
+        public HSBColor(double hue, double saturation, double brightness)
         {
-            if (dh > 180.0) dh -= 360.0;
-            else if (dh < -180.0) dh += 360.0;
+            Hue = hue % 360;
+            Saturation = saturation;
+            Brightness = brightness;
         }
-
-        double h = h1 + dh * t;
-        // normalize to [0,360)
-        h = (h + 360.0) % 360.0;
-
-        double s = ha.Saturation + (hb.Saturation - ha.Saturation) * t;
-        double v = ha.Brightness + (hb.Brightness - ha.Brightness) * t;
-
-        float alpha = (a.A + (b.A - a.A) * t) / 255f;
-
-        return FromHSB(h, s, v, alpha);
-    }
-
-    #region oklab/oklch
-    // ===== OKLab / OKLCH 変換＆知覚補間 =====
-    private struct OKLab { public float L, a, b; public OKLab(float L, float a, float b) { this.L = L; this.a = a; this.b = b; } }
-    private struct OKLCH { public float L, C, h; public OKLCH(float L, float C, float h) { this.L = L; this.C = C; this.h = h; } }
-    #region oklab
-    // sRGB(0..255) -> Linear(0..1)
-    private static float SrgbToLinear(float c)
-        => (c <= 0.04045f) ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
-
-    // Linear(0..1) -> sRGB(0..1)
-    private static float LinearToSrgb(float c)
-    {
-        c = c < 0f ? 0f : (c > 1f ? 1f : c);
-        return (c <= 0.0031308f) ? 12.92f * c : 1.055f * MathF.Pow(c, 1f / 2.4f) - 0.055f;
-    }
-
-    // sRGB(0..255) -> OKLab
-    private static OKLab RgbToOKLab(Color c)
-    {
-        // 1) to linear sRGB (0..1)
-        float r = SrgbToLinear(c.R / 255f);
-        float g = SrgbToLinear(c.G / 255f);
-        float b = SrgbToLinear(c.B / 255f);
-
-        // 2) linear sRGB -> LMS (OKLab)
-        float l = 0.4122214708f * r + 0.5363325363f * g + 0.0514459929f * b;
-        float m = 0.2119034982f * r + 0.6806995451f * g + 0.1073969566f * b;
-        float s = 0.0883024619f * r + 0.2817188376f * g + 0.6299787005f * b;
-
-        float l_ = MathF.Cbrt(l);
-        float m_ = MathF.Cbrt(m);
-        float s_ = MathF.Cbrt(s);
-
-        float L = 0.2104542553f * l_ + 0.7936177850f * m_ - 0.0040720468f * s_;
-        float A = 1.9779984951f * l_ - 2.4285922050f * m_ + 0.4505937099f * s_;
-        float B = 0.0259040371f * l_ + 0.7827717662f * m_ - 0.8086757660f * s_;
-        return new OKLab(L, A, B);
-    }
-
-    // OKLab -> sRGB(0..255)（単純クリップでガマット内に収める）
-    private static Color OKLabToRgb(OKLab lab, byte alpha)
-    {
-        float l_ = lab.L + 0.3963377774f * lab.a + 0.2158037573f * lab.b;
-        float m_ = lab.L - 0.1055613458f * lab.a - 0.0638541728f * lab.b;
-        float s_ = lab.L - 0.0894841775f * lab.a - 1.2914855480f * lab.b;
-
-        float l = l_ * l_ * l_;
-        float m = m_ * m_ * m_;
-        float s = s_ * s_ * s_;
-
-        float r_lin = +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
-        float g_lin = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
-        float b_lin = -0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s;
-
-        int r = (int)MathF.Round(LinearToSrgb(r_lin) * 255f);
-        int g = (int)MathF.Round(LinearToSrgb(g_lin) * 255f);
-        int b = (int)MathF.Round(LinearToSrgb(b_lin) * 255f);
-        return new Color(r, g, b, alpha);
-    }
-
-    private static OKLCH OKLabToOKLCH(OKLab lab)
-    {
-        float C = MathF.Sqrt(lab.a * lab.a + lab.b * lab.b);
-        float h = MathF.Atan2(lab.b, lab.a) * (180f / MathF.PI);
-        if (h < 0f) h += 360f;
-        return new OKLCH(lab.L, C, h);
-    }
-
-    private static OKLab OKLCHToOKLab(OKLCH lch)
-    {
-        float a = lch.C * MathF.Cos(lch.h * MathF.PI / 180f);
-        float b = lch.C * MathF.Sin(lch.h * MathF.PI / 180f);
-        return new OKLab(lch.L, a, b);
-    }
-
-    public static Color LerpOKLab(Color a, Color b, float t)
-    {
-        t = t < 0f ? 0f : (t > 1f ? 1f : t);
-        var la = RgbToOKLab(a);
-        var lb = RgbToOKLab(b);
-        float L = la.L + (lb.L - la.L) * t;
-        float A = la.a + (lb.a - la.a) * t;
-        float B = la.b + (lb.b - la.b) * t;
-        var mid = new OKLab(L, A, B);
-        byte alpha = (byte)MathF.Round(a.A + (b.A - a.A) * t);
-        return OKLabToRgb(mid, alpha);
-    }
-    #endregion
-    #region oklch
-    public static Color LerpOKLCH(Color a, Color b, float t)
-    {
-        t = Math.Clamp(t, 0f, 1f);
-        var la = OKLabToOKLCH(RgbToOKLab(a));
-        var lb = OKLabToOKLCH(RgbToOKLab(b));
-
-        // Hue 補間（角度）。longArc指定なら長い方の弧で回す
-        (float h1, float h2) = OKLCHHue(a, b, HueRoute.Shortest);//Math.Round(difH, 0) < 0.5f
-
-        float L = la.L + (lb.L - la.L) * t;
-        float C = la.C + (lb.C - la.C) * t;
-        float h = h1 + (h2 - h1) * t;
-        // wrap
-        h = (h + 360f) % 360f;
-
-        var mid = OKLCHToOKLab(new OKLCH(L, C, h));
-        byte alpha = (byte)MathF.Round(a.A + (b.A - a.A) * t);
-        return OKLabToRgb(mid, alpha);
-    }
-    /// <summary>
-    /// OKLCH（知覚的）で補間。赤→シアンを「紫側」で回したい時は throughMagenta=true。
-    /// </summary>
-    private static (float h1, float h2) OKLCHHue(Color a, Color b, HueRoute route)
-    {
-        var la = OKLabToOKLCH(RgbToOKLab(a));
-        var lb = OKLabToOKLCH(RgbToOKLab(b));
-        // Hue 補間（角度）。longArc指定なら長い方の弧で回す
-        float h1 = la.h;
-        float h2 = lb.h;
-
-        float epsilonDeg = 0.5f;   // 180°近傍の“揺れ止め”幅
-
-        float dh = h2 - h1;
-
-        // 角度の正規化（-180..180]
-        while (dh > 180f) dh -= 360f;
-        while (dh <= -180f) dh += 360f;
-
-        // 180度差の場合、長い方に回すことも(赤->シアンを紫側に回す)
-        float ah = (float)new HSBColor(a).Hue;
-        float bh = (float)new HSBColor(b).Hue;
-        float difH = MathF.Abs(MathF.Abs(bh - ah) - 180f);
-
-        switch (route)
+        public HSBColor(Color color)
         {
-            case HueRoute.ViaMagenta:     // 必ず“長い弧”（紫側）へ
-                {
-                    float h3 = MathF.Abs(MathF.Max(h2 - h1, h1 - h2) - 180f);
-                    float minH = MathF.Min(h2, h1);
-                    if (minH < 60f && MathF.Abs(difH) < epsilonDeg)
-                    {
-                        // 短い方の弧なので、長い方に回す
-                        if (h2 > h1)
-                            h2 -= 360f;
-                        else
-                            h2 += 360f;
-                    }
-                }
-                break;
-
-            case HueRoute.ViaGreen:       // 必ず“長い弧”（緑側）へ
-                dh = (dh > 0) ? dh + 360f : dh - 360f;
-                break;
-
-            case HueRoute.Shortest:
-                if (h2 - h1 > 180f)
-                    h2 -= 360f;
-                if (h2 - h1 < -180f)
-                    h2 += 360f;
-                break;
-        }
-        /*if (throughMagenta)
-        {
-            float minH = MathF.Min(h2, h1);
-            float centerH = (h1 + h2) / 2f;
-            log += $"\n (HSB Δ180近似 detected, minH={minH:F2}, centerH={centerH:F2})";
-            if (minH < 60f)
+            double r = color.R / 255.0;
+            double g = color.G / 255.0;
+            double b = color.B / 255.0;
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            double delta = max - min;
+            // Hue
+            Hue = delta == 0 ? 0 : max == r ? 60 * ((g - b) / delta % 6) : max == g ? 60 * ((b - r) / delta + 2) : 60 * ((r - g) / delta + 4);
+            if (Hue < 0)
             {
-                // 短い方の弧なので、長い方に回す
-                if (h2 > h1)
-                {
-                    h2 -= 360f;
-                    log += "\n (adjusted -)";
-                }
-                else
-                {
-                    h2 += 360f;
-                    log += "\n (adjusted +)";
-                }
+                Hue += 360;
             }
+            // Saturation
+            Saturation = (max == 0) ? 0 : (delta / max);
+            // Brightness
+            Brightness = max;
         }
-        else
+
+        public readonly Color ToColor(float alpha = 1f)
         {
-        }*/
-        return (h1, h2);
+            double percent = Hue / 60.0;
+            int max = (int)(255 * Brightness);
+            int min = max - (int)(max * Saturation);
+            int m = max - min;
+            double d = percent - (int)percent;
+            int R, G, B;
+            switch ((int)percent % 6)
+            {
+                case 0:
+                default:
+                    R = max;
+                    G = (int)(m * d) + min;
+                    B = min;
+                    break;
+                case 1:
+                    R = (int)(m * (1.0 - d)) + min;
+                    G = max;
+                    B = min;
+                    break;
+                case 2:
+                    R = min;
+                    G = max;
+                    B = (int)(m * d) + min;
+                    break;
+                case 3:
+                    R = min;
+                    G = (int)(m * (1.0 - d)) + min;
+                    B = max;
+                    break;
+                case 4:
+                    R = (int)(m * d) + min;
+                    G = min;
+                    B = max;
+                    break;
+                case 5:
+                    R = max;
+                    G = min;
+                    B = (int)(m * (1.0 - d)) + min;
+                    break;
+            }
+            return new Color(R, G, B, alpha);
+        }
     }
-    // 補助：-180..180 に正規化
-    private static float Norm180(float a)
+    public HSBColor ToHSB()
     {
-        while (a > 180f) a -= 360f;
-        while (a <= -180f) a += 360f;
-        return a;
+        float fr = R / 255f;
+        float fg = G / 255f;
+        float fb = B / 255f;
+        float max = MathF.Max(fr, MathF.Max(fg, fb));
+        float min = MathF.Min(fr, MathF.Min(fg, fb));
+        float delta = max - min;
+        float h = 0f;
+        if (delta != 0f)
+        {
+            if (max == fr)
+            {
+                h = (fg - fb) / delta;
+                if (h < 0f) h += 6f;
+            }
+            else
+            {
+                h = max == fg ? 2f + (fb - fr) / delta : 4f + (fr - fg) / delta;
+            }
+            h *= 60f;
+        }
+        float s = max == 0f ? 0f : delta / max;
+        float b = max;
+        return new HSBColor(h, s, b);
     }
-    // 補助：0..1 のスムースステップ
-    private static float SmoothStep(float a, float b, float x)
-    {
-        float t = Math.Clamp((x - a) / (b - a), 0f, 1f);
-        return t * t * (3f - 2f * t);
-    }
-    public enum HueRoute { Shortest, ViaMagenta, ViaGreen }
-    #endregion
-    #endregion
+
+    public static Color FromHSB(double hue, double saturation, double brightness, float alpha = 1f)
+        => new HSBColor(hue, saturation, brightness).ToColor(alpha);
 
     // 背景色と被らない色
     public static Color VisibleColor(Color color)
@@ -528,6 +281,12 @@ public readonly struct Color : IEquatable<Color>
         return brightness >= 128 ? Black : White;
     }
     public static Color Invert(Color color) => new(255 - color.R, 255 - color.G, 255 - color.B, color.A);
+    public static Color Grayscale(Color color)
+    {
+        int gray = (int)MathF.Round((color.R * 0.299f + color.G * 0.587f + color.B * 0.114f));
+        return new Color(gray, gray, gray, color.A);
+    }
+
 
     public override string ToString() => $"R:{R} G:{G} B:{B} A:{A}";
 
@@ -1129,14 +888,4 @@ public readonly struct Color : IEquatable<Color>
     #endregion
 
     internal readonly string DebugDisplayString => $"{R}  {G}  {B}  {A}";
-}
-public struct Rainbow(float potition, float white = 0, float black = 0)
-{
-    internal Color.HSBColor Color = new(potition % 360, 1.0 - white, 1.0 - black);
-
-    public Rainbow(double prog, float potition = 0, float white = 0, float black = 0, bool reverse = false)
-        : this((potition +
-              (reverse ? -360 * (float)prog + 360
-              : 360 * (float)prog)) % 360, white, black)
-    { }
 }
