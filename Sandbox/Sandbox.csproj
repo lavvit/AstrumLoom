@@ -11,4 +11,9 @@
 
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Core\AstrumLoom.csproj" />
+    <ProjectReference Include="..\DXLib\AstrumLoom.DXLib.csproj" />
+  </ItemGroup>
+
 </Project>
