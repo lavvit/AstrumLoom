@@ -29,7 +29,15 @@ internal sealed class SimpleTestGame : IGame
         float x = 640 - _tex.Width / 2f;
         float y = 360 - _tex.Height / 2f;
 
-        _platform.Graphics.DrawTexture(_tex, x, y);
+        var g = _platform.Graphics;
+
+        //g.DrawTexture(_tex, x, y);
+
+        g.Box(100, 100, 300, 200, Color.White, fill: false, thickness: 3);
+        g.Circle(640, 360, 80, Color.Red, fill: false, thickness: 4);
+        g.Text(640, 80, "DXLib / Raylib", 32, Color.White, ReferencePoint.TopCenter);
+        g.Cross(640, 360, 40, Color.Lime);
+
     }
 }
 

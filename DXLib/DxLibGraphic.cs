@@ -1,0 +1,226 @@
+﻿using static DxLibDLL.DX;
+
+namespace AstrumLoom.DXLib;
+
+
+
+internal sealed class DxLibTexture : ITexture
+{
+    public int Handle { get; }
+    public int Width { get; }
+    public int Height { get; }
+
+    public DxLibTexture(int handle, int width, int height)
+    {
+        Handle = handle;
+        Width = width;
+        Height = height;
+    }
+}
+
+internal sealed class DxLibGraphics : IGraphics
+{
+    public ITexture LoadTexture(string path)
+    {
+        // 画像読み込み
+        int handle = LoadGraph(path);
+        if (handle < 0)
+        {
+            throw new Exception($"LoadGraph failed: {path}");
+        }
+
+        // サイズ取得
+        if (GetGraphSize(handle, out int w, out int h) != 0)
+        {
+            // 失敗してもとりあえず 0 のまま返す
+            w = h = 0;
+        }
+
+        return new DxLibTexture(handle, w, h);
+    }
+
+    public void UnloadTexture(ITexture texture)
+    {
+        if (texture is DxLibTexture tex)
+        {
+            DeleteGraph(tex.Handle);
+        }
+    }
+
+    public void BeginFrame()
+    {
+        // 今は特に何もしない（必要ならここで状態リセット）
+    }
+
+    public void Clear(Color color)
+    {
+        // AstrumLoom.Color → System.Drawing.Color にキャストできるのでそれを使う
+        var c = (System.Drawing.Color)color;
+        SetBackgroundColor(c.R, c.G, c.B);
+        ClearDrawScreen();
+    }
+
+    public void DrawTexture(
+        ITexture texture,
+        float x, float y,
+        float scaleX = 1f,
+        float scaleY = 1f,
+        float rotationRad = 0f)
+    {
+        if (texture is not DxLibTexture tex) return;
+
+        int ix = (int)x;
+        int iy = (int)y;
+
+        bool noRotate = Math.Abs(rotationRad) < 0.0001f;
+
+        // 1. 拡大縮小も回転もなし → DrawGraph
+        if (Math.Abs(scaleX - 1f) < 0.0001f &&
+            Math.Abs(scaleY - 1f) < 0.0001f &&
+            noRotate)
+        {
+            DrawGraph(ix, iy, tex.Handle, TRUE);
+            return;
+        }
+
+        // 2. 回転なし・拡大縮小あり → DrawExtendGraph
+        if (noRotate)
+        {
+            int x2 = ix + (int)(tex.Width * scaleX);
+            int y2 = iy + (int)(tex.Height * scaleY);
+            DrawExtendGraph(ix, iy, x2, y2, tex.Handle, TRUE);
+            return;
+        }
+
+        // 3. 回転あり → 中心回りに回転させる
+        double cx = tex.Width * 0.5;
+        double cy = tex.Height * 0.5;
+        double rad = rotationRad;
+
+        DrawRotaGraph2F(
+            (float)(ix + cx),
+            (float)(iy + cy),
+            (float)cx,
+            (float)cy,
+            scaleX,
+            (float)rad,
+            tex.Handle,
+            TRUE);
+    }
+
+    public void EndFrame() => ScreenFlip();
+
+
+    public void Blackout(double opacity = 1.0, Color? color = null)
+    {
+        Box(0, 0, 1280, 720, new()
+        {
+            Color = color ?? Color.Black,
+            Opacity = opacity,
+            Fill = true
+        });
+    }
+
+    public void Line(double x, double y, double dx, double dy,
+        DrawOptions options)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        DrawLineAA((float)x, (float)y, (float)(x + dx), (float)(y + dy), (uint)c, options.Thickness);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+    }
+
+    public void Box(double x, double y, double width, double height,
+        DrawOptions options)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        DrawBoxAA((float)x, (float)y, (float)(x + width), (float)(y + height),
+                  (uint)c, options.Fill ? TRUE : FALSE, options.Thickness);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+    }
+
+    public void Circle(double x, double y, double radius,
+        DrawOptions options, int segments = 64)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        DrawCircleAA((float)x, (float)y, (float)radius, segments,
+                (uint)c, options.Fill ? TRUE : FALSE, options.Thickness);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+    }
+
+    public void Oval(double x, double y, double rx, double ry,
+        DrawOptions options, int segments = 64)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        DrawOvalAA((float)x, (float)y, (float)rx, (float)ry, segments,
+            (uint)c, options.Fill ? TRUE : FALSE);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+    }
+
+    public void Triangle(double x1, double y1, double x2, double y2, double x3, double y3,
+        DrawOptions options)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+        SetDrawBlendMode((int)options.Blend, (int)(255.0 * options.Opacity));
+        DrawTriangleAA((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3,
+                       (uint)c, options.Fill ? TRUE : FALSE);
+        SetDrawBlendMode((int)BlendMode.None, 255);
+    }
+
+    // Text
+    public void Text(double x, double y, string text, int fontSize,
+        DrawOptions options)
+    {
+        var use = options.Color ?? Color.White;
+        int c = ToDxColor(use);
+
+        var (w, h) = MeasureText(text, fontSize);
+        var offset = AnchorToOffset(options.Point, w, h);
+        float x1 = (float)(x - offset.X);
+        float y1 = (float)(y - offset.Y);
+
+        SetFontSize(fontSize);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, (int)(255.0 * options.Opacity));
+
+        // 縁取りは「ずらし描き」で実装してもいいし、最初はナシでもOK
+        DrawString((int)x1, (int)y1, text, (uint)c);
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
+    }
+
+    public (int Width, int Height) MeasureText(string text, int fontSize = 20)
+    {
+        SetFontSize(fontSize);
+        GetDrawStringSize(out int w, out int h, out _, text, text.Length);
+        return (w, h);
+    }
+
+    private static System.Drawing.Point AnchorToOffset(ReferencePoint anchor, int w, int h)
+    {
+        return anchor switch
+        {
+            ReferencePoint.TopLeft => new(0, 0),
+            ReferencePoint.TopCenter => new(w / 2, 0),
+            ReferencePoint.TopRight => new(w, 0),
+            ReferencePoint.CenterLeft => new(0, h / 2),
+            ReferencePoint.Center => new(w / 2, h / 2),
+            ReferencePoint.CenterRight => new(w, h / 2),
+            ReferencePoint.BottomLeft => new(0, h),
+            ReferencePoint.BottomCenter => new(w / 2, h),
+            ReferencePoint.BottomRight => new(w, h),
+            _ => new(0, 0),
+        };
+    }
+
+    // ToDxColor は MultiBeat のやつをそのまま持ってきてOK
+    private static int ToDxColor(Color col)
+        => (int)GetColor(col.R, col.G, col.B);
+}
