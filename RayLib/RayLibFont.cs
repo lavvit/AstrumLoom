@@ -36,11 +36,11 @@ internal sealed class RayLibFont : IFont
         var (w, h) = Measure(text);
         var off =
             LayoutUtil.GetAnchorOffset(options.Point, w, h);
-        var drawX = (int)(x + off.X);
-        var drawY = (int)(y + off.Y);
+        int drawX = (int)(x + off.X);
+        int drawY = (int)(y + off.Y);
 
-        Color color = options.Color ?? Color.White;
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var color = options.Color ?? Color.White;
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         byte a = (byte)(color.A * opacity);
         var c = new Raylib_cs.Color(color.R, color.G, color.B, a);
 
@@ -48,10 +48,7 @@ internal sealed class RayLibFont : IFont
                    Spec.Size, 0, c);
     }
 
-    public void Dispose()
-    {
-        UnloadFont(_font);
-    }
+    public void Dispose() => UnloadFont(_font);
 
     private static string GetFont(string? font, FontSpec spec)
     {

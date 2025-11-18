@@ -61,10 +61,7 @@ public sealed class DxLibPlatform : IGamePlatform
         WaitVSync(VSync ? 1 : 0);
     }
 
-    public void Close()
-    {
-        ShouldClose = true;
-    }
+    public void Close() => ShouldClose = true;
 
     public void Dispose() => DxLib_End();
 

@@ -2,7 +2,6 @@
 
 namespace AstrumLoom;
 
-
 public class Log
 {
     public static List<LogEntry> LogMessages = [];
@@ -23,7 +22,6 @@ public class Log
     public static void Error(string message) => Write(message, LogLevel.Error, true);
     public static void Debug(string message, bool timestamp = false) => Write(message, LogLevel.Debug, timestamp);
     public static void EmptyLine() => Write("");
-
 
     public static void Clear() => LogMessages.Clear();
     public static void Save(string filePath)
@@ -113,7 +111,6 @@ public class LogEntry(string message, LogLevel level)
         _ => Color.White,
     };
 }
-
 
 public enum LogLevel
 {

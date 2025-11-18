@@ -165,8 +165,6 @@ public readonly struct Color : IEquatable<Color>
         );
     }
 
-
-
     // HSBColor and Rainbow left mostly unchanged
     public struct HSBColor
     {
@@ -283,10 +281,9 @@ public readonly struct Color : IEquatable<Color>
     public static Color Invert(Color color) => new(255 - color.R, 255 - color.G, 255 - color.B, color.A);
     public static Color Grayscale(Color color)
     {
-        int gray = (int)MathF.Round((color.R * 0.299f + color.G * 0.587f + color.B * 0.114f));
+        int gray = (int)MathF.Round(color.R * 0.299f + color.G * 0.587f + color.B * 0.114f);
         return new Color(gray, gray, gray, color.A);
     }
-
 
     public override string ToString() => $"R:{R} G:{G} B:{B} A:{A}";
 

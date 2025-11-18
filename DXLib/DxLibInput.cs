@@ -78,7 +78,6 @@ internal sealed class DxLibInput : IInput
         Key.Y => KEY_INPUT_Y,
         Key.Z => KEY_INPUT_Z,
 
-
         Key.At => KEY_INPUT_AT,
         Key.SemiColon => KEY_INPUT_SEMICOLON,
         Key.Colon => KEY_INPUT_COLON,
@@ -211,7 +210,6 @@ internal sealed class DxLibTextInput : ITextInput
         }
         Selection = new TextSelection(-1, -1);
 
-
         // ここで MakeKeyInput / SetActiveKeyInput / SetUseIMEFlag などを呼ぶ
         IsActive = true;
     }
@@ -242,20 +240,15 @@ internal sealed class DxLibTextInput : ITextInput
 
         // Protect Builder null when calling native GetIMEInputModeStr
         var tmpBuilder = Builder ?? new StringBuilder();
-        int imeMode = 0;
+        int imeMode;
         try { imeMode = GetIMEInputModeStr(tmpBuilder); } catch { imeMode = 0; }
         if (caret)
         {
-            Color cursorcol;
-            switch (imeMode)
+            var cursorcol = imeMode switch
             {
-                case 0:
-                    cursorcol = Color.Yellow;
-                    break;
-                default:
-                    cursorcol = color ?? Color.White;
-                    break;
-            }
+                0 => Color.Yellow,
+                _ => color ?? Color.White,
+            };
             Drawing.Box(w + x, y, 2, h, cursorcol);
         }
         font.Draw(x, y, currentText, color);
@@ -272,7 +265,7 @@ internal sealed class DxLibTextInput : ITextInput
     {
         if (IsActive && Handle > 0)
         {
-            var result = DeleteKeyInput(Handle);
+            int result = DeleteKeyInput(Handle);
             if (result == 0)
             {
                 IsActive = false;
@@ -296,7 +289,7 @@ internal sealed class DxLibTextInput : ITextInput
         }
         if (GetDragFileNum() > 0)
         {
-            StringBuilder sb = new StringBuilder("", 256);
+            var sb = new StringBuilder("", 256);
             if (GetDragFilePath(sb) == 0)
             {
                 Text += sb.ToString();
@@ -312,19 +305,14 @@ internal sealed class DxLibTextInput : ITextInput
         get
         {
             if (!IsActive || Handle <= 0) return KeyInputState.Error;
-            var result = CheckKeyInput(Handle);
-            switch (result)
+            int result = CheckKeyInput(Handle);
+            return result switch
             {
-                case 0:
-                    return KeyInputState.Typing;
-                case 1:
-                    return KeyInputState.Finished;
-                case 2:
-                    return KeyInputState.Canceled;
-                case -1:
-                default:
-                    return KeyInputState.Error;
-            }
+                0 => KeyInputState.Typing,
+                1 => KeyInputState.Finished,
+                2 => KeyInputState.Canceled,
+                _ => KeyInputState.Error,
+            };
         }
     }
 
@@ -363,7 +351,7 @@ internal sealed class DxLibTextInput : ITextInput
         get
         {
             if (!IsActive || Handle <= 0) return new TextSelection(-1, -1);
-            GetKeyInputSelectArea(out var s, out var e, Handle);
+            GetKeyInputSelectArea(out int s, out int e, Handle);
             return new TextSelection(s, e);
         }
 

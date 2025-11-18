@@ -173,57 +173,50 @@ internal sealed class RayLibTextInput : ITextInput
     // Raylib には組み込みのテキスト入力管理機能がないため、
     // 独自実装が必要になる。
     // ここでは簡易的な実装例を示す。
-    private bool _isActive;
     private StringBuilder _textBuilder = new();
-    private int _cursor;
-    private TextSelection _selection = new(0, 0);
     private TextInputOptions _options = new();
-    public bool IsActive => _isActive;
+    public bool IsActive { get; private set; }
     public string Text => _textBuilder.ToString();
-    public int Cursor => _cursor;
-    public TextSelection Selection => _selection;
+    public int Cursor { get; private set; }
+    public TextSelection Selection { get; private set; } = new(0, 0);
     public void Begin(TextInputOptions options)
     {
         _options = options;
         _textBuilder.Clear();
         _textBuilder.Append(options.InitialText);
-        _cursor = options.InitialText.Length;
-        _selection = new TextSelection(_cursor, _cursor);
-        _isActive = true;
+        Cursor = options.InitialText.Length;
+        Selection = new TextSelection(Cursor, Cursor);
+        IsActive = true;
     }
     public void Cancel()
     {
         if (_options.EscapeCancelable)
         {
-            _isActive = false;
+            IsActive = false;
         }
     }
-    public void Commit()
-    {
-        _isActive = false;
-    }
+    public void Commit() => IsActive = false;
     public KeyInputState KeyState
     {
         get
         {
-            if (!_isActive) return KeyInputState.Error;
+            if (!IsActive) return KeyInputState.Error;
 
             // Enter 確定
             if (IsKeyPressed(KeyboardKey.Enter))
                 return KeyInputState.Finished;
 
             // Esc キャンセル
-            if (_options.EscapeCancelable &&
-                IsKeyPressed(KeyboardKey.Escape))
-                return KeyInputState.Canceled;
-
-            return KeyInputState.Typing;
+            return _options.EscapeCancelable &&
+                IsKeyPressed(KeyboardKey.Escape)
+                ? KeyInputState.Canceled
+                : KeyInputState.Typing;
         }
     }
 
     public void Update()
     {
-        if (!_isActive) return;
+        if (!IsActive) return;
         int key = GetCharPressed();
         while (key != 0)
         {
@@ -231,27 +224,27 @@ internal sealed class RayLibTextInput : ITextInput
             // 簡易的にバイト数制限のみ考慮
             if ((ulong)_textBuilder.Length < _options.MaxLength)
             {
-                _textBuilder.Insert(_cursor, c);
-                _cursor++;
+                _textBuilder.Insert(Cursor, c);
+                Cursor++;
             }
             key = GetCharPressed();
         }
         // バックスペース処理
-        if (IsKeyPressed(KeyboardKey.Backspace) && _cursor > 0)
+        if (IsKeyPressed(KeyboardKey.Backspace) && Cursor > 0)
         {
-            _textBuilder.Remove(_cursor - 1, 1);
-            _cursor--;
+            _textBuilder.Remove(Cursor - 1, 1);
+            Cursor--;
         }
     }
     public void Draw(double x = 0, double y = 0, Color? color = null, IFont font = null!, bool caret = true)
     {
-        if (!_isActive) return;
+        if (!IsActive) return;
         string displayText = _textBuilder.ToString();
-        Color drawColor = color ?? Color.Black;
+        var drawColor = color ?? Color.Black;
         font.Draw(x, y, displayText, drawColor);
         // キャレットの描画（簡易的に固定幅フォントを想定）
         if (!caret) return;
-        (int caretX, int height) = font.Measure(displayText[.._cursor]);
+        (int caretX, int height) = font.Measure(displayText[..Cursor]);
         if (height == 0) height = font.Measure("aあ").height;
         Drawing.Line((int)x + caretX, (int)y, 0, height, drawColor, thickness: 2);
     }

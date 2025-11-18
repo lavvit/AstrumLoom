@@ -23,7 +23,6 @@ public interface IGraphics
 
     void EndFrame();
 
-
     // --- 追加: 図形 ---
     void Blackout(double opacity = 1.0, Color? color = null);
 
@@ -61,7 +60,6 @@ public interface IGraphics
 
     // おまけ：デフォルトフォント（ゲームごとに 1 個用意）
     IFont DefaultFont { get; }
-
 }
 
 public enum BlendMode
@@ -85,7 +83,6 @@ public enum ReferencePoint
     BottomCenter,
     BottomRight,
 }
-
 
 public struct DrawOptions
 {
@@ -177,7 +174,6 @@ public static class GraphicsExtensions
             Opacity = opacity
         }, segments);
 
-
     public static void Cross(
         this IGraphics g,
         double x, double y, double size, DrawOptions options)
@@ -201,7 +197,6 @@ public static class GraphicsExtensions
         Blend = blend,
         Opacity = opacity
     });
-
 
     public static void Text(
     this IGraphics g,
@@ -262,11 +257,7 @@ public static class LayoutUtil
         public static Point operator /(Point a, double b) => new(a.X / b, a.Y / b);
         public static bool operator ==(Point a, Point b) => a.X == b.X && a.Y == b.Y;
         public static bool operator !=(Point a, Point b) => !(a == b);
-        public override readonly bool Equals(object? obj)
-        {
-            if (obj is not Point p) return false;
-            return this == p;
-        }
+        public override readonly bool Equals(object? obj) => obj is Point p && this == p;
 
         public override string ToString() => $"({X}, {Y})";
         public readonly double Length() => Math.Sqrt(X * X + Y * Y);

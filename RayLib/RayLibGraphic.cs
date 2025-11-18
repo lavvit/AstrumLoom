@@ -8,7 +8,6 @@ using RColor = Raylib_cs.Color;
 
 namespace AstrumLoom.RayLib;
 
-
 // ================================
 //  IGraphics 実装
 // ================================
@@ -20,23 +19,17 @@ internal sealed class RayLibTexture : ITexture
     public int Width => Native.Width;
     public int Height => Native.Height;
 
-    public RayLibTexture(Texture2D texture)
-    {
-        Native = texture;
-    }
+    public RayLibTexture(Texture2D texture) => Native = texture;
 }
 
 internal sealed class RayLibGraphics : IGraphics
 {
-    public RayLibGraphics()
-    {
-        _defaultFont = CreateFont(new FontSpec("", 24));
-    }
+    public RayLibGraphics() => DefaultFont = CreateFont(new FontSpec("", 24));
 
     public ITexture LoadTexture(string path)
     {
         // 失敗時は Raylib が自前のエラーを出すので、ここではそのまま投げる
-        Texture2D tex = Raylib.LoadTexture(path);
+        var tex = Raylib.LoadTexture(path);
         return new RayLibTexture(tex);
     }
 
@@ -48,10 +41,7 @@ internal sealed class RayLibGraphics : IGraphics
         }
     }
 
-    public void BeginFrame()
-    {
-        BeginDrawing();
-    }
+    public void BeginFrame() => BeginDrawing();
 
     public void Clear(Color color)
     {
@@ -92,10 +82,7 @@ internal sealed class RayLibGraphics : IGraphics
             RColor.White);
     }
 
-    public void EndFrame()
-    {
-        EndDrawing();
-    }
+    public void EndFrame() => EndDrawing();
 
     // Color helper
     private static RColor ToRay(Color c, double opacity = 1.0)
@@ -114,8 +101,8 @@ internal sealed class RayLibGraphics : IGraphics
     public void Line(double x, double y, double dx, double dy,
         DrawOptions options)
     {
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
         var a = new Vector2((float)x, (float)y);
         var b = new Vector2((float)(x + dx), (float)(y + dy));
@@ -125,8 +112,8 @@ internal sealed class RayLibGraphics : IGraphics
     public void Box(double x, double y, double width, double height,
         DrawOptions options)
     {
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
         var rect = new Raylib_cs.Rectangle((float)x, (float)y, (float)width, (float)height);
 
@@ -137,8 +124,8 @@ internal sealed class RayLibGraphics : IGraphics
     public void Circle(double x, double y, double radius,
         DrawOptions options, int segments = 64)
     {
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawCircleV(new Vector2((float)x, (float)y), (float)radius, col);
         else DrawCircleLines((int)Math.Round(x), (int)Math.Round(y), (float)radius, col);
@@ -147,8 +134,8 @@ internal sealed class RayLibGraphics : IGraphics
     public void Oval(double x, double y, double rx, double ry,
         DrawOptions options, int segments = 64)
     {
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawEllipse((int)x, (int)y, (int)rx, (int)ry, col);
         else DrawEllipseLines((int)x, (int)y, (int)rx, (int)ry, col);
@@ -157,8 +144,8 @@ internal sealed class RayLibGraphics : IGraphics
     public void Triangle(double x1, double y1, double x2, double y2, double x3, double y3,
         DrawOptions options)
     {
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRay(options.Color ?? Color.White, opacity);
 
         var p1 = new Vector2((float)x1, (float)y1);
@@ -166,8 +153,8 @@ internal sealed class RayLibGraphics : IGraphics
         var p3 = new Vector2((float)x3, (float)y3);
 
         // 重心を計算
-        var cx = (p1.X + p2.X + p3.X) / 3f;
-        var cy = (p1.Y + p2.Y + p3.Y) / 3f;
+        float cx = (p1.X + p2.X + p3.X) / 3f;
+        float cy = (p1.Y + p2.Y + p3.Y) / 3f;
 
         // 各点の角度（重心基準）
         double Angle(Vector2 p) => Math.Atan2((double)p.Y - cy, (double)p.X - cx);
@@ -193,7 +180,7 @@ internal sealed class RayLibGraphics : IGraphics
     {
         if (string.IsNullOrEmpty(text)) return;
 
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var fg = ToRay(options.Color ?? Color.White, opacity);
 
         var size = MeasureTextInternal(text, fontSize);
@@ -213,8 +200,7 @@ internal sealed class RayLibGraphics : IGraphics
     private static Vector2 MeasureTextInternal(string text, int fontSize)
         => MeasureTextEx(GetFontDefault(), text ?? "", fontSize, 1f);
 
-    private readonly IFont _defaultFont;
-    public IFont DefaultFont => _defaultFont;
+    public IFont DefaultFont { get; }
     public IFont CreateFont(FontSpec spec)
         => new RayLibFont(spec);
 

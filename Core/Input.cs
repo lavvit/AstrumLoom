@@ -28,10 +28,7 @@ public static class KeyInput
         _textEnter.Update(ref value, options ?? new TextInputOptions());
     }
 
-    public static void DrawText(double x, double y, Color? color = null, IFont? font = null)
-    {
-        _textEnter.Draw(x, y, color, font);
-    }
+    public static void DrawText(double x, double y, Color? color = null, IFont? font = null) => _textEnter.Draw(x, y, color, font);
     public static void DrawText(double x, double y, object text, Color? color = null, IFont? font = null)
     {
         if (Typing)
@@ -42,12 +39,7 @@ public static class KeyInput
     public static string GetText(ref string value)
     {
         string text = value;
-        if (!Typing) return "";
-        if (_textEnter.Update(ref value))
-        {
-            return text != value ? value : "";
-        }
-        return "";
+        return !Typing ? "" : _textEnter.Update(ref value) ? text != value ? value : "" : "";
     }
 
     public static bool Enter(ref string value)
@@ -167,7 +159,6 @@ public enum Key
     // ポーズ
     Pause,
 
-
     // IME
     変換,
     無変換,
@@ -214,7 +205,6 @@ public enum Key
     // テンキーのエンター
     NumPad_Enter,
 
-
     // 定義されていないキー
     None = -1,
 }
@@ -222,21 +212,17 @@ public enum Key
 public sealed class TextEnter
 {
     private readonly ITextInput _impl;
-    private bool _isActive;
-    private TextInputOptions _options;
-
-
     private double _caretTimer;
 
     // コンストラクタで ITime を受け取れるなら保持しておく
     private readonly ITime _time;
 
-    public TextInputOptions Option => _options;
+    public TextInputOptions Option { get; private set; }
 
     public TextEnter(ITextInput impl, ITime time)
     {
         _impl = impl;
-        _options = new();
+        Option = new();
         _time = time;
     }
 
@@ -245,15 +231,15 @@ public sealed class TextEnter
     /// true が返ったフレームで value に確定済み文字列が入る。
     /// </summary>
     public bool Update(ref string value)
-        => Update(ref value, _options);
+        => Update(ref value, Option);
     public bool Update(ref string value, TextInputOptions options)
     {
         // まだ入力を開始していない → 開始する
-        if (!_isActive)
+        if (!IsActive)
         {
-            _isActive = true;
-            _options = options with { InitialText = value };
-            _impl.Begin(_options);
+            IsActive = true;
+            Option = options with { InitialText = value };
+            _impl.Begin(Option);
             return false;
         }
 
@@ -278,7 +264,7 @@ public sealed class TextEnter
                 // 確定
                 value = _impl.Text;
                 _impl.Cancel();      // ハンドル開放
-                _isActive = false;
+                IsActive = false;
                 return true;
 
             case KeyInputState.Canceled:
@@ -286,18 +272,18 @@ public sealed class TextEnter
             default:
                 // キャンセル or 失敗
                 _impl.Cancel();
-                _isActive = false;
+                IsActive = false;
                 return false;
         }
     }
 
     public void Draw(double x, double y, Color? color = null, IFont? font = null)
     {
-        if (!_isActive) return;
+        if (!IsActive) return;
         _impl.Draw(x, y, color, font ?? Drawing.G.DefaultFont, _caretTimer < 0.6);
     }
 
-    public bool IsActive => _isActive;
+    public bool IsActive { get; private set; }
 }
 
 public sealed record TextInputOptions
@@ -321,7 +307,6 @@ public readonly struct TextSelection
         End = end;
     }
 }
-
 
 /// <summary>
 /// キー入力の状態。
@@ -366,7 +351,7 @@ public class KeyBoard
         double tx = 1.0 * size;
         double ty = 0.66 * size;
         bool isfull = (int)type % 2 == 1;
-        IFont f = font ?? Drawing.G.DefaultFont;
+        var f = font ?? Drawing.G.DefaultFont;
 
         // 行ごとのキー列を定義して反復処理するユーティリティ
         void DrawRow(ref double rx, double ry, KeySpec[] specs)
@@ -421,24 +406,24 @@ public class KeyBoard
         y2 += 1.5 * boxSize;
         var row2 = new List<KeySpec>
         {
-            new KeySpec(Key.漢字, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.Key_1, "1", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_2, "2", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_3, "3", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_4, "4", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_5, "5", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_6, "6", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_7, "7", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_8, "8", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_9, "9", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Key_0, "0", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Minus, "-", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Prevtrack, "^", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Yen, @"\", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Back, "←", 1.0, 1.5, RenderKind.Labeled),
-            new KeySpec(Key.Insert, "Ins", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Home, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.PgUp, null, 1.0, 0.0, RenderKind.Default),
+            new(Key.漢字, null, 1.0, 1.25, RenderKind.Default),
+            new(Key.Key_1, "1", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_2, "2", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_3, "3", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_4, "4", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_5, "5", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_6, "6", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_7, "7", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_8, "8", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_9, "9", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Key_0, "0", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Minus, "-", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Prevtrack, "^", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Yen, @"\", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Back, "←", 1.0, 1.5, RenderKind.Labeled),
+            new(Key.Insert, "Ins", 1.0, 1.25, RenderKind.Labeled),
+            new(Key.Home, null, 1.0, 1.25, RenderKind.Default),
+            new(Key.PgUp, null, 1.0, 0.0, RenderKind.Default),
         };
         DrawRow(ref x2, y2, row2.ToArray());
 
@@ -583,27 +568,27 @@ public class KeyBoard
     }
 
     // キー仕様を表すシンプルなローカル型
-    record KeySpec(Key Key, string? Label, double Width, double Advance, RenderKind Kind);
-    enum RenderKind { Default, Labeled, Enter, NumEnter }
+    private record KeySpec(Key Key, string? Label, double Width, double Advance, RenderKind Kind);
+    private enum RenderKind
+    { Default, Labeled, Enter, NumEnter }
 
-
-    static void DrawKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
+    private static void DrawKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
         font.Draw(Drawing.G, (int)(x2 + tx * width), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
-    static void DrawKey(Key key, string keyname, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
+    private static void DrawKey(Key key, string keyname, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
         font.Draw(Drawing.G, (int)(x2 + tx * width), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
     }
-    static void DrawEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
+    private static void DrawEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
         Drawing.Box(x2 + 0.5 * boxSize, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));
         font.Draw(Drawing.G, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
-    static void DrawNumEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
+    private static void DrawNumEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         string keyname = "Enter";
         Drawing.Box(x2, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));

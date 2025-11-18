@@ -46,7 +46,6 @@ public static class FontHandle
 
 }
 
-
 /// <summary>フォントの“表示名”から TTF/OTF の実ファイルパスを解決する</summary>
 public static class SystemFontResolver
 {
@@ -61,9 +60,9 @@ public static class SystemFontResolver
         {
             using var key = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts");
             if (key == null) yield break;
-            foreach (var nameObj in key.GetValueNames())
+            foreach (string nameObj in key.GetValueNames())
             {
-                var val = key.GetValue(nameObj) as string;
+                string? val = key.GetValue(nameObj) as string;
                 if (string.IsNullOrWhiteSpace(val)) continue;
 
                 string displayName = nameObj; // 例: "MS UI Gothic (TrueType)"
@@ -96,8 +95,7 @@ public static class SystemFontResolver
             .Where(t => File.Exists(t.path))
             .Select(t => (name: t.displayName.Replace("(TrueType)", "", StringComparison.OrdinalIgnoreCase)
                                         .Replace("(OpenType)", "", StringComparison.OrdinalIgnoreCase)
-                                        .Trim(),
-                          path: t.path))
+                                        .Trim(), t.path))
             .ToList();
 
         // Face名/Family名のどちらでも拾えるよう、部分一致も許容
@@ -143,7 +141,7 @@ public static class SystemFontResolver
             .First();
 
         // TTC/OTCはサブフェイス選択が必要になることがあり、Raylibだと扱いづらいので注意喚起
-        var extChosen = Path.GetExtension(chosen.path).ToLowerInvariant();
+        string extChosen = Path.GetExtension(chosen.path).ToLowerInvariant();
         if (extChosen is ".ttc" or ".otc")
         {
             // できれば TTF/OTF の別実体を使うのが吉

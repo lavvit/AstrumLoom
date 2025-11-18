@@ -34,7 +34,6 @@ public class Drawing
         Line(x1, y1, x2 - x1, y2 - y1, color, thickness, blend, opacity);
     }
 
-
     public static void Box(double x, double y, double width, double height,
         Color? color = null,
         int thickness = 0,
@@ -142,11 +141,9 @@ public class Drawing
     public static void Fill(Color color)
         => Blackout(1.0, color);
 
-
-    private static IFont? _defaultfont;
     public static IFont DefaultFont
     {
-        get => _defaultfont ?? G.DefaultFont; set => _defaultfont = value;
+        get => field ?? G.DefaultFont; set;
     }
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");
@@ -155,7 +152,6 @@ public class Drawing
         ReferencePoint point = ReferencePoint.TopLeft,
         BlendMode blend = BlendMode.None, double opacity = 1)
         => DefaultFont.Draw(x, y, text, color ?? Color.White, point, blend, opacity);
-
 
     public static void Polygon(IEnumerable<(double x, double y)> points,
         Color? color = null,

@@ -40,12 +40,12 @@ internal sealed class DxLibFont : IFont
         var (w, h) = Measure(text);
         var off =
             LayoutUtil.GetAnchorOffset(options.Point, w, h);
-        var drawX = (int)(x + off.X);
-        var drawY = (int)(y + off.Y);
+        int drawX = (int)(x + off.X);
+        int drawY = (int)(y + off.Y);
 
         var useColor = options.Color ?? Color.White;
         uint c = (uint)DxLibGraphics.ToDxColor(useColor); // らびぃが既に持ってる変換ヘルパー
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
 
         SetDrawBlendMode(DxLibGraphics.GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawStringToHandle(drawX, drawY, text, c, _handle);

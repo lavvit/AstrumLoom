@@ -11,10 +11,7 @@ internal sealed class SimpleTestGame : IGame
     private IFont? _font;
     private string _playerName = "lavvit";
 
-    public SimpleTestGame(IGamePlatform platform)
-    {
-        _platform = platform;
-    }
+    public SimpleTestGame(IGamePlatform platform) => _platform = platform;
 
     public void Initialize()
     {
@@ -29,7 +26,6 @@ internal sealed class SimpleTestGame : IGame
         {
             _platform.Close();
         }
-
 
         // F2 押したら名前入力開始
         if (KeyInput.Push(Key.F2))
@@ -102,7 +98,6 @@ internal static class Program
             try { Console.ReadLine(); } catch { }
             throw;
         }
-
     }
 }
 internal static class PlatformFactory

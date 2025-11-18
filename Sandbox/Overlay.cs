@@ -25,7 +25,6 @@ internal sealed class SandboxOverlay : Overlay
         _large = g.CreateFont(new FontSpec(fontpath, 32, Bold: true));
     }
 
-
     public override void Draw(IGamePlatform platform)
     {
         // まずはベースの FPS / 時刻 を描く

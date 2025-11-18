@@ -16,14 +16,14 @@ public static class MathExtend
         int g = GCD(a, b);
         if (g == 0) return 0;
         // Use division first to reduce overflow risk
-        return Math.Abs((a / g) * b);
+        return Math.Abs(a / g * b);
     }
 
     /// <summary>複数の整数の最小公倍数を返します。</summary>
     public static int LCM(IEnumerable<int> numbers)
     {
         int lcm = 1;
-        foreach (var n in numbers)
+        foreach (int n in numbers)
         {
             // If any number is zero, overall LCM is zero
             if (n == 0) return 0;
@@ -58,8 +58,6 @@ public static class MathExtend
         }
         return true;
     }
-
-
 }
 
 // ---- 有理数表現 ----
@@ -132,7 +130,6 @@ public readonly struct Rational
             }
         }
     }
-
 }
 
 public class Easing

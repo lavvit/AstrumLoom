@@ -6,7 +6,6 @@ using Newtonsoft.Json.Serialization;
 
 namespace AstrumLoom;
 
-
 public class Text
 {
     public static List<string> Read(string path, bool allsplit = true, bool removeempty = true)
@@ -55,7 +54,6 @@ public class Text
         for (int i = 0; i <= last; i++)
             sw.WriteLine(list[i]);
     }
-
 
     /// <summary>
     /// エンコードを読み込みます。
@@ -412,7 +410,7 @@ public class Text
             ObjectCreationHandling = ObjectCreationHandling.Auto,
             DefaultValueHandling = DefaultValueHandling.Include,
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
-            Converters = new StringEnumConverter[] { new () }
+            Converters = new StringEnumConverter[] { new() }
         };
     /// <summary>
     /// Jsonファイルの読み込みを行います。ファイルが存在しなかった場合、そのクラスの新規インスタンスを返します。

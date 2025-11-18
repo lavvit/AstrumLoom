@@ -47,10 +47,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
     }
 
-    public void Close()
-    {
-        ShouldClose = true;
-    }
+    public void Close() => ShouldClose = true;
 
     private bool _disposed;
     public void Dispose()

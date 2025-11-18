@@ -6,7 +6,7 @@ public sealed class FpsCounter
     public double NowValue { get; private set; }
 
     private double _prevTimeMs;
-    private readonly List<(double timeMs, double value)> _times = new();
+    private readonly List<(double timeMs, double value)> _times = [];
 
     /// <summary>
     /// ゲーム内時間（秒）を渡して Tick する

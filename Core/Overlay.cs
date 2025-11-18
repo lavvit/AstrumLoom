@@ -10,7 +10,6 @@ public class Overlay
     public static void Set(Overlay? overlay)
         => Current = overlay ?? new Overlay();
 
-
     private readonly FpsCounter _fps = new();
 
     // ここがベースの描画
@@ -22,7 +21,7 @@ public class Overlay
         _fps.Tick(time.TotalTime);
 
         var g = platform.Graphics;
-        var backend = platform.BackendKind.ToString();
+        string backend = platform.BackendKind.ToString();
 
         double avg = _fps.GetFPS(0.3);
         double max = _fps.GetMaxFPS(0.3);

@@ -2,8 +2,6 @@
 
 namespace AstrumLoom.DXLib;
 
-
-
 internal sealed class DxLibTexture : ITexture
 {
     public int Handle { get; }
@@ -20,11 +18,9 @@ internal sealed class DxLibTexture : ITexture
 
 internal sealed class DxLibGraphics : IGraphics
 {
-    public DxLibGraphics()
-    {
+    public DxLibGraphics() =>
         // ここではとりあえず「Default」の 24px ぐらいを作っておく
-        _defaultFont = CreateFont(new FontSpec("", 24));
-    }
+        DefaultFont = CreateFont(new FontSpec("", 24));
 
     public ITexture LoadTexture(string path)
     {
@@ -117,7 +113,6 @@ internal sealed class DxLibGraphics : IGraphics
 
     public void EndFrame() => ScreenFlip();
 
-
     public void Blackout(double opacity = 1.0, Color? color = null)
     {
         GetWindowSize(out int w, out int h);
@@ -133,8 +128,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawLineAA((float)x, (float)y, (float)(x + dx), (float)(y + dy), (uint)c, thickness);
         SetDrawBlendMode((int)BlendMode.None, 255);
@@ -145,8 +140,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawBoxAA((float)x, (float)y, (float)(x + width), (float)(y + height),
                   (uint)c, options.Fill ? TRUE : FALSE, thickness);
@@ -158,8 +153,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawCircleAA((float)x, (float)y, (float)radius, segments,
                 (uint)c, options.Fill ? TRUE : FALSE, thickness);
@@ -171,8 +166,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawOvalAA((float)x, (float)y, (float)rx, (float)ry, segments,
             (uint)c, options.Fill ? TRUE : FALSE, thickness);
@@ -184,8 +179,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
         DrawTriangleAA((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3,
                        (uint)c, options.Fill ? TRUE : FALSE, thickness);
@@ -198,8 +193,8 @@ internal sealed class DxLibGraphics : IGraphics
     {
         var use = options.Color ?? Color.White;
         int c = ToDxColor(use);
-        var thickness = Math.Max(1, options.Thickness);
-        var opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        int thickness = Math.Max(1, options.Thickness);
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
 
         // まずフォントサイズだけ確定
         EnsureFontSize(fontSize);
@@ -243,11 +238,9 @@ internal sealed class DxLibGraphics : IGraphics
         _currentFontSize = fontSize;
     }
 
-    private readonly IFont _defaultFont;
-    public IFont DefaultFont => _defaultFont;
+    public IFont DefaultFont { get; }
     public IFont CreateFont(FontSpec spec)
         => new DxLibFont(spec);
-
 
     internal static int GetBlendMode(BlendMode mode) => mode switch
     {
