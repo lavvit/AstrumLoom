@@ -4,17 +4,14 @@ namespace AstrumLoom;
 
 public class Drawing
 {
-    private static IGraphics _g { get; set; } = null!;
-    internal static void Initialize(IGraphics graphics)
-    {
-        _g = graphics;
-    }
+    internal static IGraphics G { get; private set; } = null!;
+    internal static void Initialize(IGraphics graphics) => G = graphics;
 
     public static void Line(double x1, double y1, double dx, double dy,
         Color? color = null,
         int thickness = 1,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Line(x1, y1, dx, dy,
+        => G.Line(x1, y1, dx, dy,
             new DrawOptions
             {
                 Color = color,
@@ -42,7 +39,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Box(x, y, width, height,
+        => G.Box(x, y, width, height,
             new DrawOptions
             {
                 Color = color,
@@ -69,7 +66,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Circle(x, y, radius,
+        => G.Circle(x, y, radius,
             new DrawOptions
             {
                 Color = color,
@@ -89,7 +86,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Oval(x, y, rx, ry,
+        => G.Oval(x, y, rx, ry,
             new DrawOptions
             {
                 Color = color,
@@ -110,7 +107,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Triangle(x1, y1, x2, y2, x3, y3,
+        => G.Triangle(x1, y1, x2, y2, x3, y3,
             new DrawOptions
             {
                 Color = color,
@@ -141,18 +138,24 @@ public class Drawing
     }
 
     public static void Blackout(double opacity = 1.0, Color? color = null)
-        => _g.Blackout(opacity, color);
+        => G.Blackout(opacity, color);
     public static void Fill(Color color)
         => Blackout(1.0, color);
 
-    public static (int width, int height) TextSize(string text)
-        => _g.MeasureText(text);
 
-    public static void Text(double x, double y, string text,
+    private static IFont? _defaultfont;
+    public static IFont DefaultFont
+    {
+        get => _defaultfont ?? G.DefaultFont; set => _defaultfont = value;
+    }
+    public static (int width, int height) TextSize(object text)
+        => DefaultFont.Measure(text.ToString() ?? "");
+    public static void Text(double x, double y, object text,
         Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => _g.Text(x, y, text, color ?? Color.White, point, blend, opacity);
+        => DefaultFont.Draw(x, y, text, color ?? Color.White, point, blend, opacity);
+
 
     public static void Polygon(IEnumerable<(double x, double y)> points,
         Color? color = null,

@@ -59,9 +59,8 @@ public class Log
 
     public static bool IncludeInfo = true;
     public static int MaxLogCount = 30;
-    public static void Draw(IGamePlatform platform)
+    public static void Draw()
     {
-        var g = platform.Graphics;
         int x = 10, y = 10;
         var loglist = LogMessages
             .Where(l => (DateTime.Now - l.Timestamp).TotalSeconds < 10)
@@ -79,13 +78,13 @@ public class Log
         }
         if (loglist.Count == 0) return;
 
-        (int width, int height) = g.MeasureText(string.Join("\n", loglist).Trim());
+        (int width, int height) = Drawing.TextSize(string.Join("\n", loglist).Trim());
         int size = 16;
-        g.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
+        Drawing.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
         for (int i = 0; i < loglist.Count; i++)
         {
             var log = loglist[i];
-            g.Text(x, y + i * size, log, log.Color);
+            Drawing.Text(x, y + i * size, log, log.Color);
         }
     }
 }

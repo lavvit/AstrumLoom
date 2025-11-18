@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics;
 
-using DxLibDLL;
-
 using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
@@ -13,10 +11,13 @@ public sealed class DxLibPlatform : IGamePlatform
     public IGraphics Graphics { get; }
     public IInput Input { get; }
     public ITime Time { get; }
+    public TextEnter TextInput { get; }
 
     public bool ShouldClose { get; private set; }
 
     public bool VSync { get; private set; }
+
+    private readonly DxLibInput _input;
     public DxLibPlatform(GameConfig config)
     {
         ChangeWindowMode(TRUE);                                 // ウィンドウモード
@@ -39,7 +40,9 @@ public sealed class DxLibPlatform : IGamePlatform
 
         Time = new SimpleTime();
         Graphics = new DxLibGraphics(); // DummyGraphics の代わり
-        Input = new DxLibInput();
+        _input = new DxLibInput();
+        Input = _input;
+        TextInput = new(new DxLibTextInput(), Time);
     }
 
     public void PollEvents()
@@ -52,35 +55,20 @@ public sealed class DxLibPlatform : IGamePlatform
             ShouldClose = true;
             return;
         }
+        // キー状態の更新
+        _input.Update();
 
         WaitVSync(VSync ? 1 : 0);
-        if (CheckHitKey(KEY_INPUT_ESCAPE) != 0)
-        {
-            ShouldClose = true;
-        }
+    }
+
+    public void Close()
+    {
+        ShouldClose = true;
     }
 
     public void Dispose() => DxLib_End();
 
     // --- 以下 stub 実装たち ---
-
-    private sealed class DxLibInput : IInput
-    {
-        public bool GetKey(Key key) => key switch
-        {
-            Key.Space => DX.CheckHitKey(DX.KEY_INPUT_SPACE) != 0,
-            Key.Left => DX.CheckHitKey(DX.KEY_INPUT_LEFT) != 0,
-            Key.Right => DX.CheckHitKey(DX.KEY_INPUT_RIGHT) != 0,
-            Key.Up => DX.CheckHitKey(DX.KEY_INPUT_UP) != 0,
-            Key.Down => DX.CheckHitKey(DX.KEY_INPUT_DOWN) != 0,
-            Key.Escape => DX.CheckHitKey(DX.KEY_INPUT_ESCAPE) != 0,
-            _ => false
-        };
-
-        // とりあえず GetKeyDown/Up は後でちゃんと実装
-        public bool GetKeyDown(Key key) => GetKey(key);
-        public bool GetKeyUp(Key key) => false;
-    }
 
     private sealed class SimpleTime : ITime
     {

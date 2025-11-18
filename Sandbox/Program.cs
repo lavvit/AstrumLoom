@@ -8,17 +8,45 @@ internal sealed class SimpleTestGame : IGame
 {
     private readonly IGamePlatform _platform;
     private ITexture? _tex;
+    private IFont? _font;
+    private string _playerName = "lavvit";
 
     public SimpleTestGame(IGamePlatform platform)
-        => _platform = platform;
+    {
+        _platform = platform;
+    }
 
-    public void Initialize() =>
+    public void Initialize()
+    {
         // 実行ファイルからの相対パスになる
         _tex = _platform.Graphics.LoadTexture("Assets/test.png");
+        _font = _platform.Graphics.CreateFont(new FontSpec("ＤＦ太丸ゴシック体 Pro-5", 44));
+    }
 
     public void Update(float deltaTime)
     {
-        // とりあえず何もしない
+        if (KeyInput.Push(Key.Esc) && !_platform.TextInput.IsActive)
+        {
+            _platform.Close();
+        }
+
+
+        // F2 押したら名前入力開始
+        if (KeyInput.Push(Key.F2))
+        {
+            KeyInput.ActivateText(ref _playerName, new()
+            {
+                MaxLength = 16,
+                EscapeCancelable = true,
+                // 位置とかフォントサイズとかもここで
+            });
+        }
+        // 入力中の監視（SeaDrop の Enter() 相当）
+        else if (KeyInput.Enter(ref _playerName))
+        {
+            // ここに「入力確定した瞬間」の処理を書く
+            Log.Write(_playerName);
+        }
     }
 
     public void Draw()
@@ -33,6 +61,9 @@ internal sealed class SimpleTestGame : IGame
         var g = _platform.Graphics;
 
         g.DrawTexture(_tex, x, y);
+        KeyInput.DrawText(x, y, _playerName, Color.White, _font);
+
+        //KeyBoard.Draw(20, 200, 16, KeyType.JPTKL, _font);
     }
 }
 
@@ -53,12 +84,24 @@ internal static class Program
             GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
         };
 
-        var platform = PlatformFactory.Create(config);
-        var game = new SimpleTestGame(platform);
-        Overlay.Set(new SandboxOverlay(platform.Graphics));
-        using var host = new GameHost(config, platform, game);
+        try
+        {
+            var platform = PlatformFactory.Create(config);
+            var game = new SimpleTestGame(platform);
+            Overlay.Set(new SandboxOverlay(platform.Graphics));
 
-        host.Run();
+            using var host = new GameHost(config, platform, game);
+            host.Run();
+        }
+        catch (Exception ex)
+        {
+            // 実行時の例外をコンソールに出力して原因を特定しやすくする
+            Console.Error.WriteLine("Unhandled exception:");
+            Console.Error.WriteLine(ex.ToString());
+            Console.Error.WriteLine("Press Enter to exit...");
+            try { Console.ReadLine(); } catch { }
+            throw;
+        }
 
     }
 }

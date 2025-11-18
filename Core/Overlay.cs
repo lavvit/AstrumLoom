@@ -29,11 +29,11 @@ public class Overlay
         double min = _fps.GetMinFPS(0.3);
 
         // 1行目：昔の ToString スタイル
-        g.Text(10, 10,
+        Drawing.Text(10, 10,
             $"{backend} {avg:0.0} FPS ({max:0}-{min:0})",
             new Color(230, 240, 255), point: ReferencePoint.TopLeft);
 
         // 2行目: 現在時刻
-        g.Text(10, 32, $"{DateTime.Now:G}", new Color(180, 200, 220), point: ReferencePoint.TopLeft);
+        Drawing.Text(10, 32, $"{DateTime.Now:G}", new Color(180, 200, 220), point: ReferencePoint.TopLeft);
     }
 }

@@ -43,9 +43,8 @@ internal sealed class SandboxOverlay : Overlay
         // 例: 右下にちょっとしたデバッグテキスト
         Drawing.Text(1270, 710, "Sandbox Overlay", new Color(160, 220, 160), point: ReferencePoint.BottomRight);
 
-        Drawing.Gradation(480, 360, 320, 50, gradation, rotate: 0, colorSpace: Gradation.ColorSpace.OKLab);
+        //Drawing.Gradation(480, 360, 320, 50, gradation, rotate: 0, colorSpace: Gradation.ColorSpace.OKLab);
 
-        Drawing.Polygon([(200, 500), (300, 450), (400, 500), (450, 600), (350, 650), (250, 600)], Color.Cyan
-        );
+        //Drawing.Polygon([(200, 500), (300, 450), (400, 500), (450, 600), (350, 650), (250, 600)], Color.Cyan);
     }
 }

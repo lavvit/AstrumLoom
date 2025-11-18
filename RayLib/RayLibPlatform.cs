@@ -1,9 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Drawing;
-using System.Threading;
-
-using AstrumLoom;
+﻿using System.Diagnostics;
 
 using Raylib_cs;
 
@@ -18,6 +13,7 @@ public sealed class RayLibPlatform : IGamePlatform
     public IGraphics Graphics { get; }
     public IInput Input { get; }
     public ITime Time { get; }
+    public TextEnter TextInput { get; }
 
     public bool ShouldClose { get; private set; }
 
@@ -32,10 +28,12 @@ public sealed class RayLibPlatform : IGamePlatform
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
         SetTargetFPS(0);
+        SetExitKey(0); // ESC キーで終了しないようにする
 
         Time = new SimpleTime { TargetFps = config.TargetFps };
         Graphics = new RayLibGraphics();
         Input = new RayLibInput();
+        TextInput = new(new RayLibTextInput(), Time);
     }
 
     public void PollEvents()
@@ -45,7 +43,13 @@ public sealed class RayLibPlatform : IGamePlatform
         if (WindowShouldClose())
         {
             ShouldClose = true;
+            return;
         }
+    }
+
+    public void Close()
+    {
+        ShouldClose = true;
     }
 
     private bool _disposed;
@@ -58,42 +62,6 @@ public sealed class RayLibPlatform : IGamePlatform
         if (IsWindowReady())
         {
             CloseWindow();
-        }
-    }
-
-    // ================================
-    //  入力
-    // ================================
-
-    private sealed class RayLibInput : IInput
-    {
-        private static KeyboardKey ToRayKey(Key key) => key switch
-        {
-            Key.Space => KeyboardKey.Space,
-            Key.Left => KeyboardKey.Left,
-            Key.Right => KeyboardKey.Right,
-            Key.Up => KeyboardKey.Up,
-            Key.Down => KeyboardKey.Down,
-            Key.Escape => KeyboardKey.Escape,
-            _ => KeyboardKey.Null,
-        };
-
-        public bool GetKey(Key key)
-        {
-            var rk = ToRayKey(key);
-            return rk != KeyboardKey.Null && IsKeyDown(rk);
-        }
-
-        public bool GetKeyDown(Key key)
-        {
-            var rk = ToRayKey(key);
-            return rk != KeyboardKey.Null && IsKeyPressed(rk);
-        }
-
-        public bool GetKeyUp(Key key)
-        {
-            var rk = ToRayKey(key);
-            return rk != KeyboardKey.Null && IsKeyReleased(rk);
         }
     }
 

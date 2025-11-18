@@ -7,10 +7,13 @@ public interface IGamePlatform : IDisposable
     IGraphics Graphics { get; }
     IInput Input { get; }
     ITime Time { get; }
+    TextEnter TextInput { get; }
 
     bool ShouldClose { get; }
 
     void PollEvents();
+
+    void Close();
 }
 
 public enum GraphicsBackendKind

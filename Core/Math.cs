@@ -9,7 +9,15 @@ public static class MathExtend
         return Math.Abs(a);
     }
     /// <summary>最小公倍数を返します。</summary>
-    public static int LCM(int a, int b) => a / GCD(a, b) * b;
+    public static int LCM(int a, int b)
+    {
+        // If either is zero, LCM is defined as 0 (avoid division by zero)
+        if (a == 0 || b == 0) return 0;
+        int g = GCD(a, b);
+        if (g == 0) return 0;
+        // Use division first to reduce overflow risk
+        return Math.Abs((a / g) * b);
+    }
 
     /// <summary>複数の整数の最小公倍数を返します。</summary>
     public static int LCM(IEnumerable<int> numbers)
@@ -17,9 +25,25 @@ public static class MathExtend
         int lcm = 1;
         foreach (var n in numbers)
         {
+            // If any number is zero, overall LCM is zero
+            if (n == 0) return 0;
             lcm = LCM(lcm, n);
         }
         return lcm;
+    }
+    /// <summary>有理数の最小公倍数を返します。</summary>
+    public static int LCM(Rational a, Rational b)
+    {
+        // 分母のLCMで整数化
+        int L = LCM(a.Den, b.Den);
+        if (L == 0) return 1;
+        int i1 = checked(a.Num * (L / a.Den));
+        int i2 = checked(b.Num * (L / b.Den));
+        if (i1 == 0 || i2 == 0) return 1;
+
+        int m = LCM(Math.Abs(i1), Math.Abs(i2));
+        if (m <= 0) return 1; // どちらか0や異常時のフォールバック
+        return m;
     }
 
     public static bool PrimeCheck(int n)
@@ -52,9 +76,9 @@ public readonly struct Rational
 
     public Rational(int num, int den)
     {
-        if (den == 0) { Den = 1; return; }
+        if (den == 0) { Den = 1; Num = num; return; }
         if (den < 0) { num = -num; den = -den; }
-        int g = GCD(Math.Abs(num), den);
+        int g = MathExtend.GCD(Math.Abs(num), den);
         if (g == 0) g = 1;
         Num = num / g;
         Den = den / g;
@@ -107,25 +131,6 @@ public readonly struct Rational
                 return new Rational(sign * n1, d1);
             }
         }
-    }
-
-    public static int GCD(int a, int b)
-    {
-        while (b != 0) { int t = a % b; a = b; b = t; }
-        return Math.Abs(a);
-    }
-    public static int LCM(int a, int b) => a / GCD(a, b) * b;
-    public static int LCM(Rational a, Rational b)
-    {
-        // 分母のLCMで整数化
-        int L = LCM(a.Den, b.Den);
-        int i1 = checked(a.Num * (L / a.Den));
-        int i2 = checked(b.Num * (L / b.Den));
-        if (i1 == 0 || i2 == 0) return 1;
-
-        int m = LCM(Math.Abs(i1), Math.Abs(i2));
-        if (m <= 0) return 1; // どちらか0や異常時のフォールバック
-        return m;
     }
 
 }

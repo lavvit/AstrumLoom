@@ -12,8 +12,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     private static readonly Color BackgroundColor = new(10, 10, 11);
     public void Run()
     {
-        game.Initialize();
         Drawing.Initialize(platform.Graphics);
+        KeyInput.Initialize(platform.Input, platform.TextInput);
+        game.Initialize();
 
         while (!platform.ShouldClose)
         {
@@ -30,7 +31,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             {
                 Overlay.Current.Draw(platform);
             }
-            Log.Draw(platform);
+            Log.Draw();
             platform.Graphics.EndFrame();
 
             platform.Time.EndFrame();

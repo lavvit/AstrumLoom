@@ -221,9 +221,8 @@ public static class GraphicsExtensions
 
     public static (int Width, int Height) MeasureText(
         this IGraphics g,
-        object text,
-        int size = 16)
-        => g.MeasureText(text.ToString() ?? "", size);
+        object text)
+        => g.DefaultFont.Measure(text.ToString() ?? "");
 }
 public static class LayoutUtil
 {

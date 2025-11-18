@@ -20,6 +20,32 @@ public interface IFont : IDisposable
         DrawOptions options);   // ★ 基準点・色・不透明度などをここで受ける
 }
 
+public static class FontHandle
+{
+    private static IGraphics G => Drawing.G;
+
+    // フォント作成
+    public static IFont? Create(FontSpec spec)
+        => G?.CreateFont(spec) ?? null;
+    public static IFont? Create(string nameOrPath, int size = 16, bool bold = false, bool italic = false)
+        => Create(new FontSpec(nameOrPath, size, bold, italic));
+
+    public static void Draw(this IFont? font, double x, double y, object text,
+        Color? color = null,
+        ReferencePoint point = ReferencePoint.TopLeft,
+        BlendMode blend = BlendMode.None,
+        double opacity = 1)
+        => (font ?? Drawing.G.DefaultFont).Draw(G, x, y, text?.ToString() ?? "",
+            new DrawOptions
+            {
+                Color = color,
+                Point = point,
+                Blend = blend,
+                Opacity = opacity
+            });
+
+}
+
 
 /// <summary>フォントの“表示名”から TTF/OTF の実ファイルパスを解決する</summary>
 public static class SystemFontResolver
@@ -136,7 +162,7 @@ public static class FontExtensions
     Color? color = null,
     ReferencePoint point = ReferencePoint.TopLeft,
     double opacity = 1)
-        => f.Draw(g, x, y, text?.ToString() ?? "",
+        => f?.Draw(g, x, y, text?.ToString() ?? "",
             new DrawOptions
             {
                 Color = color,
