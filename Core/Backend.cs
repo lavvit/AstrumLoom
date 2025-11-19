@@ -8,6 +8,7 @@ public interface IGamePlatform : IDisposable
     IInput Input { get; }
     ITime Time { get; }
     TextEnter TextInput { get; }
+    IMouse Mouse { get; }
 
     bool ShouldClose { get; }
 

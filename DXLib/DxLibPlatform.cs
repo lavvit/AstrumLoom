@@ -12,6 +12,7 @@ public sealed class DxLibPlatform : IGamePlatform
     public IInput Input { get; }
     public ITime Time { get; }
     public TextEnter TextInput { get; }
+    public IMouse Mouse { get; }
 
     public bool ShouldClose { get; private set; }
 
@@ -20,15 +21,20 @@ public sealed class DxLibPlatform : IGamePlatform
     private readonly DxLibInput _input;
     public DxLibPlatform(GameConfig config)
     {
-        ChangeWindowMode(TRUE);                                 // ウィンドウモード
-        SetWindowStyleMode(7);
+        SetOutApplicationLogValidFlag(0); // ログファイル無効化
+        ChangeWindowMode(TRUE); // ウィンドウモード
+        SetWindowStyleMode(7); // 通常のウィンドウスタイル
         SetGraphMode(config.Width, config.Height, 32); // 解像度
-        SetBackgroundColor(0, 0, 0);                // デフォルト背景
-        SetDrawScreen(DX_SCREEN_BACK);                  // 裏画面へ描画
-        SetWindowText(config.Title);                   // ウィンドウタイトル
-        SetAlwaysRunFlag(TRUE);                           // 非アクティブでも動かす
-        SetWaitVSyncFlag(0);                             // VSync 無効
+        SetBackgroundColor(0, 0, 0); // デフォルト背景
+        SetWindowText(config.Title); // ウィンドウタイトル
+        SetWindowSizeExtendRate(config.Scale); // ウィンドウ拡大率
+        SetAlwaysRunFlag(1); // 非アクティブでも動かす
+        SetWaitVSyncFlag(0); // VSync 無効
         VSync = config.VSync;
+
+        SetMultiThreadFlag(1); // マルチスレッド
+        SetDoubleStartValidFlag(1); // 複数起動
+        SetUseDirectInputFlag(0); // DirectInputコントローラー(重いため一時無効化)
 
         SetUseDirect3DVersion(DX_DIRECT3D_11);   // 11 を指定
                                                  // ソフトウェアレンダにしてないか確認
@@ -43,6 +49,7 @@ public sealed class DxLibPlatform : IGamePlatform
         _input = new DxLibInput();
         Input = _input;
         TextInput = new(new DxLibTextInput(), Time);
+        Mouse = new DxLibMouse();
     }
 
     public void PollEvents()

@@ -14,6 +14,7 @@ public sealed class RayLibPlatform : IGamePlatform
     public IInput Input { get; }
     public ITime Time { get; }
     public TextEnter TextInput { get; }
+    public IMouse Mouse { get; }
 
     public bool ShouldClose { get; private set; }
 
@@ -34,6 +35,7 @@ public sealed class RayLibPlatform : IGamePlatform
         Graphics = new RayLibGraphics();
         Input = new RayLibInput();
         TextInput = new(new RayLibTextInput(), Time);
+        Mouse = new RayLibMouse();
     }
 
     public void PollEvents()
