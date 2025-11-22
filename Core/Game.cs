@@ -26,6 +26,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             platform.Time.BeginFrame();
             platform.PollEvents();
 
+            KeyInput.Update(platform.Time.DeltaTime);
             game.Update(platform.Time.DeltaTime);
             platform.Mouse.Update();
 

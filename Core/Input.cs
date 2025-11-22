@@ -20,6 +20,84 @@ public static class KeyInput
     public static bool Hold(this Key key) => !Typing && _input.GetKey(key);
     public static bool Left(this Key key) => !Typing && _input.GetKeyUp(key);
 
+    public static bool Shift => Key.LShift.Hold() || Key.RShift.Hold();
+    public static bool Ctrl => Key.LCtrl.Hold() || Key.RCtrl.Hold();
+    public static bool Alt => Key.LAlt.Hold() || Key.RAlt.Hold();
+
+    public static bool TryParse(string keyString, out Key key)
+    {
+        try
+        {
+            key = Enum.Parse<Key>(keyString, ignoreCase: true);
+            return true;
+        }
+        catch
+        {
+            key = Key.None;
+            return false;
+        }
+    }
+
+    public static Key Parse(string keyString) => TryParse(keyString, out var key) ? key : Key.None;
+
+    public static IEnumerable<Key> GetAllKeys()
+    {
+        foreach (var key in Enum.GetValues<Key>())
+        {
+            if (key != Key.None)
+                yield return key;
+        }
+    }
+    public static IEnumerable<Key> GetPressedKeys()
+    {
+        foreach (var key in GetAllKeys())
+        {
+            if (key.Hold())
+                yield return key;
+        }
+    }
+
+    private static Dictionary<Key, double> _pressstarttime = [];
+    private static Dictionary<Key, double> _pressedFrameCounts = [];
+    internal static void Update(double deltaTime)
+    {
+        double time = deltaTime;
+        // キー押下のTime処理
+        foreach (var key in GetAllKeys())
+        {
+            if (key.Hold())
+            {
+                if (!_pressstarttime.ContainsKey(key))
+                {
+                    _pressstarttime[key] = time;
+                }
+                if (!_pressedFrameCounts.ContainsKey(key))
+                {
+                    _pressedFrameCounts[key] = 0;
+                }
+                _pressedFrameCounts[key] = time - _pressstarttime[key];
+            }
+            else
+            {
+                _pressstarttime.Remove(key);
+                _pressedFrameCounts.Remove(key);
+            }
+        }
+    }
+    private static int PressedFrameCount(Key key)
+        => _pressedFrameCounts.TryGetValue(key, out double time) ? (int)time : 0;
+
+    public static bool Repeat(this Key key, int interval, int delay)
+    {
+        if (!key.Hold()) return false;
+        // 経過フレーム数を取得
+        int frames = PressedFrameCount(key);
+        // 最初の delay フレームは無視
+        if (frames <= delay) return false;
+        // delay フレーム以降、interval ごとに true を返す
+        return (frames - delay) % interval == 0;
+    }
+
     public static bool Typing => _textEnter.IsActive;
 
     public static void ActivateText(ref string value, TextInputOptions? options = null)

@@ -213,6 +213,15 @@ public class Texture : IDisposable
         (int)(Height * Scale * Drawing.DefaultScale)
     );
 
+    public void SetColor(Color color, Color? add = null)
+    {
+        Color = color;
+        if (add != null)
+        {
+            //AddColor = add.Value;
+        }
+    }
+
     public Texture Export()
     {
         var tex = new Texture
