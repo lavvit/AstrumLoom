@@ -22,7 +22,8 @@ public interface IFont : IDisposable
 
 public static class FontHandle
 {
-    private static IGraphics G => Drawing.G;
+    private static IGraphics G => AstrumCore.Graphic;
+    public static string SystemFont => GetSystemFontName();
 
     // フォント作成
     public static IFont? Create(FontSpec spec)
@@ -35,7 +36,7 @@ public static class FontHandle
         ReferencePoint point = ReferencePoint.TopLeft,
         BlendMode blend = BlendMode.None,
         double opacity = 1)
-        => (font ?? Drawing.G.DefaultFont).Draw(G, x, y, text?.ToString() ?? "",
+        => (font ?? Drawing.DefaultFont).Draw(G, x, y, text?.ToString() ?? "",
             new DrawOptions
             {
                 Color = color,
@@ -44,6 +45,37 @@ public static class FontHandle
                 Opacity = opacity
             });
 
+    private static string GetSystemFontName()
+    {
+        try
+        {
+            //if (OperatingSystem.IsWindowsVersionAtLeast(6, 1))
+            //    return SystemFonts.DefaultFont.FontFamily.Name;
+
+            // Windows: 既存の SystemFonts 候補を優先
+            if (OperatingSystem.IsWindows())
+                return "Yu Gothic";
+            // macOS
+            if (OperatingSystem.IsMacOS())
+                return "Helvetica";
+            // iOS
+            if (OperatingSystem.IsIOS())
+                return "Helvetica";
+            // Linux
+            if (OperatingSystem.IsLinux())
+                return "DejaVu Sans";
+            // Android
+            if (OperatingSystem.IsAndroid())
+                return "Roboto";
+        }
+        catch
+        {
+            // 例外が発生した場合はフォールバックを返す
+        }
+
+        // 不明なプラットフォームまたはフォント取得失敗時の最終フォールバック
+        return Environment.OSVersion.Platform == PlatformID.Win32NT ? "Segoe UI" : "Arial";
+    }
 }
 
 /// <summary>フォントの“表示名”から TTF/OTF の実ファイルパスを解決する</summary>

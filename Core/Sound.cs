@@ -32,7 +32,7 @@ public class Sound : IDisposable
     private ISound? _sound { get; set; } = null;
     private bool _disposed = false;
     public Sound() { }
-    public Sound(string path, bool stream = false) => _sound = GameRunner.Platform.LoadSound(path, stream);
+    public Sound(string path, bool stream = false) => _sound = AstrumCore.Platform.LoadSound(path, stream);
 
     public void Play() => _sound?.Play();
     public void Stop() => _sound?.Stop();

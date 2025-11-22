@@ -179,6 +179,19 @@ public class Texture : IDisposable
             }
         }
     }
+    public double Angle
+    {
+        get => _texture?.Option?.Angle ?? 0.0;
+        set
+        {
+            if (_texture?.Option != null)
+            {
+                var opt = _texture.Option.Value;
+                opt.Angle = value;
+                _texture.Option = opt;
+            }
+        }
+    }
     public (bool X, bool Y) Flip
     {
         get => _texture?.Option?.Flip ?? (false, false);
@@ -199,4 +212,45 @@ public class Texture : IDisposable
         (int)(Width * Scale * Drawing.DefaultScale),
         (int)(Height * Scale * Drawing.DefaultScale)
     );
+
+    public Texture Export()
+    {
+        var tex = new Texture
+        {
+            Color = Color,
+            //AddColor = AddColor,
+            BlendMode = BlendMode,
+            Opacity = Opacity,
+            Scale = Scale,
+            Angle = Angle,
+            XYScale = XYScale,
+            Position = Position,
+            Point = Point,
+            Rectangle = Rectangle,
+            Flip = Flip,
+        };
+        return tex;
+    }
+    public void Import(Texture tex)
+    {
+        Color = tex.Color;
+        //AddColor = tex.AddColor;
+        BlendMode = tex.BlendMode;
+        Opacity = tex.Opacity;
+        Scale = tex.Scale;
+        Angle = tex.Angle;
+        XYScale = tex.XYScale;
+        Position = tex.Position;
+        Point = tex.Point;
+        Rectangle = tex.Rectangle;
+        Flip = tex.Flip;
+    }
+
+    public void Draw(double x, double y, LayoutUtil.Rect rectangle)
+    {
+        var beforeRect = Rectangle;
+        Rectangle = rectangle;
+        Draw(x, y);
+        Rectangle = beforeRect;
+    }
 }

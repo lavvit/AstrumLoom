@@ -16,6 +16,8 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         KeyInput.Initialize(platform.Input, platform.TextInput);
         Mouse.Init(platform.Mouse, showMouse);
         game.Initialize();
+        AstrumCore.InitDrop();
+        AstrumCore.InitCompleted = true;
 
         while (!platform.ShouldClose)
         {
@@ -30,9 +32,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             game.Draw();
             // ★ ここでオーバーレイ
             if (showOverlay)
-            {
-                Overlay.Current.Draw(platform);
-            }
+                Overlay.Current.Draw();
             Log.Draw();
             platform.Graphics.EndFrame();
 

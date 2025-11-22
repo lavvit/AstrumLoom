@@ -151,4 +151,9 @@ public class AstrumCore
         get; internal set;
         //get => Platform.IsActive;
     } = true;
+
+    public static bool InitCompleted
+        { get; internal set; }
+
+    public static double WindowScale => WindowConfig.Scale;
 }

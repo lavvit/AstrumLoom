@@ -102,7 +102,7 @@ internal sealed class DxLibTexture : ITexture
         }
     }
     public bool Enable => Handle > 0 && Loaded;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == GameRunner.MainThreadId;
+    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
     private bool _deferred;
     private long _startTicks;
     private const int DefaultTimeoutMs = 15000;

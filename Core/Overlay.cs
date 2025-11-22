@@ -13,8 +13,9 @@ public class Overlay
     private readonly FpsCounter _fps = new();
 
     // ここがベースの描画
-    public virtual void Draw(IGamePlatform platform)
+    public virtual void Draw()
     {
+        var platform = AstrumCore.Platform;
         var time = platform.Time;
 
         // ★ 毎フレーム、ゲーム時間で Tick

@@ -107,7 +107,7 @@ public class RayLibSound : ISound
         }
     }
     public bool Enable => _loaded && Loaded;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == GameRunner.MainThreadId;
+    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
     private bool _deferred;
     private long _startTicks;
     private const int DefaultTimeoutMs = 60000;

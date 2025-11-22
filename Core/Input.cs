@@ -280,7 +280,7 @@ public sealed class TextEnter
     public void Draw(double x, double y, Color? color = null, IFont? font = null)
     {
         if (!IsActive) return;
-        _impl.Draw(x, y, color, font ?? Drawing.G.DefaultFont, _caretTimer < 0.6);
+        _impl.Draw(x, y, color, font ?? AstrumCore.Graphic.DefaultFont, _caretTimer < 0.6);
     }
 
     public bool IsActive { get; private set; }
@@ -353,7 +353,7 @@ public class KeyBoard
         double ty = 0.66 * size;
         bool isfull = (int)type % 2 == 1;
         bool isjp = (int)type < 2;
-        var f = font ?? Drawing.G.DefaultFont;
+        var f = font ?? AstrumCore.Graphic.DefaultFont;
 
         // 行ごとのキー列を定義して反復処理するユーティリティ
         void DrawRow(ref double rx, double ry, KeySpec[] specs)
@@ -660,24 +660,24 @@ public class KeyBoard
     private static void DrawKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
-        font.Draw(Drawing.G, (int)(x2 + tx * width), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawKey(Key key, string keyname, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
-        font.Draw(Drawing.G, (int)(x2 + tx * width), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
         Drawing.Box(x2 + 0.5 * boxSize, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));
-        font.Draw(Drawing.G, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawNumEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         string keyname = "Enter";
         Drawing.Box(x2, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));
-        font.Draw(Drawing.G, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
     }
 }
 
