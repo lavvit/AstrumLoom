@@ -157,8 +157,11 @@ internal sealed class DxLibTexture : ITexture
         if (!Enable) return;
         var use = options ?? Option ?? new DrawOptions();
         SetOptions(use);
+        (double width, double height) = use.Rectangle.HasValue
+            ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
+            : (Width, Height);
 
-        var point = use.Position ?? (GetAnchorOffset(use.Point, Width, Height) * -1);
+        var point = use.Position ?? (GetAnchorOffset(use.Point, width, height) * -1);
         float defscale = (float)Drawing.DefaultScale;
         float fx = (float)(x * defscale);
         float fy = (float)(y * defscale);

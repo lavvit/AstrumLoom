@@ -131,6 +131,12 @@ public class Texture : IDisposable
                 opt.Position = value.Value;
                 _texture.Option = opt;
             }
+            else if (_texture?.Option != null)
+            {
+                var opt = _texture.Option.Value;
+                opt.Position = null;
+                _texture.Option = opt;
+            }
         }
     }
     public ReferencePoint Point
@@ -261,11 +267,23 @@ public class Texture : IDisposable
         Flip = tex.Flip;
     }
 
-    public void Draw(double x, double y, LayoutUtil.Rect rectangle)
+    public void Draw(double x, double y, LayoutUtil.Rect rectangle, LayoutUtil.Point? point = null)
     {
-        var beforeRect = Rectangle;
-        Rectangle = rectangle;
-        Draw(x, y);
-        Rectangle = beforeRect;
+        var options = new DrawOptions()
+        {
+            Color = Color,
+            Blend = BlendMode,
+            Opacity = Opacity,
+            Scale = XYScale ?? (Scale, Scale),
+            Angle = Angle,
+            Position = point ?? Position,
+            Point = Point,
+            Rectangle = rectangle,
+            Flip = Flip,
+            EdgeColor = _texture?.Option?.EdgeColor,
+            Font = _texture?.Option?.Font,
+            Thickness = _texture?.Option?.Thickness ?? 0,
+        };
+        _texture?.Draw(x, y, options);
     }
 }

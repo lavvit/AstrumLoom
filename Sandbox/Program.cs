@@ -22,11 +22,11 @@ internal sealed class SimpleTestGame : Scene
         _sound = new Sound("Assets/Cancel.ogg");
         _bgm = new Sound("Assets/バヨリンの音.ogg", true);
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
-        _kbfont = FontHandle.Create("Noto Sans JP", 6, true);
+        _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
         Drawing.DefaultFont = _font!;
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
-        _scene = new FancyShapesScene(1280, 720);
+        //_scene = new FancyShapesScene(1280, 720);
         Overlay.Set(new SandboxOverlay());
     }
 
@@ -58,12 +58,14 @@ internal sealed class SimpleTestGame : Scene
         if (_tex is null) return;
 
         // 画面中央あたりに描く（適当に）
-        float x = 640 + 160f * (float)Math.Sin(AstrumCore.Platform.Time.TotalTime);
-        float y = 240;
+        float x = 640;// + 160f * (float)Math.Sin(AstrumCore.Platform.Time.TotalTime)
+        float y = 360;
 
-        _tex.Scale = 1;
-        _tex.Point = ReferencePoint.Center;
-        _tex.Draw(x, y);
+        int p = DateTime.Now.Second % 9;
+        _tex.Point = (ReferencePoint)p;
+        _tex.XYScale = (2, 1);
+        //_tex.Draw(x, y);
+        _tex.Draw(x, y, new(150, 150, 300, 300));
         Drawing.Cross(x, y, size: 40, color: Color.Red, thickness: 2);
 
         KeyBoard.Draw(10, 540, size: 10, KeyType.JPFull, _kbfont);

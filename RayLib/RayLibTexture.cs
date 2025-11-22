@@ -162,8 +162,11 @@ internal sealed class RayLibTexture : ITexture
         if (!Enable) return;
         var use = options ?? Option ?? new DrawOptions();
         SetOptions(use);
+        (double width, double height) = use.Rectangle.HasValue
+            ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
+            : (Width, Height);
 
-        var point = use.Position ?? (GetAnchorOffset(use.Point, Width, Height) * -1);
+        var point = use.Position ?? (GetAnchorOffset(use.Point, width, height) * -1);
         double opacity = Math.Clamp(use.Opacity, 0.0, 1.0);
         var color = use.Color ?? Color.White;
         float defscale = (float)Drawing.DefaultScale;
