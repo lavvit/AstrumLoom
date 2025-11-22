@@ -344,6 +344,7 @@ public class KeyBoard
         // 3. リストを順に処理するヘルパーを作る：描画処理を選択（通常/ラベル/Enter/NumEnter）、描画後に x2 を advance する
         // 4. isfull に依存するキー列は条件によって追加する
         // 5. 既存の DrawKey / DrawEnterKey / DrawNumEnterKey を再利用する
+        // 6. 英字配列 (ESTKL, ESFull) の場合、ラベル解決は ResolveLabel を通して行う
 
         double x2 = x;
         double y2 = y;
@@ -351,6 +352,7 @@ public class KeyBoard
         double tx = 1.0 * size;
         double ty = 0.66 * size;
         bool isfull = (int)type % 2 == 1;
+        bool isjp = (int)type < 2;
         var f = font ?? Drawing.G.DefaultFont;
 
         // 行ごとのキー列を定義して反復処理するユーティリティ
@@ -377,59 +379,75 @@ public class KeyBoard
                     DrawKey(s.Key, f, px, py, tx, ty, boxSize, s.Width);
                     break;
             }
-            px += s.Advance * boxSize;
+            px += (s.Width + s.Advance) * boxSize;
         }
 
         // 1行目
-        DrawRow(ref x2, y2, new[]
-        {
-            new KeySpec(Key.Esc, null, 1.0, 2.075, RenderKind.Default),
-            new KeySpec(Key.F1, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F2, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F3, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F4, null, 1.0, 2.075, RenderKind.Default),
-            new KeySpec(Key.F5, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F6, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F7, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F8, null, 1.0, 2.075, RenderKind.Default),
-            new KeySpec(Key.F9, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F10, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F11, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F12, null, 1.0, 1.5, RenderKind.Default),
-            new KeySpec(Key.PrintScr, "PRT", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Scroll, "SCR", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Pause, "PAU", 1.0, 0.0, RenderKind.Labeled),
-        });
+        DrawRow(ref x2, y2,
+        [
+            GetKeySpec(Key.Esc, 1.5),
+            GetKeySpec(Key.F1),
+            GetKeySpec(Key.F2),
+            GetKeySpec(Key.F3),
+            GetKeySpec(Key.F4, 0.875),
+            GetKeySpec(Key.F5),
+            GetKeySpec(Key.F6),
+            GetKeySpec(Key.F7),
+            GetKeySpec(Key.F8, 0.875),
+            GetKeySpec(Key.F9),
+            GetKeySpec(Key.F10),
+            GetKeySpec(Key.F11),
+            GetKeySpec(Key.F12, 1),
+            GetKeySpec(Key.PrintScr, "PRT"),
+            GetKeySpec(Key.Scroll, "SCR"),
+            GetKeySpec(Key.Pause, "PAU", 0.0),
+        ]);
 
         // 2行目
         x2 = x;
         y2 += 1.5 * boxSize;
-        var row2 = new List<KeySpec>
-        {
-            new(Key.漢字, null, 1.0, 1.25, RenderKind.Default),
-            new(Key.Key_1, "1", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_2, "2", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_3, "3", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_4, "4", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_5, "5", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_6, "6", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_7, "7", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_8, "8", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_9, "9", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Key_0, "0", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Minus, "-", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Prevtrack, "^", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Yen, @"\", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Back, "←", 1.0, 1.5, RenderKind.Labeled),
-            new(Key.Insert, "Ins", 1.0, 1.25, RenderKind.Labeled),
-            new(Key.Home, null, 1.0, 1.25, RenderKind.Default),
-            new(Key.PgUp, null, 1.0, 0.0, RenderKind.Default),
-        };
-        DrawRow(ref x2, y2, row2.ToArray());
+        DrawRow(ref x2, y2, isjp ? [
+            GetKeySpec(Key.漢字),
+            GetKeySpec(Key.Key_1, "1"),
+            GetKeySpec(Key.Key_2, "2"),
+            GetKeySpec(Key.Key_3, "3"),
+            GetKeySpec(Key.Key_4, "4"),
+            GetKeySpec(Key.Key_5, "5"),
+            GetKeySpec(Key.Key_6, "6"),
+            GetKeySpec(Key.Key_7, "7"),
+            GetKeySpec(Key.Key_8, "8"),
+            GetKeySpec(Key.Key_9, "9"),
+            GetKeySpec(Key.Key_0, "0"),
+            GetKeySpec(Key.Minus, "-"),
+            GetKeySpec(Key.Prevtrack, "^"),
+            GetKeySpec(Key.Yen, @"\"),
+            GetKeySpec(Key.Back, "←", 1),
+            GetKeySpec(Key.Insert, "Ins"),
+            GetKeySpec(Key.Home),
+            GetKeySpec(Key.PgUp)
+        ] : [
+            GetKeySpec(Key.At, "`"),
+            GetKeySpec(Key.Key_1, "1"),
+            GetKeySpec(Key.Key_2, "2"),
+            GetKeySpec(Key.Key_3, "3"),
+            GetKeySpec(Key.Key_4, "4"),
+            GetKeySpec(Key.Key_5, "5"),
+            GetKeySpec(Key.Key_6, "6"),
+            GetKeySpec(Key.Key_7, "7"),
+            GetKeySpec(Key.Key_8, "8"),
+            GetKeySpec(Key.Key_9, "9"),
+            GetKeySpec(Key.Key_0, "0"),
+            GetKeySpec(Key.Minus, "-"),
+            GetKeySpec(Key.SemiColon, "="),
+            GetKeySpec(Key.Back, "←", 2.25, 1),
+            GetKeySpec(Key.Insert, "Ins"),
+            GetKeySpec(Key.Home),
+            GetKeySpec(Key.PgUp)
+            ]);
 
         if (isfull)
         {
-            x2 += 1.5 * boxSize;
+            x2 += 0.5 * boxSize;
             DrawKey(Key.NumPad_NumLock, "NUM", f, x2, y2, tx, ty, boxSize);
             x2 += 1.25 * boxSize;
             DrawKey(Key.NumPad_Divide, "/", f, x2, y2, tx, ty, boxSize);
@@ -440,30 +458,47 @@ public class KeyBoard
         // 3行目
         x2 = x;
         y2 += 1.5 * boxSize;
-        DrawRow(ref x2, y2, new[]
-        {
-            new KeySpec(Key.Tab, null, 1.5, 1.75, RenderKind.Default),
-            new KeySpec(Key.Q, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.W, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.E, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.R, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.T, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.Y, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.U, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.I, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.O, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.P, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.At, "@", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.LBracket, "[", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Enter, null, 1.25, 2.25, RenderKind.Enter),
-            new KeySpec(Key.Delete, "Del", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.End, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.PgDn, null, 1.0, 0.0, RenderKind.Default),
-        });
+        DrawRow(ref x2, y2, isjp ? [
+            GetKeySpec(Key.Tab, 1.75, 0.25),
+            GetKeySpec(Key.Q),
+            GetKeySpec(Key.W),
+            GetKeySpec(Key.E),
+            GetKeySpec(Key.R),
+            GetKeySpec(Key.T),
+            GetKeySpec(Key.Y),
+            GetKeySpec(Key.U),
+            GetKeySpec(Key.I),
+            GetKeySpec(Key.O),
+            GetKeySpec(Key.P),
+            GetKeySpec(Key.At, "@"),
+            GetKeySpec(Key.LBracket, "["),
+            new(Key.Enter, null, 1.0, 1.5, RenderKind.Enter),
+            GetKeySpec(Key.Delete, "Del"),
+            GetKeySpec(Key.End),
+            GetKeySpec(Key.PgDn),
+        ] : [
+            GetKeySpec(Key.Tab, 1.75, 0.25),
+            GetKeySpec(Key.Q),
+            GetKeySpec(Key.W),
+            GetKeySpec(Key.E),
+            GetKeySpec(Key.R),
+            GetKeySpec(Key.T),
+            GetKeySpec(Key.Y),
+            GetKeySpec(Key.U),
+            GetKeySpec(Key.I),
+            GetKeySpec(Key.O),
+            GetKeySpec(Key.P),
+            GetKeySpec(Key.LBracket, "["),
+            GetKeySpec(Key.RBracket, "]"),
+            GetKeySpec(Key.Yen, @"\", 1.5, 1),
+            GetKeySpec(Key.Delete, "Del"),
+            GetKeySpec(Key.End),
+            GetKeySpec(Key.PgDn),
+            ]);
 
         if (isfull)
         {
-            x2 += 1.5 * boxSize;
+            x2 += 0.5 * boxSize;
             DrawKey(Key.NumPad_7, "7", f, x2, y2, tx, ty, boxSize);
             x2 += 1.25 * boxSize;
             DrawKey(Key.NumPad_8, "8", f, x2, y2, tx, ty, boxSize);
@@ -476,26 +511,39 @@ public class KeyBoard
         // 4行目
         x2 = x;
         y2 += 1.5 * boxSize;
-        DrawRow(ref x2, y2, new[]
-        {
-            new KeySpec(Key.CapsLock, "Caps", 2.0, 2.25, RenderKind.Labeled),
-            new KeySpec(Key.A, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.S, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.D, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.F, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.G, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.H, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.J, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.K, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.L, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.SemiColon, ";", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Colon, ":", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.RBracket, "]", 1.0, 0.0, RenderKind.Labeled),
-        });
+        DrawRow(ref x2, y2, isjp ? [
+            GetKeySpec(Key.CapsLock, "Caps", 2.0, 0.25),
+            GetKeySpec(Key.A),
+            GetKeySpec(Key.S),
+            GetKeySpec(Key.D),
+            GetKeySpec(Key.F),
+            GetKeySpec(Key.G),
+            GetKeySpec(Key.H),
+            GetKeySpec(Key.J),
+            GetKeySpec(Key.K),
+            GetKeySpec(Key.L),
+            GetKeySpec(Key.SemiColon, ";"),
+            GetKeySpec(Key.Colon, ":"),
+            GetKeySpec(Key.RBracket, "]", 2.5)
+        ] : [
+            GetKeySpec(Key.CapsLock, "Caps", 2.0, 0.25),
+            GetKeySpec(Key.A),
+            GetKeySpec(Key.S),
+            GetKeySpec(Key.D),
+            GetKeySpec(Key.F),
+            GetKeySpec(Key.G),
+            GetKeySpec(Key.H),
+            GetKeySpec(Key.J),
+            GetKeySpec(Key.K),
+            GetKeySpec(Key.L),
+            GetKeySpec(Key.Colon, ";"),
+            GetKeySpec(Key.Prevtrack, "'"),
+            GetKeySpec(Key.Enter, 2.5, 1)
+            ]);
 
         if (isfull)
         {
-            x2 += 7.0 * boxSize;
+            x2 += 4.25 * boxSize;
             DrawKey(Key.NumPad_4, "4", f, x2, y2, tx, ty, boxSize);
             x2 += 1.25 * boxSize;
             DrawKey(Key.NumPad_5, "5", f, x2, y2, tx, ty, boxSize);
@@ -508,27 +556,40 @@ public class KeyBoard
         // 5行目
         x2 = x;
         y2 += 1.5 * boxSize;
-        DrawRow(ref x2, y2, new[]
-        {
-            new KeySpec(Key.LShift, "Shift", 2.75, 3.0, RenderKind.Labeled),
-            new KeySpec(Key.Z, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.X, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.C, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.V, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.B, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.N, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.M, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.Comma, ",", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Period, ".", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Slash, "/", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.BackSlash, @"\", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.RShift, "Shift", 1.75, 3.5, RenderKind.Labeled),
-            new KeySpec(Key.Up, "↑", 1.0, 0.0, RenderKind.Labeled),
-        });
+        DrawRow(ref x2, y2, isjp ? [
+            GetKeySpec(Key.LShift, "Shift", 2.75, 0.25),
+            GetKeySpec(Key.Z),
+            GetKeySpec(Key.X),
+            GetKeySpec(Key.C),
+            GetKeySpec(Key.V),
+            GetKeySpec(Key.B),
+            GetKeySpec(Key.N),
+            GetKeySpec(Key.M),
+            GetKeySpec(Key.Comma, ","),
+            GetKeySpec(Key.Period, "."),
+            GetKeySpec(Key.Slash, "/"),
+            GetKeySpec(Key.BackSlash, @"\"),
+            GetKeySpec(Key.RShift, "Shift", 1.75, 2.25),
+            GetKeySpec(Key.Up, "↑")
+        ] : [
+            GetKeySpec(Key.LShift, "Shift", 2.75, 0.25),
+            GetKeySpec(Key.Z),
+            GetKeySpec(Key.X),
+            GetKeySpec(Key.C),
+            GetKeySpec(Key.V),
+            GetKeySpec(Key.B),
+            GetKeySpec(Key.N),
+            GetKeySpec(Key.M),
+            GetKeySpec(Key.Comma, ","),
+            GetKeySpec(Key.Period, "."),
+            GetKeySpec(Key.Slash, "/"),
+            GetKeySpec(Key.RShift, "Shift", 3, 2.25),
+            GetKeySpec(Key.Up, "↑")
+            ]);
 
         if (isfull)
         {
-            x2 += 2.75 * boxSize;
+            x2 += 1.75 * boxSize;
             DrawKey(Key.NumPad_1, "1", f, x2, y2, tx, ty, boxSize);
             x2 += 1.25 * boxSize;
             DrawKey(Key.NumPad_2, "2", f, x2, y2, tx, ty, boxSize);
@@ -541,26 +602,36 @@ public class KeyBoard
         // 6行目
         x2 = x;
         y2 += 1.5 * boxSize;
-        DrawRow(ref x2, y2, new[]
-        {
-            new KeySpec(Key.LCtrl, "Ctrl", 1.5, 1.75, RenderKind.Labeled),
-            new KeySpec(Key.LWindows, "Win", 1.5, 1.75, RenderKind.Labeled),
-            new KeySpec(Key.LAlt, "Alt", 1.5, 1.75, RenderKind.Labeled),
-            new KeySpec(Key.無変換, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.Space, null, 3.75, 4.0, RenderKind.Default),
-            new KeySpec(Key.変換, null, 1.0, 1.25, RenderKind.Default),
-            new KeySpec(Key.かな, null, 1.5, 1.75, RenderKind.Default),
-            new KeySpec(Key.RAlt, "Alt", 1.5, 1.75, RenderKind.Labeled),
-            new KeySpec(Key.RWindows, "Win", 1.5, 1.75, RenderKind.Labeled),
-            new KeySpec(Key.RCtrl, "Ctrl", 1.5, 2.0, RenderKind.Labeled),
-            new KeySpec(Key.Left, "←", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Down, "↓", 1.0, 1.25, RenderKind.Labeled),
-            new KeySpec(Key.Right, "→", 1.0, 0.0, RenderKind.Labeled),
-        });
+        DrawRow(ref x2, y2, isjp ? [
+            GetKeySpec(Key.LCtrl, "Ctrl", 1.5, 0.25),
+            GetKeySpec(Key.LWindows, "Win", 1.5, 0.25),
+            GetKeySpec(Key.LAlt, "Alt", 1.5, 0.25),
+            GetKeySpec(Key.無変換),
+            GetKeySpec(Key.Space, 3.75, 0.25),
+            GetKeySpec(Key.変換),
+            GetKeySpec(Key.かな, 1.5, 0.25),
+            GetKeySpec(Key.RAlt, "Alt", 1.5, 0.25),
+            GetKeySpec(Key.RWindows, "Win", 1.5, 0.25),
+            GetKeySpec(Key.RCtrl, "Ctrl", 1.5, 1),
+            GetKeySpec(Key.Left, "←"),
+            GetKeySpec(Key.Down, "↓"),
+            GetKeySpec(Key.Right, "→"),
+        ] : [
+            GetKeySpec(Key.LCtrl, "Ctrl", 1.5, 0.25),
+            GetKeySpec(Key.LWindows, "Win", 1.5, 0.25),
+            GetKeySpec(Key.LAlt, "Alt", 1.5, 0.25),
+            GetKeySpec(Key.Space, 8, 0.25),
+            GetKeySpec(Key.RAlt, "Alt", 1.5, 0.25),
+            GetKeySpec(Key.RWindows, "Win", 1.5, 0.25),
+            GetKeySpec(Key.RCtrl, "Ctrl", 1.5, 1),
+            GetKeySpec(Key.Left, "←"),
+            GetKeySpec(Key.Down, "↓"),
+            GetKeySpec(Key.Right, "→"),
+            ]);
 
         if (isfull)
         {
-            x2 += 1.5 * boxSize;
+            x2 += 0.5 * boxSize;
             DrawKey(Key.NumPad_0, "0", f, x2, y2, tx, ty, boxSize, 2.25);
             x2 += 2.5 * boxSize;
             DrawKey(Key.NumPad_Decimal, ".", f, x2, y2, tx, ty, boxSize);
@@ -569,6 +640,20 @@ public class KeyBoard
 
     // キー仕様を表すシンプルなローカル型
     private record KeySpec(Key Key, string? Label, double Width, double Advance, RenderKind Kind);
+
+    private static KeySpec GetKeySpec(Key key, string label, double width, double advance)
+        => new(key, label, width, advance, RenderKind.Labeled);
+    private static KeySpec GetKeySpec(Key key, string label, double advance)
+        => new(key, label, 1.0, advance, RenderKind.Labeled);
+    private static KeySpec GetKeySpec(Key key, string label)
+        => new(key, label, 1.0, 0.25, RenderKind.Labeled);
+    private static KeySpec GetKeySpec(Key key, double width, double advance)
+        => new(key, null, width, advance, RenderKind.Default);
+    private static KeySpec GetKeySpec(Key key, double advance)
+        => new(key, null, 1.0, advance, RenderKind.Default);
+    private static KeySpec GetKeySpec(Key key)
+        => new(key, null, 1.0, 0.25, RenderKind.Default);
+
     private enum RenderKind
     { Default, Labeled, Enter, NumEnter }
 

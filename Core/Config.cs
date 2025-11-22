@@ -9,6 +9,8 @@ public sealed class GameConfig
     public double Scale { get; set; } = 1.0;   // 論理解像度に対する拡大率
     public bool Resizable { get; set; } = true;
     public bool RunInBackground { get; set; } = true; // 非アクティブでも動かすか
+    public bool Fullscreen { get; set; } = false;
+    public bool ShowMouse { get; set; } = true;
 
     // --- Timing / Performance ---
     public float TargetFps { get; set; } = 60f;

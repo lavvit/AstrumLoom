@@ -1,25 +1,13 @@
-﻿namespace AstrumLoom;
+﻿using static AstrumLoom.LayoutUtil;
 
-public interface ITexture
-{
-    int Width { get; }
-    int Height { get; }
-}
+namespace AstrumLoom;
 
 public interface IGraphics
 {
     ITexture LoadTexture(string path);
-    void UnloadTexture(ITexture texture);
 
     void BeginFrame();
     void Clear(Color color);
-
-    void DrawTexture(
-        ITexture texture,
-        float x, float y,
-        float scaleX = 1f,
-        float scaleY = 1f,
-        float rotationRad = 0f);
 
     void EndFrame();
 
@@ -65,10 +53,11 @@ public interface IGraphics
 public enum BlendMode
 {
     None = 0,
-    Alpha = 1,
-    Add = 2,
+    Add = 1,
+    Subtract = 2,
     Multiply = 3,
-    Screen = 4,
+    Reverse = 4,
+    Screen = 5,
 }
 
 public enum ReferencePoint
@@ -86,6 +75,7 @@ public enum ReferencePoint
 
 public struct DrawOptions
 {
+    public DrawOptions() { }
     public Color? Color { get; set; } = null;
     public double Opacity { get; set; } = 1.0;
     public readonly bool Fill => Thickness <= 0;
@@ -93,7 +83,13 @@ public struct DrawOptions
     public BlendMode Blend { get; set; } = BlendMode.None;
     public ReferencePoint Point { get; set; } = ReferencePoint.TopLeft;
 
-    public DrawOptions() { }
+    // テクスチャ用
+    public (double W, double H) Scale { get; set; } = (1.0, 1.0);
+    public double Angle { get; set; } = 0.0;
+    public (bool X, bool Y) Flip { get; set; } = (false, false);
+
+    public Point? Position { get; set; } = null;
+    public Rect? Rectangle { get; set; } = null;
 }
 
 public static class GraphicsExtensions
@@ -269,5 +265,69 @@ public static class LayoutUtil
         public (double x, double y) ToTuple() => (X, Y);
 
         public override int GetHashCode() => HashCode.Combine(X, Y);
+    }
+
+    public struct Size
+    {
+        public double Width;
+        public double Height;
+        public Size() { Width = 0; Height = 0; }
+        public Size(double w, double h)
+        {
+            Width = w;
+            Height = h;
+        }
+        public Size(System.Drawing.SizeF s)
+        {
+            Width = s.Width;
+            Height = s.Height;
+        }
+        public static Size operator +(Size a, Size b) => new(a.Width + b.Width, a.Height + b.Height);
+        public static Size operator -(Size a, Size b) => new(a.Width - b.Width, a.Height - b.Height);
+        public static Size operator *(Size a, double b) => new(a.Width * b, a.Height * b);
+        public static Size operator /(Size a, double b) => new(a.Width / b, a.Height / b);
+        public static bool operator ==(Size a, Size b) => a.Width == b.Width && a.Height == b.Height;
+        public static bool operator !=(Size a, Size b) => !(a == b);
+        public override readonly bool Equals(object? obj) => obj is Size s && this == s;
+        public override readonly string ToString() => $"({Width}, {Height})";
+        public override int GetHashCode() => HashCode.Combine(Width, Height);
+    }
+
+    public struct Rect
+    {
+        public double X;
+        public double Y;
+        public double Width;
+        public double Height;
+        public Rect()
+        {
+            X = 0; Y = 0; Width = 0; Height = 0;
+        }
+        public Rect(Point p, Size s)
+        {
+            X = p.X; Y = p.Y; Width = s.Width; Height = s.Height;
+        }
+        public Rect(double w, double h)
+        {
+            X = 0; Y = 0; Width = w; Height = h;
+        }
+        public Rect(double x, double y, double w, double h)
+        {
+            X = x; Y = y; Width = w; Height = h;
+        }
+        public Rect(System.Drawing.RectangleF r)
+        {
+            X = r.X; Y = r.Y; Width = r.Width; Height = r.Height;
+        }
+        public static Rect operator +(Rect a, Point b)
+            => new(a.X + b.X, a.Y + b.Y, a.Width, a.Height);
+        public static Rect operator -(Rect a, Point b)
+            => new(a.X - b.X, a.Y - b.Y, a.Width, a.Height);
+        public static bool operator ==(Rect a, Rect b)
+            => a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height;
+        public static bool operator !=(Rect a, Rect b) => !(a == b);
+        public override readonly bool Equals(object? obj) => obj is Rect r && this == r;
+        public override readonly string ToString() => $"({X}, {Y}, {Width}, {Height})";
+        public override int GetHashCode() => HashCode.Combine(X, Y, Width, Height);
     }
 }

@@ -7,59 +7,60 @@ namespace Sandbox;
 internal sealed class SimpleTestGame : IGame
 {
     private readonly IGamePlatform _platform;
-    private ITexture? _tex;
+    private Texture? _tex;
     private IFont? _font;
-    private string _playerName = "lavvit";
+    private IFont? _kbfont;
+
+    // 追加: 図形テストシーン
+    private Scene? _scene;
 
     public SimpleTestGame(IGamePlatform platform) => _platform = platform;
 
     public void Initialize()
     {
         // 実行ファイルからの相対パスになる
-        _tex = _platform.Graphics.LoadTexture("Assets/test.png");
-        _font = _platform.Graphics.CreateFont(new FontSpec("ＤＦ太丸ゴシック体 Pro-5", 44));
+        _tex = new Texture("Assets/test.png");
+        _font = FontHandle.Create(new FontSpec("ＤＦ太丸ゴシック体 Pro-5", 24));
+        _kbfont = FontHandle.Create(new FontSpec("Noto Sans JP", 6, true));
+        Drawing.DefaultFont = _font!;
+
+        // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
+        //_scene = new FancyShapesScene(1280, 720);
     }
 
     public void Update(float deltaTime)
     {
-        if (KeyInput.Push(Key.Esc) && !_platform.TextInput.IsActive)
+        if (KeyInput.Push(Key.Esc) && !KeyInput.Typing)
         {
             _platform.Close();
         }
 
-        // F2 押したら名前入力開始
-        if (KeyInput.Push(Key.F2))
-        {
-            KeyInput.ActivateText(ref _playerName, new()
-            {
-                MaxLength = 16,
-                EscapeCancelable = true,
-                // 位置とかフォントサイズとかもここで
-            });
-        }
-        // 入力中の監視（SeaDrop の Enter() 相当）
-        else if (KeyInput.Enter(ref _playerName))
-        {
-            // ここに「入力確定した瞬間」の処理を書く
-            Log.Write(_playerName);
-        }
+        // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
+        _scene?.Update();
     }
 
     public void Draw()
     {
+        // 先に図形シーンを描く（背景＋デコレーション）
+        _scene?.Draw();
+        if (_scene != null) return;
+
         Drawing.Fill(Color.CornflowerBlue);
+
         if (_tex is null) return;
 
         // 画面中央あたりに描く（適当に）
-        float x = 640 - _tex.Width / 2f + 160f * (float)Math.Sin(_platform.Time.TotalTime);
-        float y = 360 - _tex.Height / 2f;
+        float x = 640 + 160f * (float)Math.Sin(_platform.Time.TotalTime);
+        float y = 240;
 
-        var g = _platform.Graphics;
+        _tex.Scale = 1;
+        _tex.Point = ReferencePoint.Center;
+        _tex.Draw(x, y);
+        Drawing.Cross(x, y, size: 40, color: Color.Red, thickness: 2);
 
-        g.DrawTexture(_tex, x, y);
-        KeyInput.DrawText(x, y, _playerName, Color.White, _font);
+        KeyBoard.Draw(10, 540, size: 10, KeyType.JPFull, _kbfont);
 
-        //KeyBoard.Draw(20, 200, 16, KeyType.JPTKL, _font);
+        Mouse.Draw(20);
     }
 }
 
@@ -75,6 +76,7 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
+            ShowMouse = false,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
             GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替

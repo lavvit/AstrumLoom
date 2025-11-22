@@ -18,7 +18,7 @@ public sealed class GameHost : IDisposable
         Game = game;
 
         Platform.Time.TargetFps = config.TargetFps;
-        _runner = new GameRunner(platform, game, config.ShowFpsOverlay);
+        _runner = new GameRunner(platform, game, config.ShowFpsOverlay, config.ShowMouse);
     }
 
     public void Run() => _runner.Run();

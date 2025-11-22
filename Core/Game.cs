@@ -7,13 +7,15 @@ public interface IGame
     void Draw();
 }
 
-public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true)
+public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true, bool showMouse = true)
 {
+    public static int MainThreadId { get; } = Environment.CurrentManagedThreadId;
     private static readonly Color BackgroundColor = new(10, 10, 11);
     public void Run()
     {
         Drawing.Initialize(platform.Graphics);
         KeyInput.Initialize(platform.Input, platform.TextInput);
+        Mouse.Init(platform.Mouse, showMouse);
         game.Initialize();
 
         while (!platform.ShouldClose)
@@ -22,6 +24,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             platform.PollEvents();
 
             game.Update(platform.Time.DeltaTime);
+            platform.Mouse.Update();
 
             platform.Graphics.BeginFrame();
             platform.Graphics.Clear(BackgroundColor);

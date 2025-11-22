@@ -130,9 +130,9 @@ public class Drawing
         int thickness = 1,
         BlendMode blend = BlendMode.None, double opacity = 1)
     {
-        Line(x - size / 2, y - size / 2, size, size,
+        Line(x - size / 2, y, size, 0,
             color, thickness, blend, opacity);
-        Line(x - size / 2, y + size / 2, size, -size,
+        Line(x, y - size / 2, 0, size,
             color, thickness, blend, opacity);
     }
 
@@ -144,7 +144,7 @@ public class Drawing
     public static IFont DefaultFont
     {
         get => field ?? G.DefaultFont; set;
-    }
+    } = null;
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");
     public static void Text(double x, double y, object text,
@@ -279,4 +279,6 @@ public class Drawing
             }
         }
     }
+
+    public static double DefaultScale { get; set; } = 1.0;
 }
