@@ -4,14 +4,13 @@ namespace AstrumLoom;
 
 public class Drawing
 {
-    internal static IGraphics G { get; private set; } = null!;
-    internal static void Initialize(IGraphics graphics) => G = graphics;
+    internal static IGraphics Graphics => AstrumCore.Graphic;
 
     public static void Line(double x1, double y1, double dx, double dy,
         Color? color = null,
         int thickness = 1,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => G.Line(x1, y1, dx, dy,
+        => Graphics.Line(x1, y1, dx, dy,
             new DrawOptions
             {
                 Color = color,
@@ -38,7 +37,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => G.Box(x, y, width, height,
+        => Graphics.Box(x, y, width, height,
             new DrawOptions
             {
                 Color = color,
@@ -65,7 +64,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => G.Circle(x, y, radius,
+        => Graphics.Circle(x, y, radius,
             new DrawOptions
             {
                 Color = color,
@@ -85,7 +84,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => G.Oval(x, y, rx, ry,
+        => Graphics.Oval(x, y, rx, ry,
             new DrawOptions
             {
                 Color = color,
@@ -106,7 +105,7 @@ public class Drawing
         Color? color = null,
         int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => G.Triangle(x1, y1, x2, y2, x3, y3,
+        => Graphics.Triangle(x1, y1, x2, y2, x3, y3,
             new DrawOptions
             {
                 Color = color,
@@ -137,13 +136,13 @@ public class Drawing
     }
 
     public static void Blackout(double opacity = 1.0, Color? color = null)
-        => G.Blackout(opacity, color);
+        => Graphics.Blackout(opacity, color);
     public static void Fill(Color color)
         => Blackout(1.0, color);
 
     public static IFont DefaultFont
     {
-        get => field ?? G.DefaultFont; set;
+        get => field ?? Graphics.DefaultFont; set;
     } = null;
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");

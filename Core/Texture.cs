@@ -38,7 +38,7 @@ public class Texture : IDisposable
     private bool _disposed = false;
     public Texture() { }
     public Texture(string path)
-        => _texture = GameRunner.Platform.LoadTexture(path);
+        => _texture = AstrumCore.Platform.LoadTexture(path);
 
     public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
 
@@ -75,6 +75,19 @@ public class Texture : IDisposable
     public bool Enable => _texture?.Enable ?? false;
 
     #region DrawOptions Proxy
+    public double Opacity
+    {
+        get => _texture?.Option?.Opacity ?? 1.0;
+        set
+        {
+            if (_texture?.Option != null)
+            {
+                var opt = _texture.Option.Value;
+                opt.Opacity = value;
+                _texture.Option = opt;
+            }
+        }
+    }
     public double Scale
     {
         get => _texture?.Option?.Scale.W ?? 1.0;
