@@ -29,15 +29,16 @@ public interface ISound
 }
 public class Sound : IDisposable
 {
-    public ISound _sound;
+    private ISound? _sound { get; set; } = null;
     private bool _disposed = false;
+    public Sound() { }
     public Sound(string path, bool stream = false) => _sound = GameRunner.Platform.LoadSound(path, stream);
 
-    public void Play() => _sound.Play();
-    public void Stop() => _sound.Stop();
-    public void PlayStream() => _sound.PlayStream();
+    public void Play() => _sound?.Play();
+    public void Stop() => _sound?.Stop();
+    public void PlayStream() => _sound?.PlayStream();
 
-    public void Pump() => _sound.Pump();
+    public void Pump() => _sound?.Pump();
 
     ~Sound() => Dispose(false);
 
@@ -53,48 +54,49 @@ public class Sound : IDisposable
         {
             if (disposing)
             {
-                _sound.Dispose();
+                _sound?.Dispose();
             }
+            _sound = null;
             _disposed = true;
         }
     }
 
-    public string Path => _sound.Path;
-    public int Length => _sound.Length;
-    public bool IsReady => _sound.IsReady;
-    public bool IsFailed => _sound.IsFailed;
-    public bool Loaded => _sound.Loaded;
-    public bool Enable => _sound.Enable;
+    public string Path => _sound?.Path ?? "";
+    public int Length => _sound?.Length ?? 0;
+    public bool IsReady => _sound?.IsReady ?? false;
+    public bool IsFailed => _sound?.IsFailed ?? false;
+    public bool Loaded => _sound?.Loaded ?? false;
+    public bool Enable => _sound?.Enable ?? false;
 
     public double Time
     {
-        get => _sound.Time;
-        set => _sound.Time = value;
+        get => _sound?.Time ?? 0;
+        set => _sound?.Time = value;
     }
     public double Volume
     {
-        get => _sound.Volume;
-        set => _sound.Volume = value;
+        get => _sound?.Volume ?? 0;
+        set => _sound?.Volume = value;
     }
     public double Pan
     {
-        get => _sound.Pan;
-        set => _sound.Pan = value;
+        get => _sound?.Pan ?? 0;
+        set => _sound?.Pan = value;
     }
     public double Pitch
     {
-        get => _sound.Pitch;
-        set => _sound.Pitch = value;
+        get => _sound?.Pitch ?? 1;
+        set => _sound?.Pitch = value;
     }
     public double Speed
     {
-        get => _sound.Speed;
-        set => _sound.Speed = value;
+        get => _sound?.Speed ?? 1;
+        set => _sound?.Speed = value;
     }
-    public bool IsPlaying => _sound.IsPlaying;
+    public bool Playing => _sound?.IsPlaying ?? false;
     public bool Loop
     {
-        get => _sound.Loop;
-        set => _sound.Loop = value;
+        get => _sound?.Loop ?? false;
+        set => _sound?.Loop = value;
     }
 }

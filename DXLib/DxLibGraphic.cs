@@ -8,6 +8,20 @@ internal sealed class DxLibGraphics : IGraphics
         // ここではとりあえず「Default」の 24px ぐらいを作っておく
         DefaultFont = CreateFont(new FontSpec("", 24));
 
+    private (int w, int h) _size = (-1, -1);
+    public LayoutUtil.Size Size
+    {
+        get
+        {
+            if (_size.w < 0 || _size.h < 0)
+            {
+                GetWindowSize(out int w, out int h);
+                _size = (w, h);
+            }
+            return new LayoutUtil.Size(_size.w, _size.h);
+        }
+    }
+
     public ITexture LoadTexture(string path) => new DxLibTexture(path);
 
     public void BeginFrame()

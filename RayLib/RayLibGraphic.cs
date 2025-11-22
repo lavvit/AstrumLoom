@@ -17,6 +17,19 @@ internal sealed class RayLibGraphics : IGraphics
 {
     public RayLibGraphics() => DefaultFont = CreateFont(new FontSpec("", 24));
 
+    private (int w, int h) _size;
+    public LayoutUtil.Size Size
+    {
+        get
+        {
+            if (_size.w <= 0 || _size.h <= 0)
+            {
+                _size.w = GetScreenWidth();
+                _size.h = GetScreenHeight();
+            }
+            return new LayoutUtil.Size(_size.w, _size.h);
+        }
+    }
     public ITexture LoadTexture(string path)
     {
         // 失敗時は Raylib が自前のエラーを出すので、ここではそのまま投げる

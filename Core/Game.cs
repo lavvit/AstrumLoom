@@ -12,6 +12,8 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     public static int MainThreadId { get; } = Environment.CurrentManagedThreadId;
     public static IGamePlatform Platform { get; private set; } = null!;
     private static readonly Color BackgroundColor = new(10, 10, 11);
+    public static int Width => (int)Platform.Graphics.Size.Width;
+    public static int Height => (int)Platform.Graphics.Size.Height;
 
     public void Run()
     {

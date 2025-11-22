@@ -4,6 +4,7 @@ namespace AstrumLoom;
 
 public interface IGraphics
 {
+    Size Size { get; }
     void BeginFrame();
     void Clear(Color color);
 

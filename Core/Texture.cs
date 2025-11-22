@@ -32,14 +32,17 @@ public static class TextureExtensions
             Opacity = opacity
         });
 }
-public class Texture(string path) : IDisposable
+public class Texture : IDisposable
 {
-    private ITexture _texture = GameRunner.Platform.LoadTexture(path);
+    private ITexture? _texture { get; set; } = null;
     private bool _disposed = false;
+    public Texture() { }
+    public Texture(string path)
+        => _texture = GameRunner.Platform.LoadTexture(path);
 
-    public void Draw(double x = 0, double y = 0) => _texture.Draw(x, y);
+    public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
 
-    public void Pump() => _texture.Pump();
+    public void Pump() => _texture?.Pump();
 
     ~Texture() => Dispose(false);
 
@@ -55,28 +58,29 @@ public class Texture(string path) : IDisposable
         {
             if (disposing)
             {
-                _texture.Dispose();
+                _texture?.Dispose();
             }
+            _texture = null;
             _disposed = true;
         }
     }
 
-    public string Path => _texture.Path;
-    public int Width => _texture.Width;
-    public int Height => _texture.Height;
+    public string Path => _texture?.Path ?? "";
+    public int Width => _texture?.Width ?? 0;
+    public int Height => _texture?.Height ?? 0;
 
-    public bool IsReady => _texture.IsReady;
-    public bool IsFailed => _texture.IsFailed;
-    public bool Loaded => _texture.Loaded;
-    public bool Enable => _texture.Enable;
+    public bool IsReady => _texture?.IsReady ?? false;
+    public bool IsFailed => _texture?.IsFailed ?? false;
+    public bool Loaded => _texture?.Loaded ?? false;
+    public bool Enable => _texture?.Enable ?? false;
 
     #region DrawOptions Proxy
     public double Scale
     {
-        get => _texture.Option?.Scale.W ?? 1.0;
+        get => _texture?.Option?.Scale.W ?? 1.0;
         set
         {
-            if (_texture.Option != null)
+            if (_texture?.Option != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Scale = (value, value);
@@ -86,10 +90,10 @@ public class Texture(string path) : IDisposable
     }
     public (double X, double Y)? XYScale
     {
-        get => _texture.Option?.Scale;
+        get => _texture?.Option?.Scale;
         set
         {
-            if (_texture.Option != null && value != null)
+            if (_texture?.Option != null && value != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Scale = value.Value;
@@ -99,10 +103,10 @@ public class Texture(string path) : IDisposable
     }
     public LayoutUtil.Point? Position
     {
-        get => _texture.Option?.Position;
+        get => _texture?.Option?.Position;
         set
         {
-            if (_texture.Option != null && value != null)
+            if (_texture?.Option != null && value != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Position = value.Value;
@@ -112,10 +116,10 @@ public class Texture(string path) : IDisposable
     }
     public ReferencePoint Point
     {
-        get => _texture.Option?.Point ?? ReferencePoint.TopLeft;
+        get => _texture?.Option?.Point ?? ReferencePoint.TopLeft;
         set
         {
-            if (_texture.Option != null)
+            if (_texture?.Option != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Point = value;
@@ -125,10 +129,10 @@ public class Texture(string path) : IDisposable
     }
     public LayoutUtil.Rect? Rectangle
     {
-        get => _texture.Option?.Rectangle;
+        get => _texture?.Option?.Rectangle;
         set
         {
-            if (_texture.Option != null && value != null)
+            if (_texture?.Option != null && value != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Rectangle = value;
@@ -138,10 +142,10 @@ public class Texture(string path) : IDisposable
     }
     public Color Color
     {
-        get => _texture.Option?.Color ?? Color.White;
+        get => _texture?.Option?.Color ?? Color.White;
         set
         {
-            if (_texture.Option != null)
+            if (_texture?.Option != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Color = value;
@@ -151,10 +155,10 @@ public class Texture(string path) : IDisposable
     }
     public BlendMode BlendMode
     {
-        get => _texture.Option?.Blend ?? BlendMode.None;
+        get => _texture?.Option?.Blend ?? BlendMode.None;
         set
         {
-            if (_texture.Option != null)
+            if (_texture?.Option != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Blend = value;
@@ -164,10 +168,10 @@ public class Texture(string path) : IDisposable
     }
     public (bool X, bool Y) Flip
     {
-        get => _texture.Option?.Flip ?? (false, false);
+        get => _texture?.Option?.Flip ?? (false, false);
         set
         {
-            if (_texture.Option != null)
+            if (_texture?.Option != null)
             {
                 var opt = _texture.Option.Value;
                 opt.Flip = value;

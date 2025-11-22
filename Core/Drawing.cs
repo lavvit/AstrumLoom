@@ -280,5 +280,9 @@ public class Drawing
         }
     }
 
+    public static Texture MakeTexture(Action drawAction, int width = 0, int height = 0)
+    //    => G.MakeTexture(drawAction, width, height);
+          => new("");
+
     public static double DefaultScale { get; set; } = 1.0;
 }
