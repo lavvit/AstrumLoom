@@ -112,6 +112,12 @@ public class Texture : IDisposable
                 opt.Scale = value.Value;
                 _texture.Option = opt;
             }
+            else if (_texture?.Option != null)
+            {
+                var opt = _texture.Option.Value;
+                opt.Scale = (1.0, 1.0);
+                _texture.Option = opt;
+            }
         }
     }
     public LayoutUtil.Point? Position
