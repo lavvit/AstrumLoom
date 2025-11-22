@@ -8,6 +8,8 @@ internal sealed class SimpleTestGame : IGame
 {
     private readonly IGamePlatform _platform;
     private Texture? _tex;
+    private Sound? _sound;
+    private Sound? _bgm;
     private IFont? _font;
     private IFont? _kbfont;
 
@@ -20,6 +22,8 @@ internal sealed class SimpleTestGame : IGame
     {
         // 実行ファイルからの相対パスになる
         _tex = new Texture("Assets/test.png");
+        _sound = new Sound("Assets/Cancel.ogg");
+        _bgm = new Sound("Assets/バヨリンの音.ogg", true);
         _font = FontHandle.Create(new FontSpec("ＤＦ太丸ゴシック体 Pro-5", 24));
         _kbfont = FontHandle.Create(new FontSpec("Noto Sans JP", 6, true));
         Drawing.DefaultFont = _font!;
@@ -30,9 +34,15 @@ internal sealed class SimpleTestGame : IGame
 
     public void Update(float deltaTime)
     {
-        if (KeyInput.Push(Key.Esc) && !KeyInput.Typing)
+        if (KeyInput.Push(Key.Esc))
         {
             _platform.Close();
+        }
+        _bgm?.Loop = true;
+        _bgm?.PlayStream();
+        if (KeyInput.Push(Key.Space))
+        {
+            _sound?.Play();
         }
 
         // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
@@ -79,7 +89,7 @@ internal static class Program
             ShowMouse = false,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
-            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
+            GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
         };
 
         try

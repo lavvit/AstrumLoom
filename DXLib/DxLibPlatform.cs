@@ -72,6 +72,11 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public void Dispose() => DxLib_End();
 
+    public ITexture LoadTexture(string path) =>
+        new DxLibTexture(path);
+    public ISound LoadSound(string path, bool streaming) =>
+        new DxLibSound(path, streaming);
+
     // --- 以下 stub 実装たち ---
 
     private sealed class SimpleTime : ITime

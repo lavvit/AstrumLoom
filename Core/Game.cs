@@ -10,9 +10,12 @@ public interface IGame
 public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true, bool showMouse = true)
 {
     public static int MainThreadId { get; } = Environment.CurrentManagedThreadId;
+    public static IGamePlatform Platform { get; private set; } = null!;
     private static readonly Color BackgroundColor = new(10, 10, 11);
+
     public void Run()
     {
+        Platform = platform;
         Drawing.Initialize(platform.Graphics);
         KeyInput.Initialize(platform.Input, platform.TextInput);
         Mouse.Init(platform.Mouse, showMouse);

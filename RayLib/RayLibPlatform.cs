@@ -30,6 +30,10 @@ public sealed class RayLibPlatform : IGamePlatform
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
         SetTargetFPS(0);
         SetExitKey(0); // ESC キーで終了しないようにする
+        if (!IsAudioDeviceReady())
+        {
+            InitAudioDevice();
+        }
 
         Time = new SimpleTime { TargetFps = config.TargetFps };
         Graphics = new RayLibGraphics();
@@ -63,6 +67,11 @@ public sealed class RayLibPlatform : IGamePlatform
             CloseWindow();
         }
     }
+
+    public ITexture LoadTexture(string path) =>
+        new RayLibTexture(path);
+    public ISound LoadSound(string path, bool streaming = false) =>
+        new RayLibSound(path, streaming);
 
     // ================================
     //  時間管理（DxLib版と同じノリ）

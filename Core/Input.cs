@@ -16,9 +16,9 @@ public static class KeyInput
         _textEnter = textEnter;
     }
 
-    public static bool Push(this Key key) => _input.GetKeyDown(key);
-    public static bool Hold(this Key key) => _input.GetKey(key);
-    public static bool Left(this Key key) => _input.GetKeyUp(key);
+    public static bool Push(this Key key) => !Typing && _input.GetKeyDown(key);
+    public static bool Hold(this Key key) => !Typing && _input.GetKey(key);
+    public static bool Left(this Key key) => !Typing && _input.GetKeyUp(key);
 
     public static bool Typing => _textEnter.IsActive;
 

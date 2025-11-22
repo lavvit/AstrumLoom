@@ -18,6 +18,7 @@ internal sealed class RayLibTexture : ITexture
         Native = texture;
         Width = texture.Width;
         Height = texture.Height;
+        Volatile.Write(ref _asyncState, 1); // Ready
     }
     public RayLibTexture(string path)
     {
@@ -61,15 +62,15 @@ internal sealed class RayLibTexture : ITexture
                     _asyncState = -1;   // Failed
                 }
             });
+            _deferred = true;
             _asyncState = 0;   // Loading扱い
             return;
         }
         else
         {
-            _startTicks = Environment.TickCount64;
-
             // PNG/JPG/BMP等そのままOK
             Native = Raylib.LoadTexture(Path);
+            _startTicks = Environment.TickCount64;
 
             // 初期状態をセット
             if (Native.Id == 0)
@@ -77,6 +78,13 @@ internal sealed class RayLibTexture : ITexture
                 _asyncState = -1;
                 return;
             }
+
+            // サイズ取得
+            int w = Native.Width, h = Native.Height;
+            Width = w;
+            Height = h;
+
+            Volatile.Write(ref _asyncState, 1); // Ready
         }
     }
 
@@ -182,7 +190,7 @@ internal sealed class RayLibTexture : ITexture
         float destW = (float)(rect.Width * Math.Abs(w));
         float destH = (float)(rect.Height * Math.Abs(h));
         // dst は (x,y) を「アンカー位置」として渡す
-        var dstRect = new Rectangle((float)x, (float)y, destW, destH);
+        var dstRect = new Rectangle(fx, fy, destW, destH);
 
         DrawTexturePro(Native, srcRect, dstRect, origin, (float)angle, ToRayColor(color, opacity));
 

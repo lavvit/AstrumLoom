@@ -4,8 +4,6 @@ namespace AstrumLoom;
 
 public interface IGraphics
 {
-    ITexture LoadTexture(string path);
-
     void BeginFrame();
     void Clear(Color color);
 

@@ -21,7 +21,7 @@ internal sealed class DxLibTexture : ITexture
         Handle = handle;
         Width = w;
         Height = h;
-
+        Volatile.Write(ref _asyncState, 1); // Ready
     }
     public DxLibTexture(string path)
     {
@@ -52,31 +52,41 @@ internal sealed class DxLibTexture : ITexture
             Handle = -1;
             return;
         }
-        int handle = LoadGraph(Path);
-        if (handle < 0)
+        // メインスレッドでのみ触る
+        if (!IsMainThread)
         {
-            Log.Debug($"Texture: LoadGraph failed: {Path}");
-            Volatile.Write(ref _asyncState, -1);
-            Handle = -1;
+            _deferred = true;
+            _asyncState = 0;   // Loading扱い
             return;
         }
-        SetUseTransColor(FALSE);                 // 色キー透過は使わない
-        SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);   // 念のため標準ブレンドに戻す
-        SetDrawBright(255, 255, 255);
-        SetDrawAddColor(0, 0, 0);
-        Handle = handle;
-        // 非同期かどうかを即チェック（ここはメインスレッド想定）
-        Volatile.Write(ref _asyncState, (CheckHandleASyncLoad(Handle) == 0) ? 1 : 0);
-        _startTicks = Environment.TickCount64;
-        // サイズ取得
-        if (GetGraphSize(handle, out int w, out int h) != 0)
+        else
         {
-            // 失敗してもとりあえず 0 のまま返す
-            w = h = 0;
+            int handle = LoadGraph(Path);
+            if (handle < 0)
+            {
+                Log.Debug($"Texture: Load failed: {Path}");
+                Volatile.Write(ref _asyncState, -1);
+                Handle = -1;
+                return;
+            }
+            SetUseTransColor(FALSE);                 // 色キー透過は使わない
+            SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);   // 念のため標準ブレンドに戻す
+            SetDrawBright(255, 255, 255);
+            SetDrawAddColor(0, 0, 0);
+            Handle = handle;
+            _startTicks = Environment.TickCount64;
+            // サイズ取得
+            if (GetGraphSize(handle, out int w, out int h) != 0)
+            {
+                // 失敗してもとりあえず 0 のまま返す
+                w = h = 0;
+            }
+            Width = w;
+            Height = h;
+            // 非同期かどうかを即チェック（ここはメインスレッド想定）
+            Volatile.Write(ref _asyncState, (CheckHandleASyncLoad(Handle) == 0) ? 1 : 0);
         }
-        Width = w;
-        Height = h;
     }
 
     // 0=Loading, 1=Ready, -1=Failed

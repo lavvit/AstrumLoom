@@ -15,6 +15,9 @@ public interface IGamePlatform : IDisposable
     void PollEvents();
 
     void Close();
+
+    ITexture LoadTexture(string path);
+    ISound LoadSound(string path, bool streaming);
 }
 
 public enum GraphicsBackendKind

@@ -34,7 +34,7 @@ public static class TextureExtensions
 }
 public class Texture(string path) : IDisposable
 {
-    private ITexture _texture = Drawing.G.LoadTexture(path);
+    private ITexture _texture = GameRunner.Platform.LoadTexture(path);
     private bool _disposed = false;
 
     public void Draw(double x = 0, double y = 0) => _texture.Draw(x, y);
