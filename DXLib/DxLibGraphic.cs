@@ -182,33 +182,34 @@ internal sealed class DxLibGraphics : IGraphics
     internal static int ToDxColor(Color col)
         => (int)GetColor(col.R, col.G, col.B);
 
+    internal static void SetColorBlend(BlendMode blend, double opacity, Color col)
+    {
+        if (blend > BlendMode.None)
+        {
+            double op = Math.Clamp(opacity, 0.0, 1.0);
+            SetDrawBlendMode(GetBlendMode(blend), (int)(255.0 * op));
+        }
+        if (col != Color.White)
+            SetDrawBright(col.R, col.G, col.B);
+    }
     internal static void SetOptions(DrawOptions option)
     {
         double opacity = Math.Clamp(option.Opacity, 0.0, 1.0);
         var color = option.Color ?? Color.White;
         opacity *= color.A / 255.0;
 
-        if (option.Blend != BlendMode.None)
-            SetDrawBlendMode(GetBlendMode(option.Blend), (int)(255.0 * opacity));
-        if (color != Color.White)
-            SetDrawBright(color.R, color.G, color.B);
-
-        if (option.Thickness > 1)
-        {
-            SetFontThickness(option.Thickness);
-        }
+        SetColorBlend(option.Blend, opacity, color);
+    }
+    internal static void ResetColorBlend(BlendMode blend, Color col)
+    {
+        if (blend != BlendMode.None)
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
+        if (col != Color.White)
+            SetDrawBright(255, 255, 255);
     }
     internal static void ResetOptions(DrawOptions option)
     {
         var color = option.Color ?? Color.White;
-        if (option.Blend != BlendMode.None)
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
-        if (color != Color.White)
-            SetDrawBright(255, 255, 255);
-
-        if (option.Thickness > 1)
-        {
-            SetFontThickness(1);
-        }
+        ResetColorBlend(option.Blend, color);
     }
 }

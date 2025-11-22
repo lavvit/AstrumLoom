@@ -16,7 +16,7 @@ public class AstrumCore
     private static string _Version => "0.1.0-alpha";
     public static int MainThreadId { get; internal set; }
     public static IGamePlatform Platform { get; internal set; } = null!;
-    public static IGraphics Graphic => Platform.Graphics;
+    public static IGraphics? Graphic => Platform?.Graphics;
 
     public static GameConfig WindowConfig { get; private set; } = null!;
     public static int Width => (int)Platform.Graphics.Size.Width;

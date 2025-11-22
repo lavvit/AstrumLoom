@@ -5,7 +5,9 @@ namespace AstrumLoom;
 public readonly record struct FontSpec(
     string NameOrPath,
     int Size,
+    int Thickness = 1,
     int Edge = 0,
+    int Spacing = 0,
     bool Bold = false,
     bool Italic = false
 );
@@ -18,22 +20,21 @@ public interface IFont : IDisposable
     (int width, int height) Measure(string text);
 
     // そのフォントで描画
-    void Draw(IGraphics g, double x, double y, string text,
+    void Draw(double x, double y, string text,
         DrawOptions options);   // ★ 基準点・色・不透明度などをここで受ける
-    void DrawEdge(IGraphics g, double x, double y, string text,
+    void DrawEdge(double x, double y, string text,
         DrawOptions options);  // ★ エッジのみ描画（必要なら実装）
 }
 
 public static class FontHandle
 {
-    private static IGraphics Graph => AstrumCore.Graphic;
     public static string SystemFont => GetSystemFontName();
 
     // フォント作成
     public static IFont? Create(FontSpec spec)
-        => Graph?.CreateFont(spec) ?? null;
-    public static IFont? Create(string nameOrPath, int size = 16, bool bold = false, bool italic = false, int edge = 0)
-        => Create(new FontSpec(nameOrPath, size, edge, bold, italic));
+        => AstrumCore.Graphic?.CreateFont(spec) ?? null;
+    public static IFont? Create(string nameOrPath, int size = 16, int thick = 1, int edge = 0, int spacing = 0, bool bold = false, bool italic = false)
+        => Create(new FontSpec(nameOrPath, size, thick, edge, spacing, bold, italic));
 
     public static void Draw(this IFont? font, double x, double y, object text,
         Color? color = null,
@@ -41,7 +42,7 @@ public static class FontHandle
         Color? edgecolor = null,
         BlendMode blend = BlendMode.None,
         double opacity = 1)
-        => (font ?? Drawing.DefaultFont).Draw(Graph, x, y, text?.ToString() ?? "",
+        => (font ?? Drawing.DefaultFont).Draw(x, y, text?.ToString() ?? "",
             new DrawOptions
             {
                 Color = color,
@@ -55,7 +56,7 @@ public static class FontHandle
         ReferencePoint point = ReferencePoint.TopLeft,
         BlendMode blend = BlendMode.None,
         double opacity = 1)
-        => (font ?? Drawing.DefaultFont).DrawEdge(Graph, x, y, text?.ToString() ?? "",
+        => (font ?? Drawing.DefaultFont).DrawEdge(x, y, text?.ToString() ?? "",
             new DrawOptions
             {
                 EdgeColor = edgecolor,

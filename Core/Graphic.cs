@@ -205,7 +205,7 @@ public static class GraphicsExtensions
     ReferencePoint point = ReferencePoint.TopLeft,
     BlendMode blend = BlendMode.None,
     double opacity = 1)
-    => g.DefaultFont.Draw(g, x, y, text.ToString() ?? "", new DrawOptions
+    => g.Text(x, y, text.ToString() ?? "", 16, new DrawOptions
     {
         Color = color,
         Point = point,
@@ -216,7 +216,7 @@ public static class GraphicsExtensions
     public static (int Width, int Height) MeasureText(
         this IGraphics g,
         object text)
-        => g.DefaultFont.Measure(text.ToString() ?? "");
+        => g.MeasureText(text.ToString() ?? "", 16);
 }
 public static class LayoutUtil
 {

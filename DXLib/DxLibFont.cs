@@ -22,9 +22,9 @@ internal sealed class DxLibFont : IFont
 
         string name = GetFont(spec.NameOrPath);
 
-        int thickness = spec.Bold ? 4 : 2;
-        _edgeThickness = spec.Edge; // 必要なら spec から拾う
-        _spacing = 0; // 今回は未使用
+        int thickness = spec.Thickness > 1 ? spec.Thickness : spec.Bold ? 4 : 1;
+        _edgeThickness = spec.Edge;
+        _spacing = spec.Spacing;
 
         _handle = CreateFontToHandle(
             name,
@@ -54,14 +54,14 @@ internal sealed class DxLibFont : IFont
         return (w, h);
     }
 
-    public void Draw(IGraphics g, double x, double y, string text, DrawOptions options)
+    public void Draw(double x, double y, string text, DrawOptions options)
     {
         if (!Enable)
         {
             Drawing.DefaultText(x, y, text);
             return;
         }
-        SetOptions(options);
+        //SetOptions(options);
         var (w, h) = Measure(text);
         var off = GetAnchorOffset(options.Point, w, h);
         int drawX = (int)(x + off.X);
@@ -70,17 +70,37 @@ internal sealed class DxLibFont : IFont
         var useColor = options.Color ?? Color.White;
         uint c = (uint)ToDxColor(useColor); // らびぃが既に持ってる変換ヘルパー
 
-        if (options.EdgeColor != null && _edgehandle > 0)
+        var useEdgeColor = options.EdgeColor ?? Color.VisibleColor(useColor);
+        uint ec = (uint)ToDxColor(useEdgeColor);
+        if (_edgehandle > 0)
         {
+            //ResetColorBlend(options.Blend, useColor);
+            //SetColorBlend(options.Blend, options.Opacity, useEdgeColor);
+            int fy = 0;
+            SetFontOnlyDrawType(2);
             SetFontSpaceToHandle(-_edgeThickness * 2 + _spacing, _edgehandle);
-            uint ec = (uint)ToDxColor(options.EdgeColor.Value);
-            DrawStringToHandle(drawX - _edgeThickness, drawY - _edgeThickness, text, ec, _edgehandle, ec);
+            foreach (string line in text.Split('\n'))
+            {
+                DrawStringToHandle(
+                    x: drawX - _edgeThickness,
+                    y: drawY + fy - _edgeThickness,
+                    String: line,
+                    Color: ec,
+                    FontHandle: _edgehandle,
+                    EdgeColor: ec,       // ★ 縁取りの色はこっち
+                    VerticalFlag: 0
+                );
+                fy += h / 2;
+            }
         }
+        //SetColorBlend(options.Blend, options.Opacity, useColor);
+
+        SetFontOnlyDrawType(0);
         SetFontSpaceToHandle(_spacing, _handle);
         DrawStringToHandle(drawX, drawY, text, c, _handle);
-        ResetOptions(options);
+        //ResetOptions(options);
     }
-    public void DrawEdge(IGraphics g, double x, double y, string text, DrawOptions options)
+    public void DrawEdge(double x, double y, string text, DrawOptions options)
     {
         if (!Enable || _edgehandle < 0)
             return;

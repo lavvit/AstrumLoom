@@ -27,7 +27,9 @@ internal sealed class RayLibFont : IFont
             _font = GetFontDefault();
             return;
         }
+        int thickness = spec.Thickness > 1 ? spec.Thickness : spec.Bold ? 4 : 1;
         _edgeThickness = spec.Edge;
+        _spacing = spec.Spacing;
 
         // Raylib: size は "baseSize" として渡す
         int[] cps = EnumRange(0x20, 0xFFFF);
@@ -41,7 +43,7 @@ internal sealed class RayLibFont : IFont
         return ((int)size.X, (int)size.Y);
     }
 
-    public void Draw(IGraphics g, double x, double y, string text, DrawOptions options)
+    public void Draw(double x, double y, string text, DrawOptions options)
     {
         if (!Enable)
         {
@@ -59,7 +61,7 @@ internal sealed class RayLibFont : IFont
         var pos = new Point(drawX, drawY);
 
         // Edge（ふち）: オフセット描画
-        if (_edgeThickness > 0 && options.EdgeColor.HasValue)
+        if (_edgeThickness > 0)
         {
             int edgecount = 8;
             // 16方向の単位ベクトル（円形に均一配置）
@@ -76,7 +78,7 @@ internal sealed class RayLibFont : IFont
                     // 端数でにじまないように整数へ
                     var p = new Point(MathF.Round((float)pos.X + v.X * r),
                     MathF.Round((float)pos.Y + v.Y * r));
-                    DrawEx(text, p, options.EdgeColor ?? Color.Black, opacity);
+                    DrawEx(text, p, options.EdgeColor ?? Color.VisibleColor(color), opacity);
                 }
             }
         }
@@ -92,7 +94,7 @@ internal sealed class RayLibFont : IFont
                    Spec.Size, spacing, c);
     }
 
-    public void DrawEdge(IGraphics g, double x, double y, string text, DrawOptions options)
+    public void DrawEdge(double x, double y, string text, DrawOptions options)
     {
         if (!Enable || _edgeThickness <= 0)
         {
