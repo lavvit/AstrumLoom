@@ -33,9 +33,9 @@ internal sealed class FancyShapesScene : Scene
         // rotate: (t * 12) % 360,
 
         // タイトル
-        Drawing.Text(_width / 2.0, 32, "AstrumLoom Shapes", Color.White, ReferencePoint.TopCenter);
+        Drawing.Text(_width / 2.0, 32, "AstrumLoom Shapes", Color.White, ReferencePoint.TopCenter, edgecolor: Color.Black);
         Drawing.Text(_width / 2.0, 68, "- simple, clean and animated -", new Color(220, 225, 235), ReferencePoint.TopCenter);
-        Drawing.Text(_width / 2.0, 92, "日本語のテキスト", new Color(180, 185, 195), ReferencePoint.TopCenter);
+        Drawing.DefaultFont.DrawEdge(_width / 2.0, 92, "日本語のテキスト", new Color(180, 185, 195), ReferencePoint.TopCenter);
         Drawing.Line(_width / 2.0 - 100, 120, 200, 0, new Color(255, 255, 255, 100), thickness: 1);
 
         // 左: ラインとクロス

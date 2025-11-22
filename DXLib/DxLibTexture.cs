@@ -180,25 +180,4 @@ internal sealed class DxLibTexture : ITexture
         }
         ResetOptions(use);
     }
-    private void SetOptions(DrawOptions? options)
-    {
-        var use = options ?? Option ?? new DrawOptions();
-        double opacity = Math.Clamp(use.Opacity, 0.0, 1.0);
-        var color = use.Color ?? Color.White;
-        opacity *= color.A / 255.0;
-
-        if (use.Blend != BlendMode.None)
-            SetDrawBlendMode(GetBlendMode(use.Blend), (int)(255.0 * opacity));
-        if (color != Color.White)
-            SetDrawBright(color.R, color.G, color.B);
-    }
-    private void ResetOptions(DrawOptions? options)
-    {
-        var use = options ?? Option ?? new DrawOptions();
-        var color = use.Color ?? Color.White;
-        if (use.Blend != BlendMode.None)
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
-        if (color != Color.White)
-            SetDrawBright(255, 255, 255);
-    }
 }

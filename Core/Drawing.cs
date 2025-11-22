@@ -146,11 +146,29 @@ public class Drawing
     } = null;
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");
+    public static (int width, int height) DefaultTextSize(object text, int size = 16)
+    {
+        var (w, h) = Graphics.MeasureText(text.ToString() ?? "", size);
+        return (w, h);
+    }
     public static void Text(double x, double y, object text,
         Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft,
+        Color? edgecolor = null,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => DefaultFont.Draw(x, y, text, color ?? Color.White, point, blend, opacity);
+        => DefaultFont.Draw(x, y, text, color ?? Color.White, point, edgecolor, blend, opacity);
+    public static void DefaultText(double x, double y, object text,
+        Color? color = null,
+        ReferencePoint point = ReferencePoint.TopLeft,
+        BlendMode blend = BlendMode.None, double opacity = 1)
+        => Graphics.Text(x, y, text.ToString() ?? "", 16,
+            new DrawOptions
+            {
+                Color = color,
+                Blend = blend,
+                Opacity = opacity,
+                Point = point
+            });
 
     public static void Polygon(IEnumerable<(double x, double y)> points,
         Color? color = null,

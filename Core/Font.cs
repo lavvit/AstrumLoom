@@ -5,11 +5,13 @@ namespace AstrumLoom;
 public readonly record struct FontSpec(
     string NameOrPath,
     int Size,
+    int Edge = 0,
     bool Bold = false,
     bool Italic = false
 );
 public interface IFont : IDisposable
 {
+    bool Enable { get; }
     FontSpec Spec { get; }
 
     // テキストサイズ計測
@@ -18,32 +20,52 @@ public interface IFont : IDisposable
     // そのフォントで描画
     void Draw(IGraphics g, double x, double y, string text,
         DrawOptions options);   // ★ 基準点・色・不透明度などをここで受ける
+    void DrawEdge(IGraphics g, double x, double y, string text,
+        DrawOptions options);  // ★ エッジのみ描画（必要なら実装）
 }
 
 public static class FontHandle
 {
-    private static IGraphics G => AstrumCore.Graphic;
+    private static IGraphics Graph => AstrumCore.Graphic;
     public static string SystemFont => GetSystemFontName();
 
     // フォント作成
     public static IFont? Create(FontSpec spec)
-        => G?.CreateFont(spec) ?? null;
-    public static IFont? Create(string nameOrPath, int size = 16, bool bold = false, bool italic = false)
-        => Create(new FontSpec(nameOrPath, size, bold, italic));
+        => Graph?.CreateFont(spec) ?? null;
+    public static IFont? Create(string nameOrPath, int size = 16, bool bold = false, bool italic = false, int edge = 0)
+        => Create(new FontSpec(nameOrPath, size, edge, bold, italic));
 
     public static void Draw(this IFont? font, double x, double y, object text,
         Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft,
+        Color? edgecolor = null,
         BlendMode blend = BlendMode.None,
         double opacity = 1)
-        => (font ?? Drawing.DefaultFont).Draw(G, x, y, text?.ToString() ?? "",
+        => (font ?? Drawing.DefaultFont).Draw(Graph, x, y, text?.ToString() ?? "",
             new DrawOptions
             {
                 Color = color,
                 Point = point,
                 Blend = blend,
-                Opacity = opacity
+                Opacity = opacity,
+                EdgeColor = edgecolor,
             });
+    public static void DrawEdge(this IFont? font, double x, double y, object text,
+        Color? edgecolor = null,
+        ReferencePoint point = ReferencePoint.TopLeft,
+        BlendMode blend = BlendMode.None,
+        double opacity = 1)
+        => (font ?? Drawing.DefaultFont).DrawEdge(Graph, x, y, text?.ToString() ?? "",
+            new DrawOptions
+            {
+                EdgeColor = edgecolor,
+                Point = point,
+                Blend = blend,
+                Opacity = opacity,
+            });
+
+    public static (int width, int height) Measure(this IFont? font, object text)
+        => (font ?? Drawing.DefaultFont).Measure(text?.ToString() ?? "");
 
     private static string GetSystemFontName()
     {
@@ -182,21 +204,4 @@ public static class SystemFontResolver
 
         return chosen.path;
     }
-}
-
-public static class FontExtensions
-{
-    public static void Draw(this IFont f, IGraphics g,
-    double x, double y,
-    object text,
-    Color? color = null,
-    ReferencePoint point = ReferencePoint.TopLeft,
-    double opacity = 1)
-        => f?.Draw(g, x, y, text?.ToString() ?? "",
-            new DrawOptions
-            {
-                Color = color,
-                Point = point,
-                Opacity = opacity
-            });
 }

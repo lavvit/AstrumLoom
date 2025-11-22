@@ -152,11 +152,11 @@ public class DxLibSound : ISound
                 _speed = (float)GetFrequency() / Frequency;
                 return;
             }
+            if (Loop) // ループ時にフラグをリセットして再生
+                _played = false;
         }
         else
         {
-            if (Loop) // ループ時にフラグをリセットして再生
-                _played = false;
             _streaming = false;
             _time = 0;
         }

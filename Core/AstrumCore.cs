@@ -22,7 +22,7 @@ public class AstrumCore
     public static int Width => (int)Platform.Graphics.Size.Width;
     public static int Height => (int)Platform.Graphics.Size.Height;
 
-    public static void Boot(GameConfig config, IGamePlatform platform)
+    public static void Boot(GameConfig config, IGamePlatform platform, Scene scene)
     {
         MainThreadId = Environment.CurrentManagedThreadId;
         Platform = platform;
@@ -30,6 +30,7 @@ public class AstrumCore
         var game = new BaseProgram(platform);
 
         using var host = new GameHost(config, platform, game);
+        Scene.Set(scene);
         host.Run();
     }
     public static void End() => Platform.Close();
@@ -153,7 +154,7 @@ public class AstrumCore
     } = true;
 
     public static bool InitCompleted
-        { get; internal set; }
+    { get; internal set; }
 
     public static double WindowScale => WindowConfig.Scale;
 }

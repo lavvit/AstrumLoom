@@ -161,13 +161,6 @@ internal sealed class RayLibGraphics : IGraphics
     public IFont CreateFont(FontSpec spec)
         => new RayLibFont(spec);
 
-    // Color helper
-    internal static RColor ToRayColor(Color c, double opacity = 1.0)
-    {
-        int a = (int)Math.Clamp(Math.Round(c.A * opacity), 0, 255);
-        return new RColor(c.R, c.G, c.B, (byte)a);
-    }
-
     internal static RayBlend GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => RayBlend.Alpha,
@@ -177,4 +170,28 @@ internal sealed class RayLibGraphics : IGraphics
         BlendMode.Reverse => RayBlend.Custom,
         _ => RayBlend.Alpha,
     };
+
+    // Color helper
+    internal static RColor ToRayColor(Color c, double opacity = 1.0)
+    {
+        int a = (int)Math.Clamp(Math.Round(c.A * opacity), 0, 255);
+        return new RColor(c.R, c.G, c.B, (byte)a);
+    }
+
+    internal static void SetOptions(DrawOptions options)
+    {
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var color = options.Color ?? Color.White;
+        opacity *= color.A / 255.0;
+
+        if (options.Blend != BlendMode.None)
+            BeginBlendMode(GetBlendMode(options.Blend));
+    }
+    internal static void ResetOptions(DrawOptions options)
+    {
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var color = options.Color ?? Color.White;
+        if (options.Blend != BlendMode.None)
+            EndBlendMode();
+    }
 }

@@ -1,5 +1,9 @@
-﻿using Raylib_cs;
+﻿using System.Numerics;
 
+using Raylib_cs;
+
+using static AstrumLoom.LayoutUtil;
+using static AstrumLoom.RayLib.RayLibGraphics;
 using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
@@ -8,6 +12,10 @@ internal sealed class RayLibFont : IFont
 {
     public FontSpec Spec { get; }
     private readonly Font _font;
+    public bool Enable => _font.Texture.Id > 0;
+
+    private int _edgeThickness = 0;
+    private int _spacing = 0;
     public RayLibFont(FontSpec spec)
     {
         Spec = spec;
@@ -19,6 +27,7 @@ internal sealed class RayLibFont : IFont
             _font = GetFontDefault();
             return;
         }
+        _edgeThickness = spec.Edge;
 
         // Raylib: size は "baseSize" として渡す
         int[] cps = EnumRange(0x20, 0xFFFF);
@@ -34,21 +43,90 @@ internal sealed class RayLibFont : IFont
 
     public void Draw(IGraphics g, double x, double y, string text, DrawOptions options)
     {
+        if (!Enable)
+        {
+            Drawing.DefaultText(x, y, text);
+            return;
+        }
+        SetOptions(options);
         var (w, h) = Measure(text);
-        var off =
-            LayoutUtil.GetAnchorOffset(options.Point, w, h);
+        var off = GetAnchorOffset(options.Point, w, h);
         int drawX = (int)(x + off.X);
         int drawY = (int)(y + off.Y);
 
         var color = options.Color ?? Color.White;
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
-        byte a = (byte)(color.A * opacity);
-        var c = new Raylib_cs.Color(color.R, color.G, color.B, a);
+        var pos = new Point(drawX, drawY);
 
-        DrawTextEx(_font, text, new System.Numerics.Vector2(drawX, drawY),
-                   Spec.Size, 0, c);
+        // Edge（ふち）: オフセット描画
+        if (_edgeThickness > 0 && options.EdgeColor.HasValue)
+        {
+            int edgecount = 8;
+            // 16方向の単位ベクトル（円形に均一配置）
+            Span<Vector2> dir = new Vector2[edgecount];
+            for (int i = 0; i < dir.Length; i++)
+            {
+                float a = (float)(i * (MathF.PI * 2) / dir.Length);
+                dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
+            }
+            for (int r = 1; r <= _edgeThickness; r++)
+            {
+                foreach (var v in dir)
+                {
+                    // 端数でにじまないように整数へ
+                    var p = new Point(MathF.Round((float)pos.X + v.X * r),
+                    MathF.Round((float)pos.Y + v.Y * r));
+                    DrawEx(text, p, options.EdgeColor ?? Color.Black, opacity);
+                }
+            }
+        }
+        DrawEx(text, pos, color, opacity);
+        ResetOptions(options);
     }
 
+    private void DrawEx(string s, Point pos, Color color, double opacity = 1, int spacing = 0)
+    {
+        var p = new Vector2((float)pos.X, (float)pos.Y);
+        var c = ToRayColor(color, color.A / 255.0 * opacity);
+        DrawTextEx(_font, s, p,
+                   Spec.Size, spacing, c);
+    }
+
+    public void DrawEdge(IGraphics g, double x, double y, string text, DrawOptions options)
+    {
+        if (!Enable || _edgeThickness <= 0)
+        {
+            return;
+        }
+        SetOptions(options);
+        var (w, h) = Measure(text);
+        var off = GetAnchorOffset(options.Point, w, h);
+        int drawX = (int)(x + off.X);
+        int drawY = (int)(y + off.Y);
+        var ec = options.EdgeColor ?? options.Color ?? Color.Black;
+        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        var pos = new Point(drawX, drawY);
+        // Edge（ふち）: オフセット描画
+        int edgecount = 8;
+        // 16方向の単位ベクトル（円形に均一配置）
+        Span<Vector2> dir = new Vector2[edgecount];
+        for (int i = 0; i < dir.Length; i++)
+        {
+            float a = (float)(i * (MathF.PI * 2) / dir.Length);
+            dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
+        }
+        for (int r = 1; r <= _edgeThickness; r++)
+        {
+            foreach (var v in dir)
+            {
+                // 端数でにじまないように整数へ
+                var p = new Point(MathF.Round((float)pos.X + v.X * r),
+                MathF.Round((float)pos.Y + v.Y * r));
+                DrawEx(text, p, ec, opacity);
+            }
+        }
+        ResetOptions(options);
+    }
     public void Dispose() => UnloadFont(_font);
 
     private static string GetFont(string? font, FontSpec spec)

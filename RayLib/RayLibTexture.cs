@@ -196,22 +196,4 @@ internal sealed class RayLibTexture : ITexture
 
         ResetOptions(use);
     }
-    private void SetOptions(DrawOptions? options)
-    {
-        var use = options ?? Option ?? new DrawOptions();
-        double opacity = Math.Clamp(use.Opacity, 0.0, 1.0);
-        var color = use.Color ?? Color.White;
-        opacity *= color.A / 255.0;
-
-        if (use.Blend != BlendMode.None)
-            BeginBlendMode(GetBlendMode(use.Blend));
-    }
-    private void ResetOptions(DrawOptions? options)
-    {
-        var use = options ?? Option ?? new DrawOptions();
-        double opacity = Math.Clamp(use.Opacity, 0.0, 1.0);
-        var color = use.Color ?? Color.White;
-        if (use.Blend != BlendMode.None)
-            EndBlendMode();
-    }
 }

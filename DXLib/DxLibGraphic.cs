@@ -181,4 +181,34 @@ internal sealed class DxLibGraphics : IGraphics
     // ToDxColor は MultiBeat のやつをそのまま持ってきてOK
     internal static int ToDxColor(Color col)
         => (int)GetColor(col.R, col.G, col.B);
+
+    internal static void SetOptions(DrawOptions option)
+    {
+        double opacity = Math.Clamp(option.Opacity, 0.0, 1.0);
+        var color = option.Color ?? Color.White;
+        opacity *= color.A / 255.0;
+
+        if (option.Blend != BlendMode.None)
+            SetDrawBlendMode(GetBlendMode(option.Blend), (int)(255.0 * opacity));
+        if (color != Color.White)
+            SetDrawBright(color.R, color.G, color.B);
+
+        if (option.Thickness > 1)
+        {
+            SetFontThickness(option.Thickness);
+        }
+    }
+    internal static void ResetOptions(DrawOptions option)
+    {
+        var color = option.Color ?? Color.White;
+        if (option.Blend != BlendMode.None)
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
+        if (color != Color.White)
+            SetDrawBright(255, 255, 255);
+
+        if (option.Thickness > 1)
+        {
+            SetFontThickness(1);
+        }
+    }
 }

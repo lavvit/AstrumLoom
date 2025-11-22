@@ -1,5 +1,7 @@
 ﻿using System.Drawing.Text;
 
+using static AstrumLoom.DXLib.DxLibGraphics;
+using static AstrumLoom.LayoutUtil;
 using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
@@ -8,7 +10,12 @@ internal sealed class DxLibFont : IFont
 {
     public FontSpec Spec { get; }
     private readonly int _handle;
+    private readonly int _edgehandle = -1;
+    public bool Enable => _handle > 0;
 
+    private const int _defaulttype = DX_FONTTYPE_ANTIALIASING_8X8;
+    private int _edgeThickness = 0;
+    private int _spacing = 0;
     public DxLibFont(FontSpec spec)
     {
         Spec = spec;
@@ -16,18 +23,30 @@ internal sealed class DxLibFont : IFont
         string name = GetFont(spec.NameOrPath);
 
         int thickness = spec.Bold ? 4 : 2;
-        int edgeSize = 0; // 必要なら spec から拾う
+        _edgeThickness = spec.Edge; // 必要なら spec から拾う
+        _spacing = 0; // 今回は未使用
 
         _handle = CreateFontToHandle(
             name,
             spec.Size,
             thickness,
-            DX_FONTTYPE_ANTIALIASING_4X4, // or edge 付き
-            -1, edgeSize, spec.Italic ? 1 : 0);
+            _defaulttype, // or edge 付き
+            -1, _edgeThickness, spec.Italic ? 1 : 0);
+        if (_edgeThickness > 0)
+        {
+            _edgehandle = CreateFontToHandle(
+                name,
+                spec.Size,
+                thickness,
+                DX_FONTTYPE_ANTIALIASING_EDGE_8X8,
+                -1, _edgeThickness, spec.Italic ? 1 : 0);
+        }
     }
 
     public (int width, int height) Measure(string text)
     {
+        if (!Enable)
+            return Drawing.DefaultTextSize(text);
         GetDrawStringSizeToHandle(
             out int w, out int h,
             out _, text, text.Length, _handle
@@ -37,19 +56,48 @@ internal sealed class DxLibFont : IFont
 
     public void Draw(IGraphics g, double x, double y, string text, DrawOptions options)
     {
+        if (!Enable)
+        {
+            Drawing.DefaultText(x, y, text);
+            return;
+        }
+        SetOptions(options);
         var (w, h) = Measure(text);
-        var off =
-            LayoutUtil.GetAnchorOffset(options.Point, w, h);
+        var off = GetAnchorOffset(options.Point, w, h);
         int drawX = (int)(x + off.X);
         int drawY = (int)(y + off.Y);
 
         var useColor = options.Color ?? Color.White;
-        uint c = (uint)DxLibGraphics.ToDxColor(useColor); // らびぃが既に持ってる変換ヘルパー
-        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+        uint c = (uint)ToDxColor(useColor); // らびぃが既に持ってる変換ヘルパー
 
-        SetDrawBlendMode(DxLibGraphics.GetBlendMode(options.Blend), (int)(255.0 * opacity));
+        if (options.EdgeColor != null && _edgehandle > 0)
+        {
+            SetFontSpaceToHandle(-_edgeThickness * 2 + _spacing, _edgehandle);
+            uint ec = (uint)ToDxColor(options.EdgeColor.Value);
+            DrawStringToHandle(drawX - _edgeThickness, drawY - _edgeThickness, text, ec, _edgehandle, ec);
+        }
+        SetFontSpaceToHandle(_spacing, _handle);
         DrawStringToHandle(drawX, drawY, text, c, _handle);
-        SetDrawBlendMode((int)BlendMode.None, 255);
+        ResetOptions(options);
+    }
+    public void DrawEdge(IGraphics g, double x, double y, string text, DrawOptions options)
+    {
+        if (!Enable || _edgehandle < 0)
+            return;
+        SetOptions(options);
+        var (w, h) = Measure(text);
+        var off = GetAnchorOffset(options.Point, w, h);
+        int drawX = (int)(x + off.X);
+        int drawY = (int)(y + off.Y);
+
+        var useColor = options.EdgeColor ?? options.Color ?? Color.Black;
+        uint ec = (uint)ToDxColor(useColor);
+
+        SetFontOnlyDrawType(2);
+        SetFontSpaceToHandle(-_edgeThickness * 2 + _spacing, _edgehandle);
+        DrawStringToHandle(drawX - _edgeThickness, drawY - _edgeThickness, text, ec, _edgehandle, ec);
+        SetFontOnlyDrawType(0);
+        ResetOptions(options);
     }
 
     public void Dispose()

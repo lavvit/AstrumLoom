@@ -660,24 +660,24 @@ public class KeyBoard
     private static void DrawKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
-        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw((int)(x2 + tx * width), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawKey(Key key, string keyname, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
-        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw((int)(x2 + tx * width), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         Drawing.Box(x2, y2, boxSize * width, boxSize, GetKeyColor(key));
         Drawing.Box(x2 + 0.5 * boxSize, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));
-        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw((int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), $"{key}", GetKeyFontColor(key), point: ReferencePoint.Center);
     }
     private static void DrawNumEnterKey(Key key, IFont font, double x2, double y2, double tx, double ty, double boxSize, double width = 1.0)
     {
         string keyname = "Enter";
         Drawing.Box(x2, y2, boxSize * width, 2.5 * boxSize, GetKeyColor(key));
-        font.Draw(AstrumCore.Graphic, (int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
+        font.Draw((int)(x2 + tx * width + 0.25 * boxSize), (int)(y2 + ty), keyname, GetKeyFontColor(key), point: ReferencePoint.Center);
     }
 }
 

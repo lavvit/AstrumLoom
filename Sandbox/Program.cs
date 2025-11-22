@@ -4,9 +4,8 @@ using AstrumLoom.RayLib;
 
 namespace Sandbox;
 
-internal sealed class SimpleTestGame : IGame
+internal sealed class SimpleTestGame : Scene
 {
-    private readonly IGamePlatform _platform;
     private Texture? _tex;
     private Sound? _sound;
     private Sound? _bgm;
@@ -16,27 +15,26 @@ internal sealed class SimpleTestGame : IGame
     // 追加: 図形テストシーン
     private Scene? _scene;
 
-    public SimpleTestGame(IGamePlatform platform) => _platform = platform;
-
-    public void Initialize()
+    public override void Enable()
     {
         // 実行ファイルからの相対パスになる
         _tex = new Texture("Assets/test.png");
         _sound = new Sound("Assets/Cancel.ogg");
         _bgm = new Sound("Assets/バヨリンの音.ogg", true);
-        _font = FontHandle.Create(new FontSpec("ＤＦ太丸ゴシック体 Pro-5", 24));
-        _kbfont = FontHandle.Create(new FontSpec("Noto Sans JP", 6, true));
+        _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
+        _kbfont = FontHandle.Create("Noto Sans JP", 6, true);
         Drawing.DefaultFont = _font!;
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
-        //_scene = new FancyShapesScene(1280, 720);
+        _scene = new FancyShapesScene(1280, 720);
+        Overlay.Set(new SandboxOverlay());
     }
 
-    public void Update(float deltaTime)
+    public override void Update()
     {
         if (KeyInput.Push(Key.Esc))
         {
-            _platform.Close();
+            AstrumCore.End();
         }
         _bgm?.Loop = true;
         _bgm?.PlayStream();
@@ -49,7 +47,7 @@ internal sealed class SimpleTestGame : IGame
         _scene?.Update();
     }
 
-    public void Draw()
+    public override void Draw()
     {
         // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
@@ -60,7 +58,7 @@ internal sealed class SimpleTestGame : IGame
         if (_tex is null) return;
 
         // 画面中央あたりに描く（適当に）
-        float x = 640 + 160f * (float)Math.Sin(_platform.Time.TotalTime);
+        float x = 640 + 160f * (float)Math.Sin(AstrumCore.Platform.Time.TotalTime);
         float y = 240;
 
         _tex.Scale = 1;
@@ -86,20 +84,16 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
-            ShowMouse = false,
+            ShowMouse = true,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
-            GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
+            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
         };
 
         try
         {
             var platform = PlatformFactory.Create(config);
-            var game = new SimpleTestGame(platform);
-            Overlay.Set(new SandboxOverlay(platform.Graphics));
-
-            using var host = new GameHost(config, platform, game);
-            host.Run();
+            AstrumCore.Boot(config, platform, new SimpleTestGame());
         }
         catch (Exception ex)
         {

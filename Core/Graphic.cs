@@ -89,6 +89,10 @@ public struct DrawOptions
 
     public Point? Position { get; set; } = null;
     public Rect? Rectangle { get; set; } = null;
+
+    // フォント用
+    public IFont? Font { get; set; } = null;
+    public Color? EdgeColor { get; set; } = null;
 }
 
 public static class GraphicsExtensions

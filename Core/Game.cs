@@ -13,11 +13,13 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
 
     public void Run()
     {
+        AstrumCore.InitDrop();
+
         KeyInput.Initialize(platform.Input, platform.TextInput);
         Mouse.Init(platform.Mouse, showMouse);
         game.Initialize();
-        AstrumCore.InitDrop();
         AstrumCore.InitCompleted = true;
+        Scene.Start();
 
         while (!platform.ShouldClose)
         {
