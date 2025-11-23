@@ -38,7 +38,7 @@ public class Texture : IDisposable
     private bool _disposed = false;
     public Texture() { }
     public Texture(string path)
-        => _texture = AstrumCore.Platform.LoadTexture(path);
+        => _texture = AstrumCore.Platform?.LoadTexture(path);
 
     public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
 

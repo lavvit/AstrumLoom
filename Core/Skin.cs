@@ -395,25 +395,7 @@ public class Skin
         string ext = Path.GetExtension(file).ToLower();
         if (ext is ".png" or ".jpg")
         {
-            if (TexExit(name, file))
-            {
-                string parentName = new DirectoryInfo(Path.GetDirectoryName(file) ?? "").Name;
-                name = $"{parentName.ToLower()}_{name}";
-                string n = name;
-                int i = 0;
-                while (TexExit(name))
-                {
-                    i++;
-                    name = n + "_" + i;
-                }
-            }
-            if (!Added(file))
-            {
-                if (inque)
-                    SkinQue.Enqueue(("tex" + name, file));
-                else
-                    Textures[name] = new Texture(file);
-            }
+            AddTexture(name, file, inque);
         }
         else if (ext is ".wav" or ".ogg" or ".mp3")
         {
@@ -462,6 +444,29 @@ public class Skin
             }
         }
     }
+    public static void AddTexture(string name, string file, bool inque = false)
+    {
+        name = name.ToLower();
+        if (TexExit(name, file))
+        {
+            string parentName = new DirectoryInfo(Path.GetDirectoryName(file) ?? "").Name;
+            name = $"{parentName.ToLower()}_{name}";
+            string n = name;
+            int i = 0;
+            while (TexExit(name))
+            {
+                i++;
+                name = n + "_" + i;
+            }
+        }
+        if (!Added(file))
+        {
+            if (inque)
+                SkinQue.Enqueue(("tex" + name, file));
+            else
+                Textures[name] = new Texture(file);
+        }
+    }
     private static bool TexExit(string name, string path = "", bool duplicate = true) =>
         // 既存のTexturesおよびSkinQue内のkeyをチェック
         (duplicate || PathList.Contains(Path.GetFullPath(path))) &&
@@ -478,9 +483,10 @@ public class Skin
     public static Texture? Texture(string name, string subname = "")
     {
         name = name.ToLower();
-        if (_textureCache.TryGetValue(name, out var cached)) return cached;
+        if (_textureCache.TryGetValue(name, out var cached))
+            return cached;
         Texture? result = null;
-        if (Textures.TryGetValue(name, out var value))
+        if (Textures.TryGetValue(name.ToLower(), out var value))
         {
             result = value;
         }
@@ -491,7 +497,8 @@ public class Skin
                 result = subvalue;
             }
         }
-        _textureCache[name] = result;
+        if (result != null)
+            _textureCache[name] = result;
         result?.Pump();
         return result != null && result.Enable ? result : null;
     }

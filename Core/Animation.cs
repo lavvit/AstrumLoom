@@ -3,7 +3,6 @@
 public class Animation : IDisposable
 {
     public string Name = "";
-    private readonly List<Texture> _frames = [];
     private Counter _counter = new();
     private bool _disposed;
 
@@ -15,12 +14,14 @@ public class Animation : IDisposable
     public Animation(string dir, string prefix = "\\", string ext = ".png", long interval = 1000000 / 60, bool isLoop = true)
     {
         int count = GetCount(dir, prefix, ext);
+        Name = Path.GetFileNameWithoutExtension(dir);
+        _keyPrefix = dir.Replace('\\', '/').Replace('/', '_').ToLower();
         for (int i = 0; i < count; i++)
         {
             string path = dir + prefix + i + ext;
-            _frames.Add(new Texture(path));
+            Skin.AddTexture($"anim_{_keyPrefix}_{i}", path);
         }
-        Name = Path.GetFileNameWithoutExtension(dir);
+        Count = Frames.Length;
 
         if (count == 0)
         {
@@ -36,6 +37,10 @@ public class Animation : IDisposable
 
     public override string ToString() => $"Animation(Name={Name}, Count={Count}, Interval={Interval}, IsLoop={IsLoop}, IsPlaying={IsPlaying}, CurrentIndex={CurrentIndex})";
 
+    private string _keyPrefix = "";
+    public Texture[] Frames
+        => [.. Skin.Textures.Where(kv => kv.Key.StartsWith($"anim_{_keyPrefix}_")).OrderBy(kv => kv.Key).Select(kv => kv.Value)];
+
     public static int GetCount(string dir, string prefix = "", string ext = ".png")
     {
         int num = 0;
@@ -50,7 +55,7 @@ public class Animation : IDisposable
     {
         get
         {
-            foreach (var f in _frames)
+            foreach (var f in Frames)
             {
                 if (!f.Loaded)
                     return false;
@@ -60,10 +65,10 @@ public class Animation : IDisposable
     }
 
     public bool Enable
-        => _frames.Count > 0 && Loaded;
+        => Count > 0 && Loaded;
 
     public (int Width, int Height) Size
-        => _frames.Count > 0 ? (_frames[0].Width, _frames[0].Height) : (0, 0);
+        => Count > 0 ? (CurrentFrame?.Width ?? 0, CurrentFrame?.Height ?? 0) : (0, 0);
 
     public int Width
         => Size.Width;
@@ -73,7 +78,7 @@ public class Animation : IDisposable
     /// <summary>
     /// フレーム数
     /// </summary>
-    public int Count => _frames.Count;
+    public int Count { get; }
 
     /// <summary>
     /// 現在のフレームインデックス。
@@ -83,7 +88,7 @@ public class Animation : IDisposable
     /// <summary>
     /// 現在のフレームのテクスチャ（存在しない場合は null）。
     /// </summary>
-    public Texture? CurrentFrame => Count == 0 ? null : _frames[CurrentIndex];
+    public Texture? CurrentFrame => Count == 0 ? null : Skin.Texture($"anim_{_keyPrefix}_{CurrentIndex}");
 
     /// <summary>
     /// ループ設定。
@@ -106,7 +111,7 @@ public class Animation : IDisposable
     public void Pump()
     {
         if (_disposed) return;
-        foreach (var f in _frames)
+        foreach (var f in Frames)
         {
             f.Pump();
         }
@@ -117,11 +122,8 @@ public class Animation : IDisposable
     /// </summary>
     public long Update() => _disposed ? 0 : _counter.Tick();
 
-    public Texture? GetFrame(int index)
-    {
-        if (_disposed) return null;
-        return index < 0 || index >= Count ? null : _frames[index];
-    }
+    public Texture? GetFrame(int index) => _disposed ? null : index < 0 || index >= Count ? null :
+        Skin.Texture($"anim_{_keyPrefix}_{index}");
 
     /// <summary>
     /// 現在のフレームを描画します。
@@ -129,6 +131,7 @@ public class Animation : IDisposable
     public void Draw(double x = 0, double y = 0)
     {
         if (_disposed) return;
+        Pump();
         var tex = CurrentFrame;
         if (tex == null) return;
         tex.Draw(x, y);
@@ -165,7 +168,7 @@ public class Animation : IDisposable
     /// </summary>
     public void SetOpacity(double opacity)
     {
-        foreach (var f in _frames) f.Opacity = opacity;
+        foreach (var f in Frames) f.Opacity = opacity;
     }
 
     /// <summary>
@@ -173,18 +176,38 @@ public class Animation : IDisposable
     /// </summary>
     public void SetColor(Color color, Color? add = null)
     {
-        foreach (var f in _frames) f.SetColor(color, add);
+        foreach (var f in Frames) f.SetColor(color, add);
     }
 
+    ~Animation()
+    {
+        Dispose();
+    }
     /// <summary>
     /// リソースを解放します。
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
-        foreach (var f in _frames) f?.Dispose();
-        _frames.Clear();
+        foreach (var f in Frames)
+        {
+            f?.Dispose();
+            if (f != null)
+                Skin.Textures.Remove($"anim_{_keyPrefix}_{Frames.ToList().IndexOf(f)}");
+        }
         _disposed = true;
         GC.SuppressFinalize(this);
+    }
+
+    public ReferencePoint Point
+    {
+        get => CurrentFrame?.Point ?? ReferencePoint.TopLeft;
+        set
+        {
+            foreach (var f in Frames)
+            {
+                f.Point = value;
+            }
+        }
     }
 }
