@@ -35,12 +35,63 @@ public class Mouse
         MouseInstance.Init(visible);
     }
 
-    public static void Update() => MouseInstance.Update();
+    public static void Update()
+    {
+        MouseInstance.Update();
+        if (AstrumCore.Active)
+        {
+            // 前回座標初期化
+            double x = X;
+            double y = Y;
+            if (double.IsNaN(_prevX))
+            {
+                _prevX = x;
+                _prevY = y;
+            }
+            _xdiff = x - _prevX;
+            _ydiff = y - _prevY;
 
+            // 次フレーム用記録
+            _prevX = x;
+            _prevY = y;
+
+            if (Speed > 0)
+            {
+                Sleep.WakeUp();
+            }
+        }
+    }
     public static double X => MouseInstance.X;
     public static double Y => MouseInstance.Y;
     public static double Wheel => MouseInstance.Wheel;
     public static double WheelTotal => MouseInstance.WheelTotal;
+
+    public static bool IsTouchPad
+    {
+        get
+        {
+            // WheelTotal が小数を含むかどうかを判定する
+            // NaN/Infinity は false とみなす
+            double wt = WheelTotal;
+            if (double.IsNaN(wt) || double.IsInfinity(wt))
+                return false;
+            // 整数部分との差の絶対値（小数部分）
+            double frac = Math.Abs(wt - Math.Truncate(wt));
+            const double eps = 1e-9;
+            return frac > eps;
+        }
+    }
+    private static double _xdiff, _ydiff;
+    public static double Speed
+    {
+        get
+        {
+            // 移動量・スピード（将来拡張用）
+            double dx = _xdiff;
+            double dy = _ydiff;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
+    }
 
     public static bool Push(MouseButton button) => MouseInstance.Push(button);
     public static bool Hold(MouseButton button) => MouseInstance.Hold(button);
@@ -56,25 +107,15 @@ public class Mouse
     /// </summary>
     /// <param name="size">基本サイズ</param>
     /// <param name="color">メインカラー（nullなら白）</param>
-    /// <param name="accent">アクセントカラー（nullなら淡いシアン）</param>
+    /// <param name="accent">アクセントカラー（nullならグレー）</param>
     public static void Draw(int size = 18, Color? color = null, Color? accent = null)
     {
-        // 前回座標初期化
         double x = X;
         double y = Y;
-        if (double.IsNaN(_prevX))
-        {
-            _prevX = x;
-            _prevY = y;
-        }
-
-        // 移動量・スピード（将来拡張用）
-        double dx = x - _prevX;
-        double dy = y - _prevY;
-        double speed = Math.Sqrt(dx * dx + dy * dy);
 
         // ホイールで微パルス + 押下で縮小
-        double pulse = 1.0 + 0.05 * Math.Sin(WheelTotal * 0.4);
+        double pulse = 1.0 + 0.05 * (Wheel != 0 ? Math.Sin(WheelTotal * 0.4) : 0)
+            + 0.01 * Speed; // スピード依存も少し追加
         double s = size * pulse;
         if (Hold(MouseButton.Left) || Hold(MouseButton.Right) || Hold(MouseButton.Middle))
             s *= 0.9;
@@ -131,7 +172,7 @@ public class Mouse
         Drawing.Triangle(shStickA.X, shStickA.Y, shStickD.X, shStickD.Y, shStickC.X, shStickC.Y, new Color(0, 0, 0, 70));
 
         var mainColor = color ?? Color.White;
-        var accColor = accent ?? Color.DarkGray;
+        var accColor = accent ?? Color.Gray;
         // 棒本体カラー（やや淡いメイン寄り）
         var stickColor = ColorEx.LerpOKLab(mainColor, accColor, 0.4f);
         Drawing.Triangle(rtStickA.X, rtStickA.Y, rtStickB.X, rtStickB.Y, rtStickD.X, rtStickD.Y, stickColor);
@@ -160,12 +201,39 @@ public class Mouse
         Drawing.Triangle(olStickA.X, olStickA.Y, olStickB.X, olStickB.Y, olStickD.X, olStickD.Y, new Color(255, 255, 255, 25));
         Drawing.Triangle(olStickA.X, olStickA.Y, olStickD.X, olStickD.Y, olStickC.X, olStickC.Y, new Color(255, 255, 255, 25));
 
-        // ホイール回転量表示（カーソル下）
-        Drawing.Text(_prevX, _prevY + 20, WheelTotal, Color.White);
+        // ホイール回転量表示（カーソル右）
+        double hwX = x + s * 0.9;
+        double hwY = y + s * 0.56;
+        double hwW = s * 0.3;
+        double hwH = s * 0.2;
+        int[] hwlimit = [1, 2, 4, 8, 16];
+        for (int i = 0; i < hwlimit.Length; i++)
+        {
+            if (Math.Abs(Wheel) >= hwlimit[i])
+            {
+                int vector = Wheel > 0 ? -1 : 1;
+                var hwC = vector < 0 ? Color.Cyan : Color.HotPink;
 
-        // 次フレーム用記録
-        _prevX = x;
-        _prevY = y;
+                double hy = hwY + hwH * vector * i + s * 0.1;
+
+                (double X, double Y) hwTip = (hwX, hy - hwH * -vector);
+                (double X, double Y) hwBaseL = (hwX - hwW / 2, hy);
+                (double X, double Y) hwBaseR = (hwX + hwW / 2, hy);
+                Drawing.Triangle(hwTip.X, hwTip.Y, hwBaseL.X, hwBaseL.Y, hwBaseR.X, hwBaseR.Y, hwC);
+            }
+        }
+        // 高速移動時のエフェクト（将来拡張用）
+        if (Speed > 40.0)
+        {
+            int st = Speed > 200.0 ? 5 : Speed > 120 ? 3 : 1;
+            Drawing.LineZ(0, y, AstrumCore.Width, y, new Color(Speed > 120 ? 255 : 0, 255, 0, 60), st);
+            Drawing.LineZ(x, 0, x, AstrumCore.Height, new Color(Speed > 120 ? 255 : 0, 255, 0, 60), st);
+            if (Speed > 200.0)
+            {
+                Drawing.LineZ(0, y, AstrumCore.Width, y, Color.White);
+                Drawing.LineZ(x, 0, x, AstrumCore.Height, Color.White);
+            }
+        }
     }
 
     private static double LerpAngle(double a, double b, double t)

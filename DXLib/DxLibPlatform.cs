@@ -69,6 +69,7 @@ public sealed class DxLibPlatform : IGamePlatform
     }
 
     public void Close() => ShouldClose = true;
+    public bool IsActive => GetWindowActiveFlag() > 0;
 
     public void Dispose() => DxLib_End();
 

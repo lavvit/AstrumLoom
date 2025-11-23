@@ -56,6 +56,7 @@ public sealed class RayLibPlatform : IGamePlatform
     }
 
     public void Close() => ShouldClose = true;
+    public bool IsActive => IsWindowFocused();
 
     private bool _disposed;
     public void Dispose()

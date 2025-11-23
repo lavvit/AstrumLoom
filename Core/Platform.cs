@@ -22,6 +22,7 @@ public interface IGamePlatform : IDisposable
     ISound LoadSound(string path, bool streaming);
 
     void SetVSync(bool enabled);
+    bool IsActive { get; }
 }
 
 public enum GraphicsBackendKind

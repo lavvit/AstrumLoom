@@ -28,13 +28,24 @@ public class DxLibMouse : IMouse
         _prevWheel = _curWheel;
 
         _curMask = GetMouseInput();
-        double wheel = GetMouseWheelRotVolF();
 
-        _curWheel = (float)wheel;
+        // ホイール：「フレーム差分」を返す
+        float wheelDelta = GetMouseWheelRotVolF();
+        //Log.Debug($"Mouse Wheel Delta: {wheelDelta}");
+        if (WheelMergeMs > 0 && Math.Abs(wheelDelta) > 0)
+        {
+            // 軽い統合（タッチパッドの細切れイベントをまとめる）
+            // ここでは単純に加算保持のみ。必要ならタイムスタンプ管理で一定時間内を合算にする。
+            _curWheel = _prevWheel + wheelDelta;
+        }
+        else
+        {
+            _curWheel = _prevWheel + wheelDelta;
+        }
+        WheelTotal = _curWheel;
+        Wheel = wheelDelta;
 
         GetMousePoint(out _x, out _y);
-        WheelTotal = _curWheel;
-        Wheel = _curWheel - _prevWheel;
 
         for (int i = 0; i < _state.Length; i++)
         {
@@ -58,4 +69,12 @@ public class DxLibMouse : IMouse
 
         return cur ? prev ? MouseState.Held : MouseState.Pressed : prev ? MouseState.Released : MouseState.None;
     }
+
+    // ====== 設定（タッチパッドゆらぎ対策）======
+    /// <summary>Pressed と判定するための最小押下時間(ms)。0 で即時。</summary>
+    public static int PressStabilityMs = 0;
+    /// <summary>押下直後の移動許容量(px)。超えると「ドラッグ始動」とみなしてもOK。</summary>
+    public static float TapMoveTolerance = 3f;
+    /// <summary>ホイールの連続イベントをマージする時間(ms)。0で無効。</summary>
+    public static int WheelMergeMs = 35;
 }

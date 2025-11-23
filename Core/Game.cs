@@ -45,7 +45,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         platform.UTime.BeginFrame();
         Sleep.Update();
         KeyInput.Update(platform.UTime.DeltaTime);
-        platform.Mouse.Update();
+        Mouse.Update();
         game.Update(platform.UTime.DeltaTime);
         platform.UTime.EndFrame();
         AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);

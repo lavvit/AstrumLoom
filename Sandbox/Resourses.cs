@@ -139,7 +139,6 @@ internal sealed class TextureSoundDemoScene : Scene
 
         // 情報パネル
         DrawInfoPanel();
-        Mouse.Draw(22);
     }
 
     private void DrawReferencePointGrid(double cx, double cy)

@@ -67,7 +67,7 @@ public static class KeyInput
         {
             if (key.Hold())
             {
-                if (key is not Key.かな and not Key.漢字 and not Key.変換 and not Key.無変換)
+                if (AstrumCore.Active && key is not Key.かな and not Key.漢字 and not Key.変換 and not Key.無変換)
                     Sleep.WakeUp();
                 if (!_pressedFrameCounts.ContainsKey(key))
                 {

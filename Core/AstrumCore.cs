@@ -151,11 +151,7 @@ public class AstrumCore
         }
     }
 
-    public static bool Active
-    {
-        get; internal set;
-        //get => Platform.IsActive;
-    } = true;
+    public static bool Active => Platform.IsActive;
 
     public static bool InitCompleted
     { get; internal set; }

@@ -51,8 +51,9 @@ public class RayLibMouse : IMouse
         if (r) _curMask |= 1 << 1;
         if (m) _curMask |= 1 << 2;
 
-        // ホイール：Raylib は「フレーム差分」を返す
+        // ホイール：「フレーム差分」を返す
         float wheelDelta = GetMouseWheelMove();
+        //Log.Debug($"Mouse Wheel Delta: {wheelDelta}");
         if (WheelMergeMs > 0 && Math.Abs(wheelDelta) > 0)
         {
             // 軽い統合（タッチパッドの細切れイベントをまとめる）
@@ -63,11 +64,11 @@ public class RayLibMouse : IMouse
         {
             _curWheel = _prevWheel + wheelDelta;
         }
+        WheelTotal = _curWheel;
+        Wheel = wheelDelta;
 
         _x = GetMouseX();
         _y = GetMouseY();
-        WheelTotal = _curWheel;
-        Wheel = WheelTotal - _prevWheel;
         for (int i = 0; i < 3; i++)
         {
             _state[i] = GetMouseState((MouseButton)i);
