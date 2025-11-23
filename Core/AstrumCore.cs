@@ -161,4 +161,49 @@ public class AstrumCore
     { get; internal set; }
 
     public static double WindowScale => WindowConfig.Scale;
+    public static string Title => WindowConfig.Title;
+    public static bool VSync
+    {
+        get => WindowConfig.VSync;
+        set
+        {
+            WindowConfig.VSync = value;
+            // DXLib など、プラットフォーム側で VSync を制御する場合は反映させる
+            Platform.SetVSync(value);
+        }
+    }
+}
+
+public class Sleep
+{
+    private static long SleepDuration => AstrumCore.WindowConfig.SleepDurationMs;
+    private static bool _vsync = AstrumCore.VSync;
+    private static long _lastWakeTime = 0;
+    public static bool Sleeping { get; private set; } = false;
+    public static void Update()
+    {
+        long ms = SleepDuration;
+        // minute分以上スリープしている場合も垂直同期
+        long last = _lastWakeTime;
+        if (Environment.TickCount64 - last > ms)
+        {
+            if (!_vsync && !Sleeping)
+            {
+                AstrumCore.Platform.SetVSync(true);
+                Sleeping = true;
+                return;
+            }
+        }
+        else
+        {
+            if (!_vsync && Sleeping)
+                Sleeping = false;
+        }
+        AstrumCore.Platform.SetVSync(_vsync);
+    }
+    public static void WakeUp()
+    {
+        if (!AstrumCore.Active) return;
+        _lastWakeTime = Environment.TickCount64;
+    }
 }

@@ -10,6 +10,7 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public IGraphics Graphics { get; }
     public IInput Input { get; }
+    public ITime UTime { get; }
     public ITime Time { get; }
     public TextEnter TextInput { get; }
     public IMouse Mouse { get; }
@@ -45,6 +46,7 @@ public sealed class DxLibPlatform : IGamePlatform
             throw new Exception("DxLib_Init failed");
 
         Time = new SimpleTime();
+        UTime = new SimpleTime();
         Graphics = new DxLibGraphics(); // DummyGraphics の代わり
         _input = new DxLibInput();
         Input = _input;
@@ -64,8 +66,6 @@ public sealed class DxLibPlatform : IGamePlatform
         }
         // キー状態の更新
         _input.Update();
-
-        WaitVSync(VSync ? 1 : 0);
     }
 
     public void Close() => ShouldClose = true;
@@ -76,6 +76,18 @@ public sealed class DxLibPlatform : IGamePlatform
         new DxLibTexture(path);
     public ISound LoadSound(string path, bool streaming) =>
         new DxLibSound(path, streaming);
+
+    public void SetVSync(bool enabled)
+    {
+        if (VSync == enabled)
+        {
+            WaitVSync(VSync ? 1 : 0);
+            return;
+        }
+        Log.Debug("VSync切替: " + enabled);
+        VSync = enabled;
+        SetWaitVSyncFlag(enabled ? 1 : 0);
+    }
 
     // --- 以下 stub 実装たち ---
 

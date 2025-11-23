@@ -184,8 +184,6 @@ internal sealed class DxLibTexture : ITexture
             DrawRotaGraph3F(fx, fy, (float)point.X, (float)point.Y, w, h,
                 angle, Handle, TRUE, tx, ty);
         }
-        Drawing.Cross(fx + point.X, fy + point.Y, 40, Color.White, 1);
-        Drawing.DefaultText(fx, fy, point);
         ResetOptions(use);
     }
     private Point Point(Rect? rectangle = null)

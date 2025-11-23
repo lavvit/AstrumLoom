@@ -10,20 +10,15 @@ public class Overlay
     public static void Set(Overlay? overlay)
         => Current = overlay ?? new Overlay();
 
-    private readonly FpsCounter _fps = new();
-
     // ここがベースの描画
     public virtual void Draw()
     {
         var platform = AstrumCore.Platform;
-        var time = platform.Time;
-
-        // ★ 毎フレーム、ゲーム時間で Tick
-        _fps.Tick(time.TotalTime);
 
         var g = platform.Graphics;
         string backend = platform.BackendKind.ToString();
 
+        var _fps = AstrumCore.DrawFPS;
         double avg = _fps.GetFPS(0.3);
         double max = _fps.GetMaxFPS(0.3);
         double min = _fps.GetMinFPS(0.3);

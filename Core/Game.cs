@@ -13,6 +13,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
 
     public void Run()
     {
+        AstrumCore.Platform = platform;
         AstrumCore.InitDrop();
 
         KeyInput.Initialize(platform.Input, platform.TextInput);
@@ -23,23 +24,36 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
 
         while (!platform.ShouldClose)
         {
-            platform.Time.BeginFrame();
+            //Sleep.Update();
+
             platform.PollEvents();
-
-            KeyInput.Update(platform.Time.DeltaTime);
-            game.Update(platform.Time.DeltaTime);
-            platform.Mouse.Update();
-
-            platform.Graphics.BeginFrame();
-            platform.Graphics.Clear(BackgroundColor);
-            game.Draw();
-            // ★ ここでオーバーレイ
-            if (showOverlay)
-                Overlay.Current.Draw();
-            Log.Draw();
-            platform.Graphics.EndFrame();
-
-            platform.Time.EndFrame();
+            Update(game);
+            Draw(game);
         }
+    }
+    public void Update(IGame game)
+    {
+        platform.UTime.BeginFrame();
+        KeyInput.Update(platform.Time.DeltaTime);
+        game.Update(platform.Time.DeltaTime);
+        platform.Mouse.Update();
+        platform.UTime.EndFrame();
+        AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);
+    }
+    public void Draw(IGame game)
+    {
+        platform.Time.BeginFrame();
+        platform.Graphics.BeginFrame();
+        platform.Graphics.Clear(BackgroundColor);
+
+        game.Draw();
+        // ★ ここでオーバーレイ
+        if (showOverlay)
+            Overlay.Current.Draw();
+        Log.Draw();
+
+        platform.Graphics.EndFrame();
+        platform.Time.EndFrame();
+        AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
     }
 }

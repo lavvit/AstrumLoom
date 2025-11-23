@@ -7,6 +7,7 @@ public interface IGamePlatform : IDisposable
     IGraphics Graphics { get; }
     IInput Input { get; }
     ITime Time { get; }
+    ITime UTime { get; }// Update 用
     TextEnter TextInput { get; }
     IMouse Mouse { get; }
 
@@ -18,6 +19,8 @@ public interface IGamePlatform : IDisposable
 
     ITexture LoadTexture(string path);
     ISound LoadSound(string path, bool streaming);
+
+    void SetVSync(bool enabled);
 }
 
 public enum GraphicsBackendKind

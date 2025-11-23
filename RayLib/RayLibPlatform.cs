@@ -13,6 +13,7 @@ public sealed class RayLibPlatform : IGamePlatform
     public IGraphics Graphics { get; }
     public IInput Input { get; }
     public ITime Time { get; }
+    public ITime UTime { get; }
     public TextEnter TextInput { get; }
     public IMouse Mouse { get; }
 
@@ -36,6 +37,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
 
         Time = new SimpleTime { TargetFps = config.TargetFps };
+        UTime = new SimpleTime { TargetFps = 0 };
         Graphics = new RayLibGraphics();
         Input = new RayLibInput();
         TextInput = new(new RayLibTextInput(), Time);
@@ -72,6 +74,25 @@ public sealed class RayLibPlatform : IGamePlatform
         new RayLibTexture(path);
     public ISound LoadSound(string path, bool streaming = false) =>
         new RayLibSound(path, streaming);
+
+    private bool VSync;
+    public void SetVSync(bool enabled)
+    {
+        if (IsWindowReady() || VSync == enabled) return;
+        Log.Debug("VSync切替: " + enabled);
+        VSync = enabled;
+        // 途中切替は SetWindowState / ClearWindowState を使う。
+        if (enabled)
+        {
+            SetWindowState(ConfigFlags.VSyncHint); // スワップ間引き（プラットフォーム依存）
+            SetTargetFPS(120); // 120 に張り付けたい場合は併用
+        }
+        else
+        {
+            ClearWindowState(ConfigFlags.VSyncHint);
+            SetTargetFPS(0); // 0 で上限無し
+        }
+    }
 
     // ================================
     //  時間管理（DxLib版と同じノリ）
