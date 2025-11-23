@@ -252,7 +252,7 @@ public class RayLibSound : ISound
         set
         {
             if (!Enable) return;
-            _volume = (float)Math.Clamp(value, 0.0, 1.0);
+            _volume = (float)Math.Clamp(value, 0.0, 10.0);
             SetSoundVolume(Sfx, _volume);
             if (_streamloaded)
                 SetMusicVolume(Music, _volume);
@@ -265,9 +265,9 @@ public class RayLibSound : ISound
         {
             if (!Enable) return;
             _pan = (float)Math.Clamp(value, -1.0, 1.0);
-            SetSoundPan(Sfx, 0.5f + 0.5f * _pan);
+            SetSoundPan(Sfx, 0.5f + 0.5f * -_pan);
             if (_streamloaded)
-                SetMusicPan(Music, 0.5f + 0.5f * _pan);
+                SetMusicPan(Music, 0.5f + 0.5f * -_pan);
         }
     }
     public double Speed
@@ -276,7 +276,8 @@ public class RayLibSound : ISound
         set
         {
             if (!Enable) return;
-            _speed = (float)Math.Clamp(value, 0.25, 4.0);
+            double max = 64.0;
+            _speed = (float)Math.Clamp(value, 1.0 / max, max);
             SetSoundPitch(Sfx, _speed);
             if (_streamloaded)
                 SetMusicPitch(Music, _speed);

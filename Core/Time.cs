@@ -38,7 +38,7 @@ public class Counter
     /// <param name="end">終了値。</param>
     /// <param name="interval">Tickする間隔(マイクロ秒)。</param>
     /// <param name="isLoop">ループするか否か。</param>
-    public Counter(long begin = 0, long end = 1000, long interval = 1000, bool isLoop = false,
+    public Counter(long begin, long end, long interval, bool isLoop = false,
         Func<long>? nowProvider = null)
     {
         _now = nowProvider ?? DefaultNow;
@@ -51,6 +51,12 @@ public class Counter
         IsLoop = isLoop;
         State = TimerState.Stopped;
     }
+    public Counter(long begin, long end, bool isLoop = false, Func<long>? nowProvider = null)
+        : this(begin, end, 1000, isLoop, nowProvider) { }
+    public Counter(long end, bool isLoop = false, Func<long>? nowProvider = null)
+        : this(0, end, isLoop, nowProvider) { }
+    public Counter(bool isLoop = false, Func<long>? nowProvider = null)
+        : this(0, 1000, isLoop, nowProvider) { }
 
     /// <summary>
     /// Tickします。
@@ -303,6 +309,7 @@ public class Counter
     public TimeConvert CTime => new(this);
 
     public double Progress => End > Begin ? (double)(Value - Begin) / (End - Begin) : 0.0;
+    public bool Running => State == TimerState.Started;
 
     public bool IsEnd => !IsLoop && Value == End;
     public bool IsBegin => !IsLoop && Value == Begin;

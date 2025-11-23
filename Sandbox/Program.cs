@@ -6,9 +6,7 @@ namespace Sandbox;
 
 internal sealed class SimpleTestGame : Scene
 {
-    private Texture? _tex;
-    private Sound? _sound;
-    private Sound? _bgm;
+    private Counter? _timer;
     private IFont? _font;
     private IFont? _kbfont;
 
@@ -17,30 +15,31 @@ internal sealed class SimpleTestGame : Scene
 
     public override void Enable()
     {
-        // 実行ファイルからの相対パスになる
-        _tex = new Texture("Assets/test.png");
-        _sound = new Sound("Assets/Cancel.ogg");
-        _bgm = new Sound("Assets/バヨリンの音.ogg", true);
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
         _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
         Drawing.DefaultFont = _font!;
+        _timer = new Counter(0, 600, true);
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
-        //_scene = new FancyShapesScene(1280, 720);
+        _scene = new TextureSoundDemoScene();
+        _scene.Enable();
         Overlay.Set(new SandboxOverlay());
     }
 
     public override void Update()
     {
-        if (KeyInput.Push(Key.Esc))
+        _timer?.Tick();
+        if (Key.Esc.Push())
         {
             AstrumCore.End();
         }
-        _bgm?.Loop = true;
-        _bgm?.PlayStream();
-        if (KeyInput.Push(Key.Space))
+
+        if (Key.T.Push())
         {
-            _sound?.Play();
+            if (_timer?.Running ?? false)
+                _timer?.Stop();
+            else
+                _timer?.Start();
         }
 
         // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
@@ -49,28 +48,22 @@ internal sealed class SimpleTestGame : Scene
 
     public override void Draw()
     {
+        Drawing.Fill(Color.CornflowerBlue);
         // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
-        if (_scene != null) return;
 
-        Drawing.Fill(Color.CornflowerBlue);
+        Drawing.Box(640 - 100, 360 - 30, 200, 60, Color.Black);
+        Drawing.Box(640 - 98, 360 - 28, 196, 56, Color.White);
+        Drawing.Box(640 - 98, 360 - 28, 196 * _timer?.Progress ?? 0, 56, Color.Green);
 
-        if (_tex is null) return;
+        if (_scene == null)
+            Drawing.Text(640, 360, "Hello, AstrumLoom!", Color.White, ReferencePoint.Center);
 
-        // 画面中央あたりに描く（適当に）
-        float x = 640;// + 160f * (float)Math.Sin(AstrumCore.Platform.Time.TotalTime)
-        float y = 360;
-
-        int p = DateTime.Now.Second % 9;
-        _tex.Point = (ReferencePoint)p;
-        _tex.XYScale = (2, 1);
-        //_tex.Draw(x, y);
-        _tex.Draw(x, y, new(150, 150, 300, 300));
-        Drawing.Cross(x, y, size: 40, color: Color.Red, thickness: 2);
-
-        KeyBoard.Draw(10, 540, size: 10, KeyType.JPFull, _kbfont);
+        KeyBoard.Draw(800, 560, size: 8, KeyType.JPFull, _kbfont);
 
         Mouse.Draw(20);
+
+        Drawing.Text(20, 400, KeyInput.PressedFrameCount(Key.J));
     }
 }
 
@@ -89,7 +82,7 @@ internal static class Program
             ShowMouse = true,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
-            GraphicsBackend = GraphicsBackendKind.DxLib, // ←ここ変えるだけで切替
+            GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替
         };
 
         try

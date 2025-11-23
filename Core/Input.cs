@@ -80,7 +80,7 @@ public static class KeyInput
             }
         }
     }
-    private static double PressedFrameCount(Key key)
+    public static double PressedFrameCount(Key key)
         => _pressedFrameCounts.TryGetValue(key, out double time) ? time : 0;
 
     public static bool Repeat(this Key key, int intervalMs) => Repeat(key, intervalMs, intervalMs);
@@ -368,7 +368,7 @@ public sealed class TextEnter
     public void Draw(double x, double y, Color? color = null, IFont? font = null)
     {
         if (!IsActive) return;
-        _impl.Draw(x, y, color, font ?? AstrumCore.Graphic.DefaultFont, _caretTimer < 0.6);
+        _impl.Draw(x, y, color, font ?? Drawing.DefaultFont, _caretTimer < 0.6);
     }
 
     public bool IsActive { get; private set; }
@@ -421,7 +421,9 @@ public interface ITextInput
 
 public class KeyBoard
 {
-    public static Color GetKeyColor(Key key) => key.Hold() ? Color.Yellow : Color.DimGray;
+    public static Color GetKeyColor(Key key) => key.Hold() ?
+        new Rainbow((float)(55 + KeyInput.PressedFrameCount(key) / 60.0 % 360.0)).From()
+        : Color.DimGray;
     public static Color GetKeyFontColor(Key key) => Color.VisibleColor(GetKeyColor(key));
 
     public static void Draw(double x, double y, int size = 20, KeyType type = KeyType.JPTKL, IFont? font = null)
@@ -441,7 +443,7 @@ public class KeyBoard
         double ty = 0.66 * size;
         bool isfull = (int)type % 2 == 1;
         bool isjp = (int)type < 2;
-        var f = font ?? AstrumCore.Graphic.DefaultFont;
+        var f = font ?? Drawing.DefaultFont;
 
         // 行ごとのキー列を定義して反復処理するユーティリティ
         void DrawRow(ref double rx, double ry, KeySpec[] specs)

@@ -240,37 +240,43 @@ public class Texture : IDisposable
         }
     }
 
-    public Texture Export()
+    public Texture Clone()
     {
         var tex = new Texture
         {
-            Color = Color,
-            //AddColor = AddColor,
-            BlendMode = BlendMode,
-            Opacity = Opacity,
-            Scale = Scale,
-            Angle = Angle,
-            XYScale = XYScale,
-            Position = Position,
-            Point = Point,
-            Rectangle = Rectangle,
-            Flip = Flip,
+            _texture = _texture
         };
+        tex.Import(Export());
         return tex;
     }
-    public void Import(Texture tex)
+
+    public DrawOptions Export() => new()
     {
-        Color = tex.Color;
-        //AddColor = tex.AddColor;
-        BlendMode = tex.BlendMode;
-        Opacity = tex.Opacity;
-        Scale = tex.Scale;
-        Angle = tex.Angle;
-        XYScale = tex.XYScale;
-        Position = tex.Position;
-        Point = tex.Point;
-        Rectangle = tex.Rectangle;
-        Flip = tex.Flip;
+        Color = Color,
+        //AddColor = AddColor,
+        Blend = BlendMode,
+        Opacity = Opacity,
+        Scale = XYScale ?? (Scale, Scale),
+        Angle = Angle,
+        Position = Position,
+        Point = Point,
+        Rectangle = Rectangle,
+        Flip = Flip,
+    };
+    public void Import(DrawOptions opt)
+    {
+        Color = opt.Color ?? Color.White;
+        //AddColor = opt.AddColor;
+        BlendMode = opt.Blend;
+        Opacity = opt.Opacity;
+        Angle = opt.Angle;
+        if (opt.Scale.W == opt.Scale.H)
+            Scale = opt.Scale.W;
+        else XYScale = opt.Scale;
+        Position = opt.Position;
+        Point = opt.Point;
+        Rectangle = opt.Rectangle;
+        Flip = opt.Flip;
     }
 
     public void Draw(double x, double y, LayoutUtil.Rect rectangle, LayoutUtil.Point? point = null)

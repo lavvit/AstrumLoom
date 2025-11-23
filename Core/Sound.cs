@@ -99,4 +99,13 @@ public class Sound : IDisposable
         get => _sound?.Loop ?? false;
         set => _sound?.Loop = value;
     }
+    public double Progress
+    {
+        get => _sound == null || _sound.Length <= 0 ? 0 : _sound.Time / _sound.Length;
+        set
+        {
+            if (_sound == null || _sound.Length <= 0) return;
+            _sound.Time = _sound.Length * value;
+        }
+    }
 }
