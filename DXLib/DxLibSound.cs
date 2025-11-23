@@ -166,6 +166,7 @@ public class DxLibSound : ISound
         get => _time;
         set
         {
+            if (Math.Abs(_time - value) < 16.0) return;
             _time = (long)value;
             SetSoundCurrentTime(_time, Handle);
         }
@@ -219,6 +220,7 @@ public class DxLibSound : ISound
     public void Play()
     {
         if (!Enable) return;
+        _time = 0;
         PlaySoundMem(Handle, DX_PLAYTYPE_BACK, TRUE);
         _played = true;
     }

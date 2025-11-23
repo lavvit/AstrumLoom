@@ -33,7 +33,43 @@ internal sealed class RayLibFont : IFont
 
         // Raylib: size は "baseSize" として渡す
         int[] cps = EnumRange(0x20, 0xFFFF);
-        _font = LoadFontEx(path, spec.Size, cps, cps.Length);
+
+        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+        {
+            // TTF/OTF どちらも stb_truetype 経由でOK
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+
+            if (ext == ".font")
+            {
+                byte[] bytes = File.ReadAllBytes(path);
+                static string GuessFontHint(byte[] b)
+                {
+                    if (b.Length >= 4)
+                    {
+                        // 00 01 00 00 → TrueType
+                        if (b[0] == 0x00 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x00) return ".ttf";
+                        // 'OTTO' → OpenType(CFF)
+                        if (b[0] == (byte)'O' && b[1] == (byte)'T' && b[2] == (byte)'T' && b[3] == (byte)'O') return ".otf";
+                        // 'ttcf' → TrueType Collection
+                        if (b[0] == (byte)'t' && b[1] == (byte)'t' && b[2] == (byte)'c' && b[3] == (byte)'f') return ".ttc";
+                    }
+                    return ".ttf"; // わからなければ TTF とみなす
+                }
+                string hint = GuessFontHint(bytes);
+                _font = Raylib.LoadFontFromMemory(hint, bytes, spec.Size, cps, cps.Length);
+                Raylib.SetTextureFilter(_font.Texture, TextureFilter.Bilinear);
+                return;
+            }
+            if (ext is ".ttf" or ".otf" or ".ttc" or ".otc")
+            {
+                _font = Raylib.LoadFontEx(path, spec.Size, cps, cps.Length);
+                Raylib.SetTextureFilter(_font.Texture, TextureFilter.Bilinear);
+            }
+            else // 未対応拡張子 → 内蔵にフォールバック
+                _font = Raylib.GetFontDefault();
+        }
+        else // パス無し → 内蔵フォント
+            _font = Raylib.GetFontDefault();
     }
 
     public (int width, int height) Measure(string text)
@@ -71,7 +107,8 @@ internal sealed class RayLibFont : IFont
                 float a = (float)(i * (MathF.PI * 2) / dir.Length);
                 dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
             }
-            for (int r = 1; r <= _edgeThickness; r++)
+            int r = _edgeThickness;
+            //for (int r = 1; r <= _edgeThickness; r++)
             {
                 foreach (var v in dir)
                 {
@@ -117,7 +154,8 @@ internal sealed class RayLibFont : IFont
             float a = (float)(i * (MathF.PI * 2) / dir.Length);
             dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
         }
-        for (int r = 1; r <= _edgeThickness; r++)
+        int r = _edgeThickness;
+        //for (int r = 1; r <= _edgeThickness; r++)
         {
             foreach (var v in dir)
             {

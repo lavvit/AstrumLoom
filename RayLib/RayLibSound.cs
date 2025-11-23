@@ -240,6 +240,7 @@ public class RayLibSound : ISound
         set
         {
             if (!Enable) return;
+            if (Math.Abs(_time - value) < 16.0) return;
             _time = Math.Clamp(value, 0, Length);
             if (_streamloaded)
                 SeekMusicStream(Music, (float)_time / 1000.0f);
@@ -293,6 +294,7 @@ public class RayLibSound : ISound
     public void Play()
     {
         if (!Enable) return;
+        _time = 0;
         if (_streamloaded)
         {
             PlayMusicStream(Music);

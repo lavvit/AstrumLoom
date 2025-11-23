@@ -163,6 +163,12 @@ public class Texture : IDisposable
                 opt.Rectangle = value;
                 _texture.Option = opt;
             }
+            else if (_texture?.Option != null)
+            {
+                var opt = _texture.Option.Value;
+                opt.Rectangle = null;
+                _texture.Option = opt;
+            }
         }
     }
     public Color Color

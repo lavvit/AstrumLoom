@@ -57,8 +57,8 @@ public static class KeyInput
         }
     }
 
-    private static Dictionary<Key, double> _pressstarttime = [];
     private static Dictionary<Key, double> _pressedFrameCounts = [];
+    private static Dictionary<Key, double> _lastRepeatTimes = [];
     internal static void Update(double deltaTime)
     {
         double time = deltaTime;
@@ -67,35 +67,45 @@ public static class KeyInput
         {
             if (key.Hold())
             {
-                if (!_pressstarttime.ContainsKey(key))
-                {
-                    _pressstarttime[key] = time;
-                }
                 if (!_pressedFrameCounts.ContainsKey(key))
                 {
                     _pressedFrameCounts[key] = 0;
                 }
-                _pressedFrameCounts[key] = time - _pressstarttime[key];
+                _pressedFrameCounts[key] += time * 1000.0;
             }
-            else
+            else if (_pressedFrameCounts.ContainsKey(key))
             {
-                _pressstarttime.Remove(key);
                 _pressedFrameCounts.Remove(key);
+                _lastRepeatTimes.Remove(key);
             }
         }
     }
-    private static int PressedFrameCount(Key key)
-        => _pressedFrameCounts.TryGetValue(key, out double time) ? (int)time : 0;
+    private static double PressedFrameCount(Key key)
+        => _pressedFrameCounts.TryGetValue(key, out double time) ? time : 0;
 
+    public static bool Repeat(this Key key, int intervalMs) => Repeat(key, intervalMs, intervalMs);
     public static bool Repeat(this Key key, int interval, int delay)
     {
         if (!key.Hold()) return false;
         // 経過フレーム数を取得
-        int frames = PressedFrameCount(key);
+        double frames = PressedFrameCount(key);
         // 最初の delay フレームは無視
-        if (frames <= delay) return false;
+        if (frames <= delay) return key.Push();
         // delay フレーム以降、interval ごとに true を返す
-        return (frames - delay) % interval == 0;
+
+        // 初回発火
+        if (!_lastRepeatTimes.ContainsKey(key))
+        {
+            _lastRepeatTimes[key] = frames;
+            return true;
+        }
+
+        if (frames - _lastRepeatTimes[key] >= interval)
+        {
+            _lastRepeatTimes[key] = frames;
+            return true;
+        }
+        return false;
     }
 
     public static bool Typing => _textEnter.IsActive;

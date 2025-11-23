@@ -37,11 +37,21 @@ public static class FontHandle
         => Create(new FontSpec(nameOrPath, size, thick, edge, spacing, bold, italic));
 
     public static void Draw(this IFont? font, double x, double y, object text,
+        Color color,
+        Color edgecolor,
+        ReferencePoint point = ReferencePoint.TopLeft,
+        BlendMode blend = BlendMode.None, double opacity = 1)
+        => Draw(font, x, y, text,
+            color,
+            point,
+            edgecolor,
+            blend,
+            opacity);
+    public static void Draw(this IFont? font, double x, double y, object text,
         Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft,
         Color? edgecolor = null,
-        BlendMode blend = BlendMode.None,
-        double opacity = 1)
+        BlendMode blend = BlendMode.None, double opacity = 1)
         => (font ?? Drawing.DefaultFont).Draw(x, y, text?.ToString() ?? "",
             new DrawOptions
             {

@@ -9,7 +9,11 @@ internal class BaseProgram : IGame
     public BaseProgram(IGamePlatform platform) => _platform = platform;
     public void Initialize() { }
     public void Update(float deltaTime) => _scene?.Update();
-    public void Draw() => _scene?.Draw();
+    public void Draw()
+    {
+        _scene?.Draw();
+        _scene?.Debug();
+    }
 }
 public class AstrumCore
 {
