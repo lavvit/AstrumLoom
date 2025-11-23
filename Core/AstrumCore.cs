@@ -177,7 +177,7 @@ public class AstrumCore
 public class Sleep
 {
     private static long SleepDuration => AstrumCore.WindowConfig.SleepDurationMs;
-    private static bool _vsync = AstrumCore.VSync;
+    private static bool _vsync => AstrumCore.VSync;
     private static long _lastWakeTime = 0;
     public static bool Sleeping { get; private set; } = false;
     public static void Update()
@@ -185,12 +185,16 @@ public class Sleep
         long ms = SleepDuration;
         // minute分以上スリープしている場合も垂直同期
         long last = _lastWakeTime;
-        if (Environment.TickCount64 - last > ms)
+        long now = Environment.TickCount64;
+        if (now - last > ms)
         {
-            if (!_vsync && !Sleeping)
+            if (!_vsync)
             {
+                if (!Sleeping)
+                {
+                    Sleeping = true;
+                }
                 AstrumCore.Platform.SetVSync(true);
-                Sleeping = true;
                 return;
             }
         }

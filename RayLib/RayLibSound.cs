@@ -252,7 +252,7 @@ public class RayLibSound : ISound
         set
         {
             if (!Enable) return;
-            _volume = (float)Math.Clamp(value, 0.0, 10.0);
+            _volume = (float)Math.Max(value, 0.0);
             SetSoundVolume(Sfx, _volume);
             if (_streamloaded)
                 SetMusicVolume(Music, _volume);

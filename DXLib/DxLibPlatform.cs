@@ -81,7 +81,7 @@ public sealed class DxLibPlatform : IGamePlatform
     {
         if (VSync == enabled)
         {
-            WaitVSync(VSync ? 1 : 0);
+            WaitVSync(enabled ? 1 : 0);
             return;
         }
         Log.Debug("VSync切替: " + enabled);

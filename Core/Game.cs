@@ -1,4 +1,6 @@
-﻿namespace AstrumLoom;
+﻿using System.Diagnostics;
+
+namespace AstrumLoom;
 
 public interface IGame
 {
@@ -21,28 +23,38 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         game.Initialize();
         AstrumCore.InitCompleted = true;
         Scene.Start();
+        Sleep.WakeUp();
+        //LoopMultiThread();
+        Loop();
+    }
 
+    public void Loop()
+    {
         while (!platform.ShouldClose)
         {
-            //Sleep.Update();
-
-            platform.PollEvents();
             Update(game);
             Draw(game);
         }
     }
+    public void LoopMultiThread()
+    {
+    }
+
     public void Update(IGame game)
     {
         platform.UTime.BeginFrame();
-        KeyInput.Update(platform.Time.DeltaTime);
-        game.Update(platform.Time.DeltaTime);
+        Sleep.Update();
+        KeyInput.Update(platform.UTime.DeltaTime);
         platform.Mouse.Update();
+        game.Update(platform.UTime.DeltaTime);
         platform.UTime.EndFrame();
         AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);
     }
     public void Draw(IGame game)
     {
         platform.Time.BeginFrame();
+        MainUpdate(game);
+
         platform.Graphics.BeginFrame();
         platform.Graphics.Clear(BackgroundColor);
 
@@ -55,5 +67,21 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         platform.Graphics.EndFrame();
         platform.Time.EndFrame();
         AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
+    }
+    public void MainUpdate(IGame game) => platform.PollEvents();
+    private static class HiResDelay
+    {
+        // 目安: sub-ms の仕上げに
+        public static void Delay(TimeSpan duration)
+        {
+            var sw = Stopwatch.StartNew();
+            // まずは大雑把に（1ms残すくらいまで）寝る
+            var sleepUntil = duration - TimeSpan.FromMilliseconds(1);
+            if (sleepUntil > TimeSpan.Zero)
+                Thread.Sleep(sleepUntil);
+
+            // 仕上げはスピンで追い込む
+            while (sw.Elapsed < duration) { /* busy wait */ }
+        }
     }
 }

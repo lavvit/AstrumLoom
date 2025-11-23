@@ -177,7 +177,7 @@ internal sealed class TextureSoundDemoScene : Scene
         {
             Drawing.Box(x, y - 4, 400 * _bgm.Progress, 8, Color.LimeGreen);
             Drawing.Text(x, y, $"BGM Vol: {_bgm.Volume:0.00} Pan: {_bgm.Pan:0.00} Pitch: {_bgm.Pitch:0.00}", Color.White);
-            Drawing.Text(x, y + 22, $"Time: {_bgm.Time:0.0}s / {_bgm.Length / 1000.0:0.0}s", Color.White);
+            Drawing.Text(x, y + 22, $"Time: {_bgm.Time / 1000.0:0.0}s / {_bgm.Length / 1000.0:0.0}s", Color.White);
         }
         Drawing.Text(x, y + 44, $"Texture Opacity: {_tex?.Opacity:0.00} Scale: {_tex?.Scale:0.00} Angle: {_angle:0.0}", Color.White);
         Drawing.Text(x, y + 66, "SPACE: SFX  Up/Down: Vol  Left/Right: Pan  F1/F2: Pitch", Color.Gray);

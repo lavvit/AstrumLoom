@@ -80,7 +80,8 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
-            ShowMouse = true,
+            ShowMouse = false,
+            SleepDurationMs = 60000,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
             GraphicsBackend = GraphicsBackendKind.RayLib, // ←ここ変えるだけで切替

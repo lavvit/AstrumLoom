@@ -64,12 +64,13 @@ public sealed class RayLibPlatform : IGamePlatform
         _disposed = true;
 
         // ウィンドウが初期化済みのときだけ閉じる
-        if (IsWindowReady())
+        if (_ready)
         {
             CloseWindow();
         }
     }
 
+    private bool _ready => IsWindowReady();
     public ITexture LoadTexture(string path) =>
         new RayLibTexture(path);
     public ISound LoadSound(string path, bool streaming = false) =>
@@ -78,7 +79,7 @@ public sealed class RayLibPlatform : IGamePlatform
     private bool VSync;
     public void SetVSync(bool enabled)
     {
-        if (IsWindowReady() || VSync == enabled) return;
+        if (!_ready || VSync == enabled) return;
         Log.Debug("VSync切替: " + enabled);
         VSync = enabled;
         // 途中切替は SetWindowState / ClearWindowState を使う。

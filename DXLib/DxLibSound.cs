@@ -147,8 +147,6 @@ public class DxLibSound : ISound
             {
                 _streaming = true;
                 _time = GetSoundCurrentTime(Handle);
-                _volume = GetVolumeSoundMem2(Handle) / 255.0f;
-                _pan = GetPanSoundMem(Handle) / 255.0f;
                 _speed = (float)GetFrequency() / Frequency;
                 return;
             }
@@ -167,7 +165,7 @@ public class DxLibSound : ISound
         set
         {
             if (Math.Abs(_time - value) < 16.0) return;
-            _time = (long)value;
+            _time = (long)Math.Clamp(value, 0, Length);
             SetSoundCurrentTime(_time, Handle);
         }
     }
@@ -176,7 +174,7 @@ public class DxLibSound : ISound
         get => _volume;
         set
         {
-            _volume = (float)value;
+            _volume = (float)Math.Max(value, 0.0);
             ChangeVolumeSoundMem((int)(_volume * 255), Handle);
         }
     }
@@ -185,8 +183,8 @@ public class DxLibSound : ISound
         get => _pan;
         set
         {
-            _pan = (float)value;
-            ChangePanSoundMem((int)(_pan * 255), Handle);
+            _pan = (float)Math.Clamp(value, -1.0, 1.0);
+            ChangePanSoundMem((int)(_pan * 255.0), Handle);
         }
     }
     public double Speed
@@ -194,7 +192,8 @@ public class DxLibSound : ISound
         get => _speed;
         set
         {
-            _speed = (float)value;
+            double max = 64.0;
+            _speed = (float)Math.Clamp(value, 1.0 / max, max);
             ResetFrequencySoundMem(Handle);
             float frequency = GetFrequencySoundMem(Handle);
             SetFrequencySoundMem((int)(frequency * _speed), Handle);
