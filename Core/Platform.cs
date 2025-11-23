@@ -18,6 +18,7 @@ public interface IGamePlatform : IDisposable
     void Close();
 
     ITexture LoadTexture(string path);
+    ITexture CreateTexture(int width, int height, Action callback);
     ISound LoadSound(string path, bool streaming);
 
     void SetVSync(bool enabled);

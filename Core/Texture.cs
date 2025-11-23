@@ -37,6 +37,10 @@ public class Texture : IDisposable
     private ITexture? _texture { get; set; } = null;
     private bool _disposed = false;
     public Texture() { }
+
+    public Texture(LayoutUtil.Size size, Action method)
+        => _texture = AstrumCore.Platform?.CreateTexture((int)size.Width, (int)size.Height, method);
+
     public Texture(string path)
         => _texture = AstrumCore.Platform?.LoadTexture(path);
 
@@ -294,5 +298,16 @@ public class Texture : IDisposable
             Thickness = _texture?.Option?.Thickness ?? 0,
         };
         _texture?.Draw(x, y, options);
+    }
+}
+
+public class TextureCathe
+{
+    private Texture? Cathe;
+    public Texture Get(Action method, LayoutUtil.Size size)
+    {
+        if (Cathe != null) return Cathe;
+        Cathe = new Texture(size, method);
+        return Cathe;
     }
 }

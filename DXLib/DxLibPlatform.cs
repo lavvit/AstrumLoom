@@ -77,6 +77,30 @@ public sealed class DxLibPlatform : IGamePlatform
     public ISound LoadSound(string path, bool streaming) =>
         new DxLibSound(path, streaming);
 
+    public ITexture CreateTexture(int width, int height, Action callback)
+    {
+        if (Environment.CurrentManagedThreadId != AstrumCore.MainThreadId)
+        {
+            Log.Warning("CreateTexture はメインスレッドで呼び出してください。");
+            return new DxLibTexture("");
+        }
+        if (width <= 0 || height <= 0) return new DxLibTexture("");
+        int scr = MakeScreen(width, height, TRUE);
+        if (scr < 0) return new DxLibTexture("");
+
+        int oldScreen = GetDrawScreen();
+        SetDrawScreen(scr);
+        SetBackgroundColor(0, 0, 0);
+        ClearDrawScreen();
+
+        // execute the provided draw actions onto the temporary screen
+        callback?.Invoke();
+
+        SetDrawScreen(oldScreen);
+
+        return new DxLibTexture(scr);
+    }
+
     public void SetVSync(bool enabled)
     {
         if (VSync == enabled)

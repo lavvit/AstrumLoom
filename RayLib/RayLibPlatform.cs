@@ -76,6 +76,21 @@ public sealed class RayLibPlatform : IGamePlatform
     public ISound LoadSound(string path, bool streaming = false) =>
         new RayLibSound(path, streaming);
 
+    public ITexture CreateTexture(int width, int height, Action callback)
+    {
+        if (Environment.CurrentManagedThreadId != AstrumCore.MainThreadId)
+        {
+            Log.Warning("CreateTexture はメインスレッドで呼び出してください。");
+            return new RayLibTexture("");
+        }
+        if (width <= 0 || height <= 0) return new RayLibTexture("");
+        var renderTex = Raylib.LoadRenderTexture(width, height);
+        Raylib.BeginTextureMode(renderTex);
+        callback?.Invoke();
+        Raylib.EndTextureMode();
+        return new RayLibTexture(renderTex.Texture);
+    }
+
     private bool VSync;
     public void SetVSync(bool enabled)
     {
