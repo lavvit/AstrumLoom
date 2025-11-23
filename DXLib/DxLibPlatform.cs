@@ -77,6 +77,8 @@ public sealed class DxLibPlatform : IGamePlatform
         new DxLibTexture(path);
     public ISound LoadSound(string path, bool streaming) =>
         new DxLibSound(path, streaming);
+    public IMovie LoadMovie(string path) =>
+        new DxLibMovie(path);
 
     public ITexture CreateTexture(int width, int height, Action callback)
     {

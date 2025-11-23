@@ -76,6 +76,8 @@ public sealed class RayLibPlatform : IGamePlatform
         new RayLibTexture(path);
     public ISound LoadSound(string path, bool streaming = false) =>
         new RayLibSound(path, streaming);
+    public IMovie LoadMovie(string path) =>
+        new RayLibMovie(path);
 
     public ITexture CreateTexture(int width, int height, Action callback)
     {
