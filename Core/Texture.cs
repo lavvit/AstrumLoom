@@ -242,10 +242,7 @@ public class Texture : IDisposable
 
     public Texture Clone()
     {
-        var tex = new Texture
-        {
-            _texture = _texture
-        };
+        var tex = new Texture(Path);
         tex.Import(Export());
         return tex;
     }

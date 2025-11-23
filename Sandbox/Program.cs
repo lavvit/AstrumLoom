@@ -19,6 +19,7 @@ internal sealed class SimpleTestGame : Scene
         _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
         Drawing.DefaultFont = _font!;
         _timer = new Counter(0, 600, true);
+        _timer.Start();
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
         _scene = new TextureSoundDemoScene();

@@ -178,20 +178,24 @@ internal sealed class RayLibGraphics : IGraphics
         return new RColor(c.R, c.G, c.B, (byte)a);
     }
 
-    internal static void SetOptions(DrawOptions options)
+    internal static void SetColorBlend(BlendMode blend, double opacity, Color col)
     {
-        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
-        var color = options.Color ?? Color.White;
+        if (blend > BlendMode.None || opacity < 1.0)
+        {
+            double op = Math.Clamp(opacity, 0.0, 1.0);
+            BeginBlendMode(GetBlendMode(blend));
+        }
+        //if (col != Color.White)
+        //    SetDrawBright(col.R, col.G, col.B);
+    }
+    internal static void SetOptions(DrawOptions option)
+    {
+        double opacity = Math.Clamp(option.Opacity, 0.0, 1.0);
+        var color = option.Color ?? Color.White;
         opacity *= color.A / 255.0;
 
-        if (options.Blend != BlendMode.None)
-            BeginBlendMode(GetBlendMode(options.Blend));
+        SetColorBlend(option.Blend, opacity, color);
     }
-    internal static void ResetOptions(DrawOptions options)
-    {
-        double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
-        var color = options.Color ?? Color.White;
-        if (options.Blend != BlendMode.None)
-            EndBlendMode();
-    }
+    internal static void ResetColorBlend() => EndBlendMode();
+    internal static void ResetOptions(DrawOptions option) => ResetColorBlend();
 }

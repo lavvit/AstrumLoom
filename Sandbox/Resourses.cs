@@ -20,7 +20,7 @@ internal sealed class TextureSoundDemoScene : Scene
     {
         // アセット読み込み（Program と同じ配置想定）
         _tex = new Texture("Assets/test.png");
-        _bgm = new Sound("Assets/バヨリンの音.ogg", stream: true);
+        _bgm = new Sound("Assets/バナナのナナチ.ogg", stream: true);
         _sfx = new Sound("Assets/Cancel.ogg");
         if (_bgm != null)
         {
@@ -31,12 +31,9 @@ internal sealed class TextureSoundDemoScene : Scene
         _clones.Clear();
         if (_tex != null)
         {
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 6; i++)
             {
                 var t = _tex.Clone();
-                t.Scale = 0.333 + i * 0.333;
-                t.Opacity = 0.1 + i * 0.3;
-                t.Point = (ReferencePoint)(i % 9);
                 _clones.Add(t);
             }
         }
@@ -123,17 +120,20 @@ internal sealed class TextureSoundDemoScene : Scene
         if (_showGrid) DrawReferencePointGrid(cx, cy + 240);
 
         // クローン達（オプション差異確認）
-        double bx = 320;
+        double bx = 40;
         double by = 200;
         for (int i = 0; i < _clones.Count; i++)
         {
             var t = _clones[i];
             t.Point = (ReferencePoint)(i % 9);
-            t.Angle = 1;
             t.Rectangle = null; // クローンはフル表示
+            t.Scale = 0.1 + i * 0.1;
+            t.Opacity = 0.1 + i * 0.3;
+            t.Angle = i * 0.25 + 0.1 * Math.Sin(_time * 1.2 + i);
             double ox = bx + i * 240;
             double oy = by + 80 * Math.Sin(_time * 1.2 + i);
             t.Draw(ox, oy);
+            Drawing.Cross(ox, oy, 24, Color.Yellow, 2);
             Drawing.Text(ox, oy + 80, t.Point.ToString(), Color.White, point: ReferencePoint.Center);
         }
 

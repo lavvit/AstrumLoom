@@ -184,7 +184,7 @@ internal sealed class DxLibGraphics : IGraphics
 
     internal static void SetColorBlend(BlendMode blend, double opacity, Color col)
     {
-        if (blend > BlendMode.None)
+        if (blend > BlendMode.None || opacity < 1.0)
         {
             double op = Math.Clamp(opacity, 0.0, 1.0);
             SetDrawBlendMode(GetBlendMode(blend), (int)(255.0 * op));
@@ -200,9 +200,9 @@ internal sealed class DxLibGraphics : IGraphics
 
         SetColorBlend(option.Blend, opacity, color);
     }
-    internal static void ResetColorBlend(BlendMode blend, Color col)
+    internal static void ResetColorBlend(BlendMode blend, double opacity, Color col)
     {
-        if (blend != BlendMode.None)
+        if (blend > BlendMode.None || opacity < 1.0)
             SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
         if (col != Color.White)
             SetDrawBright(255, 255, 255);
@@ -210,6 +210,6 @@ internal sealed class DxLibGraphics : IGraphics
     internal static void ResetOptions(DrawOptions option)
     {
         var color = option.Color ?? Color.White;
-        ResetColorBlend(option.Blend, color);
+        ResetColorBlend(option.Blend, option.Opacity, color);
     }
 }

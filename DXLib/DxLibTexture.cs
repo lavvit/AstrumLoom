@@ -161,26 +161,47 @@ internal sealed class DxLibTexture : ITexture
             ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
             : (Width, Height);
 
-        var point = use.Position ?? (GetAnchorOffset(use.Point, width, height) * -1);
+        var point = use.Position ?? Point(use.Rectangle);// (GetAnchorOffset(use.Point, width, height) * -1);
+        point = new(Math.Abs(point.X),
+                 Math.Abs(point.Y));
         float defscale = (float)Drawing.DefaultScale;
         float fx = (float)(x * defscale);
         float fy = (float)(y * defscale);
         (double w, double h) = use.Scale;
-        double angle = use.Angle * Math.PI;
+        w *= defscale; h *= defscale;
+        double angle = use.Angle * 2 * Math.PI;
         (int tx, int ty) = (use.Flip.X ? 1 : 0, use.Flip.Y ? 1 : 0);
         if (use.Rectangle.HasValue)
         {
             var rect = use.Rectangle.Value;
             DrawRectRotaGraph3F(fx, fy,
                 (int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height,
-                (float)point.X, (float)point.Y, w * defscale, h * defscale,
+                (float)point.X, (float)point.Y, w, h,
                 angle, Handle, TRUE, tx, ty);
         }
         else
         {
-            DrawRotaGraph3F(fx, fy, (float)point.X, (float)point.Y, w * defscale, h * defscale,
+            DrawRotaGraph3F(fx, fy, (float)point.X, (float)point.Y, w, h,
                 angle, Handle, TRUE, tx, ty);
         }
+        Drawing.Cross(fx + point.X, fy + point.Y, 40, Color.White, 1);
+        Drawing.DefaultText(fx, fy, point);
         ResetOptions(use);
+    }
+    private Point Point(Rect? rectangle = null)
+    {
+        if (!rectangle.HasValue) rectangle = new(0, 0, Width, Height);
+        return (Option?.Point ?? ReferencePoint.TopLeft) switch
+        {
+            ReferencePoint.TopCenter => new(rectangle.Value.Width / 2, 0),
+            ReferencePoint.TopRight => new(rectangle.Value.Width, 0),
+            ReferencePoint.CenterLeft => new(0, rectangle.Value.Height / 2),
+            ReferencePoint.Center => new(rectangle.Value.Width / 2, rectangle.Value.Height / 2),
+            ReferencePoint.CenterRight => new(rectangle.Value.Width, rectangle.Value.Height / 2),
+            ReferencePoint.BottomLeft => new(0, rectangle.Value.Height),
+            ReferencePoint.BottomCenter => new(rectangle.Value.Width / 2, rectangle.Value.Height),
+            ReferencePoint.BottomRight => new(rectangle.Value.Width, rectangle.Value.Height),
+            _ => new(0, 0),
+        };
     }
 }

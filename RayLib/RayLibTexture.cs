@@ -173,7 +173,7 @@ internal sealed class RayLibTexture : ITexture
         float fx = (float)(x * defscale);
         float fy = (float)(y * defscale);
         (double w, double h) = use.Scale;
-        double angle = use.Angle * Math.PI;
+        double angle = use.Angle;
         (int tx, int ty) = (use.Flip.X ? -1 : 1, use.Flip.Y ? -1 : 1);
 
         // ★ 宛先座標系での origin（拡大後の量に変換）
@@ -195,7 +195,8 @@ internal sealed class RayLibTexture : ITexture
         // dst は (x,y) を「アンカー位置」として渡す
         var dstRect = new Rectangle(fx, fy, destW, destH);
 
-        DrawTexturePro(Native, srcRect, dstRect, origin, (float)angle, ToRayColor(color, opacity));
+        DrawTexturePro(Native, srcRect, dstRect, origin,
+            360 * (float)angle, ToRayColor(color, opacity));
 
         ResetOptions(use);
     }
