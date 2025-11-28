@@ -9,6 +9,7 @@ internal sealed class SimpleTestGame : Scene
     private Counter? _timer;
     private IFont? _font;
     private IFont? _kbfont;
+    private Movie? _movie;
 
     // 追加: 図形テストシーン
     private Scene? _scene;
@@ -17,6 +18,7 @@ internal sealed class SimpleTestGame : Scene
     {
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
         _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
+        _movie = new("Assets/campus労働.mp4");
         Drawing.DefaultFont = _font!;
         _timer = new Counter(0, 600, true);
         _timer.Start();
@@ -42,6 +44,13 @@ internal sealed class SimpleTestGame : Scene
             else
                 _timer?.Start();
         }
+        if (Key.M.Push())
+        {
+            if (_movie?.IsPlaying ?? false)
+                _movie?.Stop();
+            else
+                _movie?.Play();
+        }
 
         // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
         _scene?.Update();
@@ -52,6 +61,14 @@ internal sealed class SimpleTestGame : Scene
         Drawing.Fill(Color.CornflowerBlue);
         // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
+        // 映像を中央に表示
+        if (_movie != null)
+        {
+            var mw = _movie.Width;
+            var mh = _movie.Height;
+            _movie.Scale = (1280.0 / mw, 720.0 / mh);
+            _movie.Draw();
+        }
 
         Drawing.Box(640 - 100, 360 - 30, 200, 60, Color.Black);
         Drawing.Box(640 - 98, 360 - 28, 196, 56, Color.White);

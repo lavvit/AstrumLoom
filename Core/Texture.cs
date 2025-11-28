@@ -1,21 +1,22 @@
 ﻿namespace AstrumLoom;
 
-public interface ITexture
+public interface IResourse : IDisposable
 {
     string Path { get; }
-    int Width { get; }
-    int Height { get; }
-
     bool IsReady { get; }
     bool IsFailed { get; }
     bool Loaded { get; }
     bool Enable { get; }
+    void Pump();
+}
+public interface ITexture : IResourse
+{
+    int Width { get; }
+    int Height { get; }
 
     DrawOptions? Option { get; set; }
 
     void Draw(double x, double y, DrawOptions? options);
-    void Pump();
-    void Dispose();
 }
 
 public static class TextureExtensions

@@ -1,14 +1,8 @@
 ﻿namespace AstrumLoom;
 
-public interface ISound
+public interface ISound : IResourse
 {
-    string Path { get; }
     int Length { get; }
-
-    bool IsReady { get; }
-    bool IsFailed { get; }
-    bool Loaded { get; }
-    bool Enable { get; }
 
     double Time { get; set; }
     double Volume { get; set; }
@@ -23,9 +17,6 @@ public interface ISound
     void Stop();
 
     void PlayStream();
-
-    void Pump();
-    void Dispose();
 }
 public class Sound : IDisposable
 {
