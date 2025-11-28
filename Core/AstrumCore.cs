@@ -4,11 +4,21 @@ namespace AstrumLoom;
 
 internal class BaseProgram : IGame
 {
-    private readonly IGamePlatform _platform;
     private Scene _scene => Scene.NowScene;
-    public BaseProgram(IGamePlatform platform) => _platform = platform;
+    public BaseProgram() { }
     public void Initialize() { }
-    public void Update(float deltaTime) => _scene?.Update();
+    public void Update(float deltaTime)
+    {
+        _scene?.Update();
+
+        bool drop = AstrumCore.IsDroppable;
+        AstrumCore.Platform.SetDragDrop(drop);
+        if (!drop) return;
+        string[] files = AstrumCore.Platform.DropFiles;
+        if (files.Length > 0)
+            foreach (string f in files)
+                _scene?.Drag(f);
+    }
     public void Draw()
     {
         _scene?.Draw();
@@ -31,7 +41,7 @@ public class AstrumCore
         MainThreadId = Environment.CurrentManagedThreadId;
         Platform = platform;
         WindowConfig = config;
-        var game = new BaseProgram(platform);
+        var game = new BaseProgram();
 
         using var host = new GameHost(config, platform, game);
         Scene.Set(scene);

@@ -23,6 +23,9 @@ public interface IGamePlatform : IDisposable
     IMovie LoadMovie(string path);
 
     void SetVSync(bool enabled);
+    void SetDragDrop(bool enabled);
+    string[] DropFiles { get; }
+
     bool IsActive { get; }
 }
 

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text;
 
 using static DxLibDLL.DX;
 
@@ -114,6 +115,30 @@ public sealed class DxLibPlatform : IGamePlatform
         Log.Debug("VSync切替: " + enabled);
         VSync = enabled;
         SetWaitVSyncFlag(enabled ? 1 : 0);
+    }
+    private bool dragDrop = false;
+    public void SetDragDrop(bool enabled)
+    {
+        if (dragDrop == enabled) return;
+        Log.Debug("DragDrop切替: " + enabled);
+        dragDrop = enabled;
+        SetDragFileValidFlag(enabled ? 1 : 0);
+    }
+    public string[] DropFiles
+    {
+        get
+        {
+            int count = GetDragFileNum();
+            if (count <= 0 || !dragDrop) return [];
+            string[] files = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                var sb = new StringBuilder(512);
+                GetDragFilePath(sb);
+                files[i] = sb.ToString();
+            }
+            return files;
+        }
     }
 
     // --- 以下 stub 実装たち ---

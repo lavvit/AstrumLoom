@@ -16,7 +16,6 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     public void Run()
     {
         AstrumCore.Platform = platform;
-        AstrumCore.InitDrop();
 
         KeyInput.Initialize(platform.Input, platform.TextInput);
         Mouse.Init(platform.Mouse, showMouse);
@@ -32,6 +31,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     {
         while (!platform.ShouldClose)
         {
+            AstrumCore.InitDrop();
             Update(game);
             Draw(game);
         }

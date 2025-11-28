@@ -1,5 +1,6 @@
 ﻿using AstrumLoom;
 using AstrumLoom.DXLib;
+using AstrumLoom.Extend;
 using AstrumLoom.RayLib;
 
 namespace Sandbox;
@@ -10,6 +11,7 @@ internal sealed class SimpleTestGame : Scene
     private IFont? _font;
     private IFont? _kbfont;
     private Movie? _movie;
+    private SoundExtend? _soundExtend;
 
     // 追加: 図形テストシーン
     private Scene? _scene;
@@ -19,18 +21,20 @@ internal sealed class SimpleTestGame : Scene
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
         _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
         _movie = new("Assets/campus労働.mp4");
+        _soundExtend = new("Assets/vs.VIGVANGS.ogg");
         Drawing.DefaultFont = _font!;
         _timer = new Counter(0, 600, true);
         _timer.Start();
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
-        _scene = new TextureSoundDemoScene();
-        _scene.Enable();
+        //_scene = new TextureSoundDemoScene();
+        _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }
 
     public override void Update()
     {
+        AstrumCore.Droppable();
         _timer?.Tick();
         if (Key.Esc.Push())
         {
@@ -51,21 +55,34 @@ internal sealed class SimpleTestGame : Scene
             else
                 _movie?.Play();
         }
+        if (Key.S.Push())
+            _soundExtend?.Play();
+
+        if (Key.F1.Push())
+        {
+            KeyInput.ActivateText(ref inputText);
+        }
+        if (KeyInput.Enter(ref inputText))
+        {
+            Log.Write("Input text: " + inputText);
+        }
 
         // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
         _scene?.Update();
     }
 
+    private string inputText = "Type something...";
     public override void Draw()
     {
+        _soundExtend?.Pump();
         Drawing.Fill(Color.CornflowerBlue);
         // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
         // 映像を中央に表示
         if (_movie != null)
         {
-            var mw = _movie.Width;
-            var mh = _movie.Height;
+            int mw = _movie.Width;
+            int mh = _movie.Height;
             _movie.Scale = (1280.0 / mw, 720.0 / mh);
             _movie.Draw();
         }
@@ -82,6 +99,14 @@ internal sealed class SimpleTestGame : Scene
         Mouse.Draw(20);
 
         Drawing.Text(20, 400, KeyInput.PressedFrameCount(Key.J));
+
+        KeyInput.DrawText(20, 430, inputText, Color.Black, _font);
+    }
+
+    public override void Drag(string str)
+    {
+        base.Drag(str);
+        Log.Write("Dragged file: " + str);
     }
 }
 

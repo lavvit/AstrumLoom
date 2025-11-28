@@ -112,6 +112,14 @@ public sealed class RayLibPlatform : IGamePlatform
             SetTargetFPS(0); // 0 で上限無し
         }
     }
+    private bool dragDrop = false;
+    public void SetDragDrop(bool enabled)
+    {
+        if (!_ready || dragDrop == enabled) return;
+        Log.Debug("Drag&Drop切替: " + enabled);
+        dragDrop = enabled;
+    }
+    public string[] DropFiles => dragDrop && IsFileDropped() ? GetDroppedFiles() : [];
 
     // ================================
     //  時間管理（DxLib版と同じノリ）
