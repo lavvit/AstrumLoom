@@ -146,6 +146,9 @@ public class Drawing
     } = null;
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");
+    public static int FontSize()
+        => TextSize("Aあ").height;
+
     public static (int width, int height) DefaultTextSize(object text, int size = 16)
     {
         var (w, h) = Graphics.MeasureText(text.ToString() ?? "", size);

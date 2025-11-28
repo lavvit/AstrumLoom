@@ -76,8 +76,9 @@ public class Log
         }
         if (loglist.Count == 0) return;
 
-        (int width, int height) = Drawing.TextSize(string.Join("\n", loglist).Trim());
-        int size = 16;
+        int size = Drawing.FontSize();
+        int width = Drawing.TextSize(string.Join("\n", loglist).Trim()).width;
+        int height = size * loglist.Count;
         Drawing.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
         for (int i = 0; i < loglist.Count; i++)
         {

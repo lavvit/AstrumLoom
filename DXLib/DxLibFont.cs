@@ -49,7 +49,7 @@ internal sealed class DxLibFont : IFont
             return Drawing.DefaultTextSize(text);
         GetDrawStringSizeToHandle(
             out int w, out int h,
-            out _, text, text.Length, _handle
+            out _, text, -1, _handle
         );
         return (w, h);
     }
