@@ -25,16 +25,23 @@ internal sealed class RayLibTexture : ITexture
         Path = path;
         Load();
     }
-    ~RayLibTexture()
+    private bool _disposed;
+    ~RayLibTexture() { Dispose(false); }
+
+    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
+
+    private void Dispose(bool disposing)
     {
-        Dispose();
-    }
-    public void Dispose()
-    {
-        if (Native.Id != 0)
+        if (_disposed) return;
+        _disposed = true;
+
+        // ネイティブ解放はメインスレッドかつウィンドウが有効な時のみ
+        if (Native.Id != 0 && IsMainThread && Raylib.IsWindowReady())
         {
-            UnloadTexture(Native);
+            try { Raylib.UnloadTexture(Native); }
+            catch { Log.Error($"Failed to unload texture: {Path}"); }
         }
+        Native = default;
     }
     #region 読み込み
     public void Load()

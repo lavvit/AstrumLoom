@@ -123,7 +123,7 @@ public sealed class DxLibPlatform : IGamePlatform
         if (dragDrop == enabled) return;
         Log.Debug("DragDrop切替: " + enabled);
         dragDrop = enabled;
-        SetDragFileValidFlag(enabled ? 1 : 0);
+        //SetDragFileValidFlag(enabled ? 1 : 0);
     }
     public string[] DropFiles
     {
