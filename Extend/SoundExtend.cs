@@ -1,0 +1,428 @@
+﻿using ManagedBass;
+
+namespace AstrumLoom.Extend;
+
+public class SoundExtend : IDisposable
+{
+    private ManagedSound? _Sound { get; set; }
+
+    public SoundExtend() { }
+    public SoundExtend(string path, bool loop = false, bool prescan = false)
+        => _Sound = new ManagedSound(path, loop, prescan);
+    public void Play() => _Sound?.Play();
+    public void Stop() => _Sound?.Stop();
+    public void PlayStream() => _Sound?.PlayStream();
+    public void Pump() => _Sound?.Pump();
+    public void Dispose()
+    {
+        _Sound?.Dispose();
+        _Sound = null;
+        GC.SuppressFinalize(this);
+    }
+    public string Path => _Sound?.Path ?? "";
+    public int Length => _Sound?.Length ?? 0;
+    public bool IsReady => _Sound?.IsReady ?? false;
+    public bool IsFailed => _Sound?.IsFailed ?? false;
+    public bool Loaded => _Sound?.Loaded ?? false;
+    public bool Enable => _Sound?.Enable ?? false;
+    public double Time
+    {
+        get => _Sound?.Time ?? 0; set => _Sound?.Time = value;
+    }
+    public double Volume
+    {
+        get => _Sound?.Volume ?? 1.0; set => _Sound!.Volume = value;
+    }
+    public double Pan
+    {
+        get => _Sound?.Pan ?? 0.0; set => _Sound!.Pan = value;
+    }
+    public double Pitch
+    {
+        get => _Sound?.Pitch ?? 1.0; set => _Sound!.Pitch = value;
+    }
+    public double Speed
+    {
+        get => _Sound?.Speed ?? 1.0; set => _Sound!.Speed = value;
+    }
+}
+
+public sealed class ManagedSound : ISound, IDisposable
+{
+    private static readonly object s_initLock = new();
+    private static bool s_bassInitialized;
+
+    private readonly bool _loopFlag;
+    private readonly bool _prescanFlag;
+
+    private int _stream;
+    private bool _disposed;
+
+    // IResourse 状態管理 (-1=Failed/Disposed, 0=Loading, 1=Ready)
+    private int _asyncState = -1;
+    private bool _deferred;
+    private long _startTicks;
+    private const int DefaultTimeoutMs = 60000;
+    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+
+    public string Path { get; private set; } = string.Empty;
+
+    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
+
+    public ManagedSound(string filePath, bool loop = false, bool prescan = false)
+    {
+        Path = filePath;
+        _loopFlag = loop;
+        _prescanFlag = prescan;
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            Volatile.Write(ref _asyncState, -1);
+            throw new ArgumentException("ファイルパスが無効です。", nameof(filePath));
+        }
+
+        // ファイルが存在しない場合は失敗
+        if (!File.Exists(Path))
+        {
+            Volatile.Write(ref _asyncState, -1);
+            return;
+        }
+
+        if (!IsMainThread)
+        {
+            // メインスレッドで後からロード
+            _deferred = true;
+            Volatile.Write(ref _asyncState, 0); // Loading
+            return;
+        }
+
+        Load();
+    }
+
+    private void Load()
+    {
+        if (Volatile.Read(ref _asyncState) == 1) return; // 既に Ready
+        if (!File.Exists(Path))
+        {
+            Volatile.Write(ref _asyncState, -1);
+            return;
+        }
+
+        try
+        {
+            EnsureBassInitialized();
+            var flags = BassFlags.Default;
+            if (_loopFlag) flags |= BassFlags.Loop;
+            if (_prescanFlag) flags |= BassFlags.Prescan;
+
+            int stream = Bass.CreateStream(Path, 0, 0, flags);
+            if (stream == 0)
+            {
+                Volatile.Write(ref _asyncState, -1);
+                return;
+            }
+
+            _stream = stream;
+            Volatile.Write(ref _asyncState, 1); // Ready
+            _startTicks = Environment.TickCount64;
+        }
+        catch
+        {
+            Volatile.Write(ref _asyncState, -1);
+        }
+    }
+
+    public void Pump()
+    {
+        // メインスレッドのみが状態更新
+        if (!IsMainThread) return;
+
+        // Deferred ロード実行
+        if (_deferred)
+        {
+            _deferred = false;
+            Load();
+            return;
+        }
+
+        // Loading 中のタイムアウト監視
+        if (Volatile.Read(ref _asyncState) == 0)
+        {
+            long elapsed = Environment.TickCount64 - _startTicks;
+            if (TimeoutMs > 0 && elapsed >= TimeoutMs)
+            {
+                Dispose();
+            }
+        }
+    }
+
+    public bool IsReady => Volatile.Read(ref _asyncState) == 1;
+    public bool IsFailed => Volatile.Read(ref _asyncState) == -1;
+    public bool Loaded
+    {
+        get
+        {
+            Pump(); // 呼び忘れ対策
+            return Volatile.Read(ref _asyncState) != 0;
+        }
+    }
+    public bool Enable => _stream != 0 && Loaded;
+
+    private void EnsureReadyForChannel()
+    {
+        EnsureNotDisposed();
+        if (!Enable)
+        {
+            throw new InvalidOperationException("サウンドが未ロードです。");
+        }
+    }
+
+    public bool IsPlaying => Enable && Bass.ChannelIsActive(_stream) == PlaybackState.Playing;
+
+    public bool Loop
+    {
+        get
+        {
+            if (!Enable) return _loopFlag;
+            var current = Bass.ChannelFlags(_stream, 0, 0);
+            return (current & BassFlags.Loop) == BassFlags.Loop;
+        }
+        set
+        {
+            if (!Enable)
+            {
+                // ロード前に意図だけ保存
+                // ロード時に反映される
+                typeof(ManagedSound)
+                    .GetField("_loopFlag", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?
+                    .SetValue(this, value);
+                return;
+            }
+            var setFlags = value ? BassFlags.Loop : 0;
+            var mask = BassFlags.Loop;
+            Bass.ChannelFlags(_stream, setFlags, mask);
+        }
+    }
+
+    public double Volume
+    {
+        get
+        {
+            if (!Enable) return 0f;
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Volume, out float vol);
+            return vol;
+        }
+        set
+        {
+            if (!Enable) return;
+            float v = Math.Clamp((float)value, 0f, 1f);
+            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Volume, v))
+            {
+                throw new InvalidOperationException($"音量の設定に失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+
+    public TimeSpan Duration
+    {
+        get
+        {
+            if (!Enable) return TimeSpan.Zero;
+            long lengthBytes = Bass.ChannelGetLength(_stream);
+            double seconds = Bass.ChannelBytes2Seconds(_stream, lengthBytes);
+            return TimeSpan.FromSeconds(seconds);
+        }
+    }
+
+    public TimeSpan Position
+    {
+        get
+        {
+            if (!Enable) return TimeSpan.Zero;
+            long posBytes = Bass.ChannelGetPosition(_stream);
+            double seconds = Bass.ChannelBytes2Seconds(_stream, posBytes);
+            return TimeSpan.FromSeconds(seconds);
+        }
+        set
+        {
+            if (!Enable) return;
+            long bytes = Bass.ChannelSeconds2Bytes(_stream, value.TotalSeconds);
+            if (!Bass.ChannelSetPosition(_stream, bytes))
+            {
+                throw new InvalidOperationException($"シークに失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+
+    public void Play(bool restart = false)
+    {
+        if (!Enable) return;
+        if (!Bass.ChannelPlay(_stream, restart))
+        {
+            throw new InvalidOperationException($"再生に失敗しました: {Bass.LastError}");
+        }
+    }
+
+    public void Pause()
+    {
+        if (!Enable) return;
+        if (!Bass.ChannelPause(_stream))
+        {
+            throw new InvalidOperationException($"一時停止に失敗しました: {Bass.LastError}");
+        }
+    }
+
+    public void Stop()
+    {
+        if (!Enable) return;
+        if (!Bass.ChannelStop(_stream))
+        {
+            throw new InvalidOperationException($"停止に失敗しました: {Bass.LastError}");
+        }
+        Bass.ChannelSetPosition(_stream, 0);
+    }
+
+    // ISound 互換
+    void ISound.Play() => Play(false);
+    void ISound.Stop() => Pause();
+    public void PlayStream()
+    {
+        if (!Enable) return;
+        if (IsPlaying)
+        {
+            Pump();
+            return;
+        }
+        Play();
+    }
+
+    private static void EnsureBassInitialized()
+    {
+        if (s_bassInitialized) return;
+
+        lock (s_initLock)
+        {
+            if (s_bassInitialized) return;
+
+            if (!Bass.Init())
+            {
+                throw new InvalidOperationException($"BASS の初期化に失敗しました: {Bass.LastError}");
+            }
+            s_bassInitialized = true;
+        }
+    }
+
+    private void EnsureNotDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(ManagedSound));
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        if (_stream != 0)
+        {
+            Bass.ChannelStop(_stream);
+            Bass.StreamFree(_stream);
+            _stream = 0;
+        }
+
+        Volatile.Write(ref _asyncState, -1);
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    public double Pan
+    {
+        get
+        {
+            EnsureReadyForChannel();
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Pan, out float pan);
+            return pan;
+        }
+        set
+        {
+            EnsureReadyForChannel();
+            float p = Math.Clamp((float)value, -1f, 1f);
+            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Pan, p))
+            {
+                throw new InvalidOperationException($"パンの設定に失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+    public double Pitch
+    {
+        get
+        {
+            EnsureReadyForChannel();
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Pitch, out float pitch);
+            return pitch;
+        }
+        set
+        {
+            EnsureReadyForChannel();
+            float p = Math.Clamp((float)value, -12f, 12f); // BASS のピッチ範囲に合わせる
+            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Pitch, p))
+            {
+                throw new InvalidOperationException($"ピッチの設定に失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+    public double Speed
+    {
+        get
+        {
+            EnsureReadyForChannel();
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out float freq);
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.OpusOriginalFrequency, out float origFreq);
+            return freq / origFreq;
+        }
+        set
+        {
+            EnsureReadyForChannel();
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "速度は正の値でなければなりません。");
+            }
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.OpusOriginalFrequency, out float origFreq);
+            float newFreq = origFreq * (float)value;
+            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Frequency, newFreq))
+            {
+                throw new InvalidOperationException($"速度の設定に失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+    public int Length
+    {
+        get
+        {
+            EnsureReadyForChannel();
+            long lengthBytes = Bass.ChannelGetLength(_stream);
+            double seconds = Bass.ChannelBytes2Seconds(_stream, lengthBytes);
+            return (int)(seconds * 1000); // ミリ秒単位で返す
+        }
+    }
+    public double Time
+    {
+        get
+        {
+            EnsureReadyForChannel();
+            long posBytes = Bass.ChannelGetPosition(_stream);
+            double seconds = Bass.ChannelBytes2Seconds(_stream, posBytes);
+            return seconds;
+        }
+        set
+        {
+            EnsureReadyForChannel();
+            long bytes = Bass.ChannelSeconds2Bytes(_stream, value);
+            if (!Bass.ChannelSetPosition(_stream, bytes))
+            {
+                throw new InvalidOperationException($"シークに失敗しました: {Bass.LastError}");
+            }
+        }
+    }
+}

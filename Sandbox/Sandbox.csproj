@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Core\AstrumLoom.csproj" />
     <ProjectReference Include="..\DXLib\AstrumLoom.DXLib.csproj" />
+    <ProjectReference Include="..\Extend\AstrumLoom.Extend.csproj" />
     <ProjectReference Include="..\RayLib\AstrumLoom.RayLib.csproj" />
   </ItemGroup>
 
