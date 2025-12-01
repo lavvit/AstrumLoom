@@ -8,6 +8,71 @@ namespace AstrumLoom.RayLib;
 
 internal sealed class RayLibInput : IInput
 {
+    // Key の全要素配列（固定）
+    private readonly Key[] _keys;
+    // 各キーの現在/前フレーム押下状態
+    private readonly bool[] _now;
+    private readonly bool[] _prev;
+    // 各キーの状態遷移（1=押下開始, 2=保持, -1=離鍵, 0=非押下）
+    private int[] _state;
+
+    public RayLibInput()
+    {
+        _keys = Enum.GetValues<Key>();
+        int len = _keys.Length;
+        _now = new bool[len];
+        _prev = new bool[len];
+        _state = new int[len];
+    }
+
+    // 毎フレーム一度呼び出して内部バッファを更新する
+    public void Buffer()
+    {
+        // 1フレーム前の状態を保存
+        Array.Copy(_now, _prev, _now.Length);
+
+        // 現在のキー状態を取得
+        for (int i = 0; i < _keys.Length; i++)
+        {
+            var k = _keys[i];
+            var rk = ToRayKey(k);
+            bool isDown = rk != KeyboardKey.Null && IsKeyDown(rk);
+            _now[i] = isDown;
+        }
+    }
+    public void Update()
+    {
+        for (int i = 0; i < _state.Length; i++)
+        {
+            _state[i] = _now[i] ? (_state[i] < 1 ? 1 : 2) : (_state[i] > 0 ? -1 : 0);
+        }
+    }
+
+    // バッファベースでキーの遷移状態を取得する（外部向けヘルパー）
+    public int GetBufferedState(Key key)
+    {
+        int idx = Array.IndexOf(_keys, key);
+        return idx >= 0 ? _state[idx] : 0;
+    }
+
+    public bool GetKey(Key key)
+    {
+        var rk = ToRayKey(key);
+        return rk != KeyboardKey.Null && GetBufferedState(key) > 0;
+    }
+
+    public bool GetKeyDown(Key key)
+    {
+        var rk = ToRayKey(key);
+        return rk != KeyboardKey.Null && GetBufferedState(key) == 1;
+    }
+
+    public bool GetKeyUp(Key key)
+    {
+        var rk = ToRayKey(key);
+        return rk != KeyboardKey.Null && GetBufferedState(key) < 0;
+    }
+
     private static KeyboardKey ToRayKey(Key key) => key switch
     {
         // 数字キー
@@ -148,24 +213,6 @@ internal sealed class RayLibInput : IInput
         // 未定義は Null
         _ => KeyboardKey.Null,
     };
-
-    public bool GetKey(Key key)
-    {
-        var rk = ToRayKey(key);
-        return rk != KeyboardKey.Null && IsKeyDown(rk);
-    }
-
-    public bool GetKeyDown(Key key)
-    {
-        var rk = ToRayKey(key);
-        return rk != KeyboardKey.Null && IsKeyPressed(rk);
-    }
-
-    public bool GetKeyUp(Key key)
-    {
-        var rk = ToRayKey(key);
-        return rk != KeyboardKey.Null && IsKeyReleased(rk);
-    }
 }
 
 internal sealed class RayLibTextInput : ITextInput

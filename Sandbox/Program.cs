@@ -24,7 +24,7 @@ internal sealed class SimpleTestGame : Scene
         //_movie = new("Assets/campus労働.mp4");
         _soundExtend = new("Assets/vs.VIGVANGS.ogg");
         Drawing.DefaultFont = _font!;
-        _timer = new Counter(0, 600, true);
+        _timer = new Counter(0, 2000, true);
         _timer.Start();
 
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
@@ -36,7 +36,6 @@ internal sealed class SimpleTestGame : Scene
 
     public override void Update()
     {
-        AstrumCore.Droppable();
         _timer?.Tick();
         if (Key.Esc.Push())
         {
@@ -48,6 +47,7 @@ internal sealed class SimpleTestGame : Scene
 
         if (_scene == null)
         {
+            AstrumCore.Droppable();
             if (Key.T.Push())
             {
                 if (_timer?.Running ?? false)

@@ -20,7 +20,6 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public bool VSync { get; private set; }
 
-    private readonly DxLibInput _input;
     public DxLibPlatform(GameConfig config)
     {
         SetOutApplicationLogValidFlag(0); // ログファイル無効化
@@ -49,8 +48,7 @@ public sealed class DxLibPlatform : IGamePlatform
         Time = new SimpleTime();
         UTime = new SimpleTime();
         Graphics = new DxLibGraphics(); // DummyGraphics の代わり
-        _input = new DxLibInput();
-        Input = _input;
+        Input = new DxLibInput();
         TextInput = new(new DxLibTextInput(), Time);
         Mouse = new DxLibMouse();
     }
@@ -66,7 +64,7 @@ public sealed class DxLibPlatform : IGamePlatform
             return;
         }
         // キー状態の更新
-        _input.Update();
+        Input.Buffer();
     }
 
     public void Close() => ShouldClose = true;

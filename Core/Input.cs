@@ -2,6 +2,8 @@
 
 public interface IInput
 {
+    void Buffer();
+    void Update();
     bool GetKey(Key key);
     bool GetKeyDown(Key key);
     bool GetKeyUp(Key key);
@@ -61,6 +63,7 @@ public static class KeyInput
     private static Dictionary<Key, double> _lastRepeatTimes = [];
     internal static void Update(double deltaTime)
     {
+        _input.Update();
         double time = deltaTime;
         // キー押下のTime処理
         foreach (var key in GetAllKeys())

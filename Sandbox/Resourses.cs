@@ -51,8 +51,8 @@ internal sealed class TextureSoundDemoScene : Scene
 
     public override void Update()
     {
-        if (!_paused) _time += AstrumCore.Platform.Time.DeltaTime;
-        double dt = AstrumCore.Platform.Time.DeltaTime;
+        double dt = AstrumCore.Platform.UTime.DeltaTime;
+        if (!_paused) _time += dt;
 
         if (Key.Esc.Push()) AstrumCore.End();
         if (Key.Space.Push()) _sfx?.Play();

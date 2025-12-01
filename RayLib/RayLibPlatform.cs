@@ -53,6 +53,8 @@ public sealed class RayLibPlatform : IGamePlatform
             ShouldClose = true;
             return;
         }
+        // キー状態の更新
+        Input.Buffer();
     }
 
     public void Close() => ShouldClose = true;

@@ -8,8 +8,10 @@ internal sealed class DxLibInput : IInput
 {
     private readonly byte[] _now = new byte[256];
     private readonly byte[] _prev = new byte[256];
+    // 各キーの状態遷移（1=押下開始, 2=保持, -1=離鍵, 0=非押下）
+    private int[] _state = new int[256];
 
-    public void Update()
+    public void Buffer()
     {
         // 1フレーム前の状態を保存
         Array.Copy(_now, _prev, _now.Length);
@@ -17,23 +19,30 @@ internal sealed class DxLibInput : IInput
         // 現在のキー状態を取得
         GetHitKeyStateAll(_now);
     }
+    public void Update()
+    {
+        for (int i = 0; i < _state.Length; i++)
+        {
+            _state[i] = _now[i] != 0 ? (_state[i] < 1 ? 1 : 2) : (_state[i] > 0 ? -1 : 0);
+        }
+    }
 
     public bool GetKey(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _now[code] != 0;
+        return code >= 0 && _state[code] > 0;
     }
 
     public bool GetKeyDown(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _now[code] != 0 && _prev[code] == 0;
+        return code >= 0 && _state[code] == 1;
     }
 
     public bool GetKeyUp(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _now[code] == 0 && _prev[code] != 0;
+        return code >= 0 && _state[code] < 0;
     }
 
     private static int ToDxKeyCode(Key key) => key switch
