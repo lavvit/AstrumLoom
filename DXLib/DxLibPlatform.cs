@@ -71,6 +71,7 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public void Close() => ShouldClose = true;
     public bool IsActive => GetWindowActiveFlag() > 0;
+    public double? SystemFPS => GetFPS();
 
     public void Dispose() => DxLib_End();
 

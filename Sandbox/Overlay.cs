@@ -30,7 +30,7 @@ internal sealed class SandboxOverlay : Overlay
         var platform = AstrumCore.Platform;
         // FPS / 時刻 を描く
         _small.Draw(10, 10, $"{platform.BackendKind} {AstrumCore.NowFPS}", Color.White);
-        _small.Draw(10, 30, $"{DateTime.Now:G}", new Color(180, 200, 220));
+        _small.Draw(10, 50, $"{DateTime.Now:G}", new Color(180, 200, 220));
 
         var c = gradation.GetColor((float)(Math.Sin(DateTime.Now.TimeOfDay.TotalSeconds) + 1) / 2);
         Drawing.DefaultText(10, 80, "AstrumLoom Sandbox", c);

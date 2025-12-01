@@ -78,7 +78,17 @@ internal sealed class RayLibFont : IFont
         if (size.X + size.Y == 0) size = new(MeasureText(text, Spec.Size), Spec.Size);
         return ((int)size.X, (int)size.Y);
     }
-
+    private static readonly Vector2[] EdgeDirs =
+[
+    new( 1,  0),
+    new(-1,  0),
+    new( 0,  1),
+    new( 0, -1),/*
+    new( 1,  1),
+    new(-1,  1),
+    new( 1, -1),
+    new(-1, -1),*/
+];
     public void Draw(double x, double y, string text, DrawOptions options)
     {
         if (!Enable)
@@ -87,10 +97,16 @@ internal sealed class RayLibFont : IFont
             return;
         }
         SetOptions(options);
-        var (w, h) = Measure(text);
-        var off = GetAnchorOffset(options.Point, w, h);
-        int drawX = (int)(x + off.X);
-        int drawY = (int)(y + off.Y);
+
+        int drawX = (int)x;
+        int drawY = (int)y;
+        if (options.Point != ReferencePoint.TopLeft)
+        {
+            var (w, h) = Measure(text);
+            var off = GetAnchorOffset(options.Point, w, h);
+            drawX = (int)(x + off.X);
+            drawY = (int)(y + off.Y);
+        }
 
         var color = options.Color ?? Color.White;
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
@@ -99,18 +115,11 @@ internal sealed class RayLibFont : IFont
         // Edge（ふち）: オフセット描画
         if (_edgeThickness > 0)
         {
-            int edgecount = 8;
-            // 16方向の単位ベクトル（円形に均一配置）
-            Span<Vector2> dir = new Vector2[edgecount];
-            for (int i = 0; i < dir.Length; i++)
-            {
-                float a = (float)(i * (MathF.PI * 2) / dir.Length);
-                dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
-            }
+            // 8方向の単位ベクトル（円形に均一配置）
             int r = _edgeThickness;
             //for (int r = 1; r <= _edgeThickness; r++)
             {
-                foreach (var v in dir)
+                foreach (var v in EdgeDirs)
                 {
                     // 端数でにじまないように整数へ
                     var p = new Point(MathF.Round((float)pos.X + v.X * r),
@@ -138,30 +147,29 @@ internal sealed class RayLibFont : IFont
             return;
         }
         SetOptions(options);
-        var (w, h) = Measure(text);
-        var off = GetAnchorOffset(options.Point, w, h);
-        int drawX = (int)(x + off.X);
-        int drawY = (int)(y + off.Y);
+
+        int drawX = (int)x;
+        int drawY = (int)y;
+        if (options.Point != ReferencePoint.TopLeft)
+        {
+            var (w, h) = Measure(text);
+            var off = GetAnchorOffset(options.Point, w, h);
+            drawX = (int)(x + off.X);
+            drawY = (int)(y + off.Y);
+        }
         var ec = options.EdgeColor ?? options.Color ?? Color.Black;
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var pos = new Point(drawX, drawY);
         // Edge（ふち）: オフセット描画
-        int edgecount = 8;
-        // 16方向の単位ベクトル（円形に均一配置）
-        Span<Vector2> dir = new Vector2[edgecount];
-        for (int i = 0; i < dir.Length; i++)
-        {
-            float a = (float)(i * (MathF.PI * 2) / dir.Length);
-            dir[i] = new Vector2(MathF.Cos(a), MathF.Sin(a));
-        }
         int r = _edgeThickness;
         //for (int r = 1; r <= _edgeThickness; r++)
         {
-            foreach (var v in dir)
+            foreach (var v in EdgeDirs)
             {
                 // 端数でにじまないように整数へ
-                var p = new Point(MathF.Round((float)pos.X + v.X * r),
-                MathF.Round((float)pos.Y + v.Y * r));
+                var p = new Point(
+                    MathF.Round((float)pos.X + v.X * r),
+                    MathF.Round((float)pos.Y + v.Y * r));
                 DrawEx(text, p, ec, opacity);
             }
         }

@@ -27,6 +27,7 @@ public interface IGamePlatform : IDisposable
     string[] DropFiles { get; }
 
     bool IsActive { get; }
+    double? SystemFPS { get; }
 }
 
 public enum GraphicsBackendKind

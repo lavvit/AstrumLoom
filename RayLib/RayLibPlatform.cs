@@ -29,7 +29,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
-        SetTargetFPS(0);
+        SetTargetFPS(config.TargetFps);
         SetExitKey(0); // ESC キーで終了しないようにする
         if (!IsAudioDeviceReady())
         {
@@ -57,6 +57,7 @@ public sealed class RayLibPlatform : IGamePlatform
 
     public void Close() => ShouldClose = true;
     public bool IsActive => IsWindowFocused();
+    public double? SystemFPS => GetFPS();
 
     private bool _disposed;
     public void Dispose()
@@ -95,6 +96,7 @@ public sealed class RayLibPlatform : IGamePlatform
     }
 
     private bool VSync;
+    private int _targetFps;
     public void SetVSync(bool enabled)
     {
         if (!_ready || VSync == enabled) return;
@@ -104,12 +106,10 @@ public sealed class RayLibPlatform : IGamePlatform
         if (enabled)
         {
             SetWindowState(ConfigFlags.VSyncHint); // スワップ間引き（プラットフォーム依存）
-            SetTargetFPS(120); // 120 に張り付けたい場合は併用
         }
         else
         {
             ClearWindowState(ConfigFlags.VSyncHint);
-            SetTargetFPS(0); // 0 で上限無し
         }
     }
     private bool dragDrop = false;

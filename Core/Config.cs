@@ -13,7 +13,7 @@ public sealed class GameConfig
     public bool ShowMouse { get; set; } = true;
 
     // --- Timing / Performance ---
-    public float TargetFps { get; set; } = 60f;
+    public int TargetFps { get; set; } = 60;
     public bool VSync { get; set; } = false;
     public bool UseMultiThreadUpdate { get; set; } = false;
     public int SleepDurationMs { get; set; } = 1000 * 60 * 10; // 長時間放置でスリープするまで

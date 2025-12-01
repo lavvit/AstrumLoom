@@ -145,10 +145,13 @@ public class AstrumCore
     {
         get
         {
-            double d = DrawFPS.GetFPS();
-            double u = UpdateFPS.GetFPS();
+            double range = 0.3;
+            double d = Platform.SystemFPS ?? DrawFPS.GetFPS(range);
+            double u = UpdateFPS.GetFPS(range);
             double ratio = d > u ? d / u : u / d;
-            return ratio > 1.2 ? $"Draw: {d:0.0}\nUpdate: {u:0.0}" : $"FPS: {DrawFPS.GetFPS(0.3):0.0}";
+            return ratio > 1.2 && MultiThreading ?
+                $"Draw: {d:0.#}\nUpdate: {u:0.#}" :
+                $"FPS: {d:0.#}";
         }
     }
 
@@ -178,6 +181,7 @@ public class AstrumCore
             Platform.SetVSync(value);
         }
     }
+    public static bool MultiThreading => WindowConfig.UseMultiThreadUpdate;
 }
 
 public class Sleep

@@ -13,9 +13,14 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
 {
     private static readonly Color BackgroundColor = new(10, 10, 11);
 
+    private volatile bool _running;
+    private Thread? _updateThread;
+    private readonly object _gameLock = new();
+
     public void Run()
     {
         AstrumCore.Platform = platform;
+        AstrumCore.MainThreadId = Environment.CurrentManagedThreadId;
 
         KeyInput.Initialize(platform.Input, platform.TextInput);
         Mouse.Init(platform.Mouse, showMouse);
@@ -23,21 +28,70 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         AstrumCore.InitCompleted = true;
         Scene.Start();
         Sleep.WakeUp();
-        //LoopMultiThread();
         Loop();
     }
 
     public void Loop()
     {
-        while (!platform.ShouldClose)
+        if (!AstrumCore.MultiThreading)
         {
-            AstrumCore.InitDrop();
-            Update(game);
+            while (!platform.ShouldClose)
+            {
+                AstrumCore.InitDrop();
+                Update(game);
+                Draw(game);
+            }
+            return;
+        }
+
+        _running = true;
+
+        // 更新スレッド開始
+        _updateThread = new Thread(UpdateLoop)
+        {
+            IsBackground = true,
+            Name = "AstrumLoom.UpdateThread"
+        };
+        _updateThread.Start();
+
+        // メインスレッドは描画ループだけ
+        while (!platform.ShouldClose && _running)
+        {
+            // Drop 初期化は「Update 側で」やりたいなら UpdateLoop に移してもOK
             Draw(game);
         }
+
+        // 終了シグナル
+        _running = false;
+
+        // 更新スレッド終了待ち
+        if (_updateThread != null && _updateThread.IsAlive)
+        {
+            try
+            {
+                _updateThread.Join();
+            }
+            catch { /* 終了中の例外は無視でOK */ }
+        }
     }
-    public void LoopMultiThread()
+    private void UpdateLoop()
     {
+        try
+        {
+            while (!platform.ShouldClose && _running)
+            {
+                AstrumCore.InitDrop(); // もともと Loop() の先頭で呼んでたやつ :contentReference[oaicite:5]{index=5}
+                Update(game);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("");
+            Log.Write("Update thread error: " + ex, true);
+            Log.Write("");
+            Log.Write("エラーです:/ ごめんねなの！");
+            platform.Close();
+        }
     }
 
     public void Update(IGame game)
@@ -46,7 +100,8 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         Sleep.Update();
         KeyInput.Update(platform.UTime.DeltaTime);
         Mouse.Update();
-        game.Update(platform.UTime.DeltaTime);
+        lock (_gameLock)
+            game.Update(platform.UTime.DeltaTime);
         platform.UTime.EndFrame();
         AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);
     }
@@ -58,7 +113,8 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         platform.Graphics.BeginFrame();
         platform.Graphics.Clear(BackgroundColor);
 
-        game.Draw();
+        lock (_gameLock)
+            game.Draw();
         // ★ ここでオーバーレイ
         if (showOverlay)
             Overlay.Current.Draw();
