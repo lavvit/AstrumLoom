@@ -387,6 +387,57 @@ public class Skin
         return count;
     }
 
+    public static void CheckResource()
+    {
+        // Remove invalid or disposed Textures
+        foreach (string? key in Textures.Keys.ToList())
+        {
+            var tex = Textures[key];
+            // Pump may update internal state; keep minimal side effects
+            tex?.Pump();
+            if (tex == null || !tex.Enable)
+            {
+                Textures[key]?.Dispose();
+                Textures.Remove(key);
+                _textureCache.TryRemove(key, out _);
+            }
+        }
+
+        // Remove invalid or disposed Sounds
+        foreach (string? key in Sounds.Keys.ToList())
+        {
+            var snd = Sounds[key];
+            snd?.Pump();
+            if (snd == null || !snd.Enable)
+            {
+                Sounds[key]?.Dispose();
+                Sounds.Remove(key);
+            }
+        }
+
+        // Remove invalid Numbers (based on Enable or internal texture state if any)
+        foreach (string? key in Numbers.Keys.ToList())
+        {
+            var num = Numbers[key];
+            if (num == null || !num.Loaded)
+            {
+                Numbers[key]?.Dispose();
+                Numbers.Remove(key);
+            }
+        }
+
+        // Fonts: keep DefaultFont fallback; remove entries that are null
+        foreach (string? key in Fonts.Keys.ToList())
+        {
+            var fon = Fonts[key];
+            if (fon == null)
+            {
+                Fonts[key]?.Dispose();
+                Fonts.Remove(key);
+            }
+        }
+    }
+
     private static void Add(string name, string file, bool inque)
     {
         if (string.IsNullOrEmpty(name)) return;
@@ -444,7 +495,7 @@ public class Skin
             }
         }
     }
-    public static void AddTexture(string name, string file, bool inque = false)
+    public static string AddTexture(string name, string file, bool inque = false)
     {
         name = name.ToLower();
         if (TexExit(name, file))
@@ -465,6 +516,17 @@ public class Skin
                 SkinQue.Enqueue(("tex" + name, file));
             else
                 Textures[name] = new Texture(file);
+        }
+        return name;
+    }
+    public static void RemoveTexture(string name)
+    {
+        name = name.ToLower();
+        if (Textures.TryGetValue(name, out var value))
+        {
+            value?.Dispose();
+            Textures.Remove(name);
+            _textureCache.TryRemove(name, out _);
         }
     }
     private static bool TexExit(string name, string path = "", bool duplicate = true) =>
