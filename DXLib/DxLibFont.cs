@@ -255,7 +255,7 @@ internal sealed class DxLibFont : IFont
             float t = h > 1 ? (float)row / (h - 1) : 0f;
 
             // OKLab グラデならこんな感じ
-            var c = gradation.GetColor(1 - t, gradation.UseColorSpace);
+            var c = gradation.GetColor(t, gradation.UseColorSpace);
 
             // SetDrawBright は 0～255 指定なのでそのまま使える
             SetDrawBright(c.R, c.G, c.B);

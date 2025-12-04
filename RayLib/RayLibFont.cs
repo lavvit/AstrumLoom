@@ -268,7 +268,7 @@ internal sealed class RayLibFont : IFont
             for (int row = 0; row < h; row++)
             {
                 float t = h > 1 ? (float)row / (h - 1) : 0f;
-                var c = gradation.GetColor(t, gradation.UseColorSpace);
+                var c = gradation.GetColor(1 - t, gradation.UseColorSpace);
                 var tint = ToRayColor(c, options.Opacity);
 
                 var src = new Rectangle(0, row, w, 1);
