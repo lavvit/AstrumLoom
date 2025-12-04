@@ -16,10 +16,11 @@ public class Animation : IDisposable
         int count = GetCount(dir, prefix, ext);
         Name = Path.GetFileNameWithoutExtension(dir);
         _keyPrefix = dir.Replace('\\', '/').Replace('/', '_').ToLower();
+        string originalKeyPrefix = _keyPrefix;
         for (int i = 0; i < count; i++)
         {
             string path = dir + prefix + i + ext;
-            Skin.AddTexture($"anim_{_keyPrefix}_{i}", path);
+            _keyPrefix = Skin.AddTexture($"anim_{originalKeyPrefix}_{i}", path).Replace($"_{i}", "");
         }
         Count = Frames.Length;
 
@@ -39,7 +40,7 @@ public class Animation : IDisposable
 
     private string _keyPrefix = "";
     public Texture[] Frames
-        => [.. Skin.Textures.Where(kv => kv.Key.StartsWith($"anim_{_keyPrefix}_")).OrderBy(kv => kv.Key).Select(kv => kv.Value)];
+        => [.. Skin.Textures.Where(kv => kv.Key.StartsWith($"{_keyPrefix}_")).OrderBy(kv => kv.Key).Select(kv => kv.Value)];
 
     public static int GetCount(string dir, string prefix = "", string ext = ".png")
     {
@@ -88,7 +89,7 @@ public class Animation : IDisposable
     /// <summary>
     /// 現在のフレームのテクスチャ（存在しない場合は null）。
     /// </summary>
-    public Texture? CurrentFrame => Count == 0 ? null : Skin.Texture($"anim_{_keyPrefix}_{CurrentIndex}");
+    public Texture? CurrentFrame => Count == 0 ? null : Skin.Texture($"{_keyPrefix}_{CurrentIndex}");
 
     /// <summary>
     /// ループ設定。
@@ -123,14 +124,14 @@ public class Animation : IDisposable
     public long Update() => _disposed ? 0 : _counter.Tick();
 
     public Texture? GetFrame(int index) => _disposed ? null : index < 0 || index >= Count ? null :
-        Skin.Texture($"anim_{_keyPrefix}_{index}");
+        Skin.Texture($"{_keyPrefix}_{index}");
 
     /// <summary>
     /// 現在のフレームを描画します。
     /// </summary>
     public void Draw(double x = 0, double y = 0)
     {
-        if (_disposed) return;
+        if (_disposed || !Enable) return;
         Pump();
         var tex = CurrentFrame;
         if (tex == null) return;
@@ -142,7 +143,7 @@ public class Animation : IDisposable
     /// </summary>
     public void Draw(double x, double y, LayoutUtil.Rect rect)
     {
-        if (_disposed) return;
+        if (_disposed || !Enable) return;
         var tex = CurrentFrame;
         if (tex == null) return;
         tex.Draw(x, y, rect);
@@ -189,12 +190,20 @@ public class Animation : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        foreach (var f in Frames)
+        // 2) Skin.Textures から _keyPrefix を含むキーを全て削除する
+        if (!string.IsNullOrEmpty(_keyPrefix) && Skin.Textures != null)
         {
-            f?.Dispose();
-            if (f != null)
-                Skin.Textures.Remove($"anim_{_keyPrefix}_{Frames.ToList().IndexOf(f)}");
+            // キー一覧を安全に取得してから削除する
+            var keysToRemove = Skin.Textures.Keys
+                .Where(k => k != null && k.StartsWith($"{_keyPrefix}_"))
+                .ToList();
+
+            foreach (string? k in keysToRemove)
+            {
+                Skin.RemoveTexture(k);
+            }
         }
+
         _disposed = true;
         GC.SuppressFinalize(this);
     }

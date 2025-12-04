@@ -41,6 +41,8 @@ internal sealed class RayLibTexture : ITexture
             try { Raylib.UnloadTexture(Native); }
             catch { Log.Error($"Failed to unload texture: {Path}"); }
         }
+        else if (Native.Id != 0)
+            Log.Debug($"Texture dispose skipped: not main thread or window not ready : {Path}");
         Native = default;
     }
     #region 読み込み
@@ -107,7 +109,7 @@ internal sealed class RayLibTexture : ITexture
             return Volatile.Read(ref _asyncState) != 0;
         }
     }
-    public bool Enable => Native.Id > 0 && Loaded;
+    public bool Enable => Native.Id > 0 && Loaded && !_disposed;
     private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
     private bool _deferred;
     private long _startTicks;
