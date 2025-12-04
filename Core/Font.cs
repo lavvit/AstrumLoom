@@ -24,6 +24,12 @@ public interface IFont : IDisposable
         DrawOptions options);   // ★ 基準点・色・不透明度などをここで受ける
     void DrawEdge(double x, double y, string text,
         DrawOptions options);  // ★ エッジのみ描画（必要なら実装）
+
+    void DrawGrad(double x, double y, string text,
+        Gradation gradation, DrawOptions options);
+
+    void DrawTexture(double x, double y, string text,
+        ITexture[] texture, DrawOptions options);
 }
 
 public static class FontHandle

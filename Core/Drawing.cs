@@ -213,27 +213,27 @@ public class Drawing
             }
         }
     }
-    public static void Gradation(int x, int y, int width, int height, Gradation grad, double rotate = 0, ColorSpace colorSpace = ColorSpace.RGB)
+    public static void Gradation(int x, int y, int width, int height, Gradation grad, double rotate = 0, ColorSpace? colorSpace = null)
     {
         if (width <= 0 || height <= 0) return;
 
         // 回転を 0..360 に正規化
         double rmod = Math.Abs((rotate % 360 + 360) % 360);
         const double EPS = 1e-6;
-
+        var cs = colorSpace ?? ColorSpace.RGB;
         // 0度/360度に近い（列単位の高速パス）
         if (Math.Abs(rmod) < EPS || Math.Abs(rmod - 360.0) < EPS)
         {
             if (width == 1)
             {
-                var c = grad.GetColor(0.5f, colorSpace);
+                var c = grad.GetColor(0.5f, cs);
                 Box(x, y, 1, height, c);
                 return;
             }
             for (int i = 0; i < width; i++)
             {
                 float pos = (float)i / (width - 1);
-                var color = grad.GetColor(pos, colorSpace);
+                var color = grad.GetColor(pos, cs);
                 Box(x + i, y, 1, height, color);
             }
             return;
@@ -244,14 +244,14 @@ public class Drawing
         {
             if (width == 1)
             {
-                var c = grad.GetColor(0.5f, colorSpace);
+                var c = grad.GetColor(0.5f, cs);
                 Box(x, y, 1, height, c);
                 return;
             }
             for (int i = 0; i < width; i++)
             {
                 float pos = 1f - (float)i / (width - 1);
-                var color = grad.GetColor(pos, colorSpace);
+                var color = grad.GetColor(pos, cs);
                 Box(x + i, y, 1, height, color);
             }
             return;
@@ -263,7 +263,7 @@ public class Drawing
             bool reversed = Math.Abs(rmod - 270.0) < EPS;
             if (height == 1)
             {
-                var c = grad.GetColor(0.5f, colorSpace);
+                var c = grad.GetColor(0.5f, cs);
                 Box(x, y, width, 1, c);
                 return;
             }
@@ -271,7 +271,7 @@ public class Drawing
             {
                 float pos = (float)j / (height - 1);
                 if (reversed) pos = 1f - pos;
-                var color = grad.GetColor(pos, colorSpace);
+                var color = grad.GetColor(pos, cs);
                 Box(x, y + j, width, 1, color);
             }
             return;
@@ -302,7 +302,7 @@ public class Drawing
                 double t = (proj - minProj) / range;
                 if (t < 0) t = 0;
                 else if (t > 1) t = 1;
-                var color = grad.GetColor((float)t, colorSpace);
+                var color = grad.GetColor((float)t, cs);
                 Box(x + i, y + j, 1, 1, color);
             }
         }

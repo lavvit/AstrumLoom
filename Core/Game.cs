@@ -86,9 +86,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         }
         catch (Exception ex)
         {
-            Log.Write("");
-            Log.Write("Update thread error: " + ex, true);
-            Log.Write("");
+            Log.EmptyLine();
+            Log.Error("Update thread error: " + ex);
+            Log.EmptyLine();
             Log.Write("エラーです:/ ごめんねなの！");
             platform.Close();
         }

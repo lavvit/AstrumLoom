@@ -45,6 +45,8 @@ public class Texture : IDisposable
     public Texture(string path)
         => _texture = AstrumCore.Platform?.LoadTexture(path);
 
+    public ITexture Interface => _texture!;
+
     public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
 
     public void Pump() => _texture?.Pump();

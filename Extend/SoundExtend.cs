@@ -10,7 +10,7 @@ public class SoundExtend : IDisposable
     public SoundExtend(string path, bool loop = false, bool prescan = false)
         => _Sound = new ManagedSound(path, loop, prescan);
     public void Play() => _Sound?.Play();
-    public void Stop() => _Sound?.Stop();
+    public void Stop() => _Sound?.Pause();
     public void PlayStream() => _Sound?.PlayStream();
     public void Pump() => _Sound?.Pump();
     public void Dispose()
@@ -45,6 +45,11 @@ public class SoundExtend : IDisposable
     {
         get => _Sound?.Speed ?? 1.0; set => _Sound!.Speed = value;
     }
+    public bool Loop
+    {
+        get => _Sound?.Loop ?? false; set => _Sound!.Loop = value;
+    }
+    public bool Playing => _Sound?.IsPlaying ?? false;
 }
 
 public sealed class ManagedSound : ISound, IDisposable
@@ -261,6 +266,7 @@ public sealed class ManagedSound : ISound, IDisposable
         {
             throw new InvalidOperationException($"再生に失敗しました: {Bass.LastError}");
         }
+        _played = true;
     }
 
     public void Pause()
@@ -288,12 +294,33 @@ public sealed class ManagedSound : ISound, IDisposable
     public void PlayStream()
     {
         if (!Enable) return;
-        if (IsPlaying)
+        if (_played)
         {
-            Pump();
+            Update();
             return;
         }
         Play();
+        _played = true;
+    }
+    private bool _played = false;
+    public void Update()
+    {
+        Pump();
+        if (!Enable) return;
+        if (_played)
+        {
+            if (!Loop && Length - Time <= 16)
+            {
+                Bass.ChannelStop(_stream);
+                return;
+            }
+        }
+        else
+        {
+            if (Loop) // ループ時にフラグをリセットして再生
+                _played = false;
+            Time = 0;
+        }
     }
 
     private static void EnsureBassInitialized()
@@ -413,15 +440,16 @@ public sealed class ManagedSound : ISound, IDisposable
             EnsureReadyForChannel();
             long posBytes = Bass.ChannelGetPosition(_stream);
             double seconds = Bass.ChannelBytes2Seconds(_stream, posBytes);
-            return seconds;
+            return seconds * 1000.0;
         }
         set
         {
             EnsureReadyForChannel();
-            long bytes = Bass.ChannelSeconds2Bytes(_stream, value);
+            float targetTime = (float)Math.Clamp(value / 1000.0f, 0, Length / 1000.0 - 0.001);
+            long bytes = Bass.ChannelSeconds2Bytes(_stream, targetTime);
             if (!Bass.ChannelSetPosition(_stream, bytes))
             {
-                throw new InvalidOperationException($"シークに失敗しました: {Bass.LastError}");
+                Log.Error($"シークに失敗しました: {Bass.LastError}");
             }
         }
     }

@@ -175,7 +175,19 @@ internal sealed class RayLibFont : IFont
         }
         ResetOptions(options);
     }
-    public void Dispose() => UnloadFont(_font);
+    public void Dispose()
+    {
+        UnloadFont(_font);
+
+        lock (_texcacheLock)
+        {
+            foreach (var rt in _texcache)
+            {
+                try { UnloadRenderTexture(rt); } catch { }
+            }
+            _texcache.Clear();
+        }
+    }
 
     private static string GetFont(string? font, FontSpec spec)
     {
@@ -225,4 +237,174 @@ internal sealed class RayLibFont : IFont
         return [.. baseSet.Concat(cjkUni).Concat(cjkCompat).Distinct()];
     }
     private static int[] EnumRange(int start, int end) => [.. Enumerable.Range(start, end - start + 1)];
+
+    #region Gradation Text
+    public void DrawGrad(double x, double y, string text, Gradation gradation, DrawOptions options)
+    {
+
+        if (!Enable) { Drawing.DefaultText(x, y, text); return; }
+
+        // 4. ふちが欲しければ、options.EdgeColor を使って別途 DrawEdge みたいに描画
+        DrawEdge(x, y, text, options);
+
+        var (w, h) = Measure(text);
+        if (w <= 0 || h <= 0) return;
+
+        var rt = AcquireRenderTexture(w, h);
+        try
+        {
+            // 1. オフスクリーンに白文字を描画
+            Raylib.BeginTextureMode(rt);
+            Raylib.ClearBackground(new Raylib_cs.Color(0, 0, 0, 0));
+            DrawEx(text, new(0, 0), Color.White, 1.0);
+            Raylib.EndTextureMode();
+
+            // 2. 基準点を考慮
+            var off = LayoutUtil.GetAnchorOffset(options.Point, w, h);
+            float x1 = (float)(x + off.X);
+            float y1 = (float)(y + off.Y);
+
+            // 3. 行ごとにグラデーション
+            for (int row = 0; row < h; row++)
+            {
+                float t = h > 1 ? (float)row / (h - 1) : 0f;
+                var c = gradation.GetColor(t, gradation.UseColorSpace);
+                var tint = ToRayColor(c, options.Opacity);
+
+                var src = new Rectangle(0, row, w, 1);
+                float dy = y1 + h - row - 1;
+                var dest = new Vector2(x1, dy);
+                Raylib.DrawTextureRec(rt.Texture, src, dest, tint);
+            }
+        }
+        finally
+        {
+            ReleaseRenderTexture(rt);
+        }
+    }
+
+    // RenderTexture2D プール (キャッシュ)
+    private readonly List<RenderTexture2D> _texcache = [];
+    private readonly object _texcacheLock = new();
+    private const int MaxTexCache = 16;
+    private RenderTexture2D AcquireRenderTexture(int width, int height)
+    {
+        lock (_texcacheLock)
+        {
+            for (int i = _texcache.Count - 1; i >= 0; i--)
+            {
+                var rt = _texcache[i];
+                try
+                {
+                    // サイズ一致で有効なものを返す
+                    if (rt.Texture.Width == width && rt.Texture.Height == height && rt.Texture.Id != 0)
+                    {
+                        _texcache.RemoveAt(i);
+                        return rt;
+                    }
+                }
+                catch
+                {
+                    // 何か不正なら破棄
+                    try { Raylib.UnloadRenderTexture(rt); } catch { }
+                    _texcache.RemoveAt(i);
+                }
+            }
+        }
+        // 見つからなければ新規作成
+        return Raylib.LoadRenderTexture(width, height);
+    }
+    private void ReleaseRenderTexture(RenderTexture2D rtex)
+    {
+        if (rtex.Texture.Id == 0)
+        {
+            try { Raylib.UnloadRenderTexture(rtex); } catch { }
+            return;
+        }
+
+        lock (_texcacheLock)
+        {
+            if (_texcache.Count >= MaxTexCache)
+            {
+                // 多すぎる場合は解放
+                try { Raylib.UnloadRenderTexture(rtex); } catch { }
+            }
+            else
+            {
+                _texcache.Add(rtex);
+            }
+        }
+    }
+    #endregion
+
+    #region Texture Text
+    public void DrawTexture(double x, double y, string text, ITexture[] textures, DrawOptions options)
+    {
+        if (!Enable)
+        {
+            Drawing.DefaultText(x, y, text);
+            return;
+        }
+        SetOptions(options);
+
+        // 4. ふちが欲しければ、options.EdgeColor を使って別途 DrawEdge みたいに描画
+        DrawEdge(x, y, text, options);
+
+        var (w, h) = Measure(text);
+        if (w <= 0 || h <= 0)
+        {
+            ResetOptions(options);
+            return;
+        }
+
+        int drawX = (int)x;
+        int drawY = (int)y;
+        if (options.Point != ReferencePoint.TopLeft)
+        {
+            var off = GetAnchorOffset(options.Point, w, h);
+            drawX = (int)(x + off.X);
+            drawY = (int)(y + off.Y);
+        }
+
+        var rt = AcquireRenderTexture(w, h);
+        try
+        {
+            // 1. マスク作成（真っ白文字）
+            BeginTextureMode(rt);
+            ClearBackground(new Raylib_cs.Color(0, 0, 0, 0));
+            DrawEx(text, new(0, 0), Color.White, 1.0);
+            EndTextureMode();
+
+            // 2. マスクの上にテクスチャを乗算で塗る
+            BeginTextureMode(rt);
+
+            // 文字の範囲いっぱいにテクスチャを敷く（タイリングしたければ for 文で）
+            BeginBlendMode(Raylib_cs.BlendMode.Multiplied);
+            foreach (var texture in textures)
+            {
+                var src = new Rectangle(0, 0, texture.Width, texture.Height);
+                var dst = new Rectangle(0, 0, w, h);
+                var tex = (texture as RayLibTexture)?.Native ?? default;
+                DrawTexturePro(tex, src, dst, Vector2.Zero, 0f, Raylib_cs.Color.White);
+            }
+            EndBlendMode();
+
+            EndTextureMode();
+
+            // 3. 出来上がったものを画面に貼る
+            double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
+            var tint = ToRayColor(options.Color ?? Color.White, opacity);
+
+            var fullSrc = new Rectangle(0, 0, rt.Texture.Width, -rt.Texture.Height);
+            var destPos = new Vector2(drawX, drawY);
+
+            DrawTextureRec(rt.Texture, fullSrc, destPos, tint);
+        }
+        finally
+        {
+            ReleaseRenderTexture(rt);
+            ResetOptions(options);
+        }
+    }
+    #endregion
 }

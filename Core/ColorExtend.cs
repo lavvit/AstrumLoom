@@ -278,7 +278,11 @@ public class Gradation
         }
     }
 
-    public Color GetColor(float position, ColorSpace colorSpace = ColorSpace.OKLab)
+    public ColorSpace UseColorSpace = ColorSpace.OKLab;
+
+    public Color GetColor(float position)
+        => GetColor(position, UseColorSpace);
+    public Color GetColor(float position, ColorSpace colorSpace)
     {
         if (Points.Length == 0)
             throw new InvalidOperationException("No color points defined.");
