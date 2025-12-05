@@ -14,15 +14,12 @@ internal sealed class RayLibTexture : ITexture
     public int Height { get; private set; } = 0;
 
     // RenderTexture の所有を持つ場合に保持する
+    private (Size size, Action callback)? _renderInfo;
     private RenderTexture2D _renderTex;
-    // CreateTexture 経由で作られた RenderTexture2D を包むコンストラクタ
-    public RayLibTexture(RenderTexture2D renderTexture)
+    public RayLibTexture(int width, int height, Action callback)
     {
-        _renderTex = renderTexture;
-        Native = renderTexture.Texture;
-        Width = Native.Width;
-        Height = Native.Height;
-        Volatile.Write(ref _asyncState, 1); // Ready
+        _renderInfo = (new Size(width, height), callback);
+        Load();
     }
     public RayLibTexture(string path)
     {
@@ -98,27 +95,39 @@ internal sealed class RayLibTexture : ITexture
     #region 読み込み
     public void Load()
     {
-        if (!File.Exists(Path))
+        if (_renderInfo == null)
         {
-            Log.Debug($"Texture: not found: {Path}");
-            Volatile.Write(ref _asyncState, -1);
-            return;
+            if (string.IsNullOrEmpty(Path))
+            {
+                Volatile.Write(ref _asyncState, -1);
+                return;
+            }
+            if (!File.Exists(Path))
+            {
+                Log.Debug($"Texture: not found: {Path}");
+                Volatile.Write(ref _asyncState, -1);
+                return;
+            }
         }
 
+        bool pathLoad = !string.IsNullOrEmpty(Path) && File.Exists(Path) && _renderInfo == null;
         if (!IsMainThread)
         {
             Task.Run(() =>
             {
-                try
+                if (pathLoad)
                 {
-                    _startTicks = Environment.TickCount64;
-                    _pendingBytes = File.ReadAllBytes(Path);
-                    _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
-                }
-                catch
-                {
-                    _pendingBytes = null;
-                    _asyncState = -1;   // Failed
+                    try
+                    {
+                        _startTicks = Environment.TickCount64;
+                        _pendingBytes = File.ReadAllBytes(Path);
+                        _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
+                    }
+                    catch
+                    {
+                        _pendingBytes = null;
+                        _asyncState = -1;   // Failed
+                    }
                 }
             });
             _deferred = true;
@@ -127,8 +136,29 @@ internal sealed class RayLibTexture : ITexture
         }
         else
         {
-            // PNG/JPG/BMP等そのままOK
-            Native = Raylib.LoadTexture(Path);
+            if (_renderInfo != null)
+            {
+                int width = (int)_renderInfo.Value.size.Width;
+                int height = (int)_renderInfo.Value.size.Height;
+                var callback = _renderInfo.Value.callback;
+                if (width <= 0 || height <= 0)
+                {
+                    Volatile.Write(ref _asyncState, -1);
+                    return;
+                }
+                var renderTex = Raylib.LoadRenderTexture(width, height);
+                Raylib.BeginTextureMode(renderTex);
+                callback?.Invoke();
+                Raylib.EndTextureMode();
+                // RenderTexture を所有する RayLibTexture として返す
+                _renderTex = renderTex;
+                Native = renderTex.Texture;
+            }
+            else
+            {
+                // PNG/JPG/BMP等そのままOK
+                Native = Raylib.LoadTexture(Path);
+            }
             _startTicks = Environment.TickCount64;
 
             // 初期状態をセット
@@ -248,6 +278,14 @@ internal sealed class RayLibTexture : ITexture
             (float)rect.Width * tx,
             (float)rect.Height * ty
         );
+
+        // Render経由の場合上下反転するので補正
+        if (_renderTex.Id != 0)
+        {
+            srcRect.Y += srcRect.Height;
+            srcRect.Height *= -1;
+        }
+
         // 宛先サイズ（常に正）※拡大後の大きさ
         float destW = (float)(rect.Width * Math.Abs(w));
         float destH = (float)(rect.Height * Math.Abs(h));

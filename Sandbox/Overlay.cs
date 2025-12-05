@@ -1,12 +1,12 @@
 ﻿// Sandbox/SandboxOverlay.cs
 using AstrumLoom;
+using AstrumLoom.Extend;
 
 namespace Sandbox;
 
 internal sealed class SandboxOverlay : Overlay
 {
     private readonly IFont? _small;
-    private readonly IFont? _large;
     private readonly Gradation gradation = new(
     [
         (0.0f, Color.Red),
@@ -22,15 +22,38 @@ internal sealed class SandboxOverlay : Overlay
         string fontName = "ＤＦ太丸ゴシック体 Pro-5";
         string fontpath = "Assets/FOT-大江戸勘亭流 Std E.otf";
         _small = FontHandle.Create(fontName, 16);
-        _large = FontHandle.Create(fontpath, 32, bold: true);
     }
+
+    private (float t, float draw, float update) _fpsHistory = (0, 0, 0);
 
     public override void Draw()
     {
         var platform = AstrumCore.Platform;
+        if (platform.Time.TotalTime - _fpsHistory.t >= 0.16666f)
+        {
+            _fpsHistory = (platform.Time.TotalTime,
+                (float)AstrumCore.DrawFPS.GetFPS(),
+                (float)AstrumCore.UpdateFPS.GetFPS());
+        }
+
+        if (Scene.NowScene is SimpleTestGame s)
+        {
+            if (s.SceneName == "LoadCheckScene")
+            {
+                // 簡易描画のみ
+                int size = 10;
+                var color = Color.Lime;
+                ShapeText.Draw(10, 10, $"D:{_fpsHistory.draw:0}\nU:{_fpsHistory.update:0}",
+                    size: size, color: color, thickness: 2);
+                return;
+            }
+        }
+
         // FPS / 時刻 を描く
-        _small.Draw(10, 10, $"{platform.BackendKind} {AstrumCore.NowFPS}", Color.White);
-        _small.Draw(10, 50, $"{DateTime.Now:G}", new Color(180, 200, 220));
+        string fps = $"{platform.BackendKind} {AstrumCore.NowFPS}";
+        string time = $"{DateTime.Now:G}";
+        _small.Draw(10, 10, fps, Color.White);
+        _small.Draw(10, 50, time, new Color(180, 200, 220));
 
         var c = gradation.GetColor((float)(Math.Sin(DateTime.Now.TimeOfDay.TotalSeconds) + 1) / 2);
         Drawing.DefaultText(10, 80, "AstrumLoom Sandbox", c);

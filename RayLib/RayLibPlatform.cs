@@ -83,20 +83,7 @@ public sealed class RayLibPlatform : IGamePlatform
         new RayLibMovie(path);
 
     public ITexture CreateTexture(int width, int height, Action callback)
-    {
-        if (Environment.CurrentManagedThreadId != AstrumCore.MainThreadId)
-        {
-            Log.Warning("CreateTexture はメインスレッドで呼び出してください。");
-            return new RayLibTexture("");
-        }
-        if (width <= 0 || height <= 0) return new RayLibTexture("");
-        var renderTex = Raylib.LoadRenderTexture(width, height);
-        Raylib.BeginTextureMode(renderTex);
-        callback?.Invoke();
-        Raylib.EndTextureMode();
-        // RenderTexture を所有する RayLibTexture として返す
-        return new RayLibTexture(renderTex);
-    }
+        => new RayLibTexture(width, height, callback);
 
     private bool VSync;
     private int _targetFps;

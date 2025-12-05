@@ -4,14 +4,15 @@ public static class DecorateText
 {
     public static void Draw(this IFont font,
         double x, double y,
-        string text, DecorateOption option,
+        object? text, DecorateOption? option,
         ReferencePoint point = ReferencePoint.TopLeft,
         Color? edgecolor = null,
         BlendMode blend = BlendMode.None, double opacity = 1)
     {
-        if (option.Gradation != null)
+        string str = text?.ToString() ?? "";
+        if (option?.Gradation != null)
         {
-            font.DrawGrad(x, y, text, option.Gradation,
+            font.DrawGrad(x, y, str, option.Gradation,
                 new DrawOptions
                 {
                     Point = point,
@@ -20,9 +21,9 @@ public static class DecorateText
                     Opacity = opacity
                 });
         }
-        else if (option.Texture != null)
+        else if (option?.Texture != null)
         {
-            font.DrawTexture(x, y, text, [option.Texture.Interface],
+            font.DrawTexture(x, y, str, [option.Texture.Interface],
                 new DrawOptions
                 {
                     Point = point,
@@ -33,7 +34,7 @@ public static class DecorateText
         }
         else
         {
-            font.Draw(x, y, text,
+            font.Draw(x, y, str,
                 new DrawOptions
                 {
                     Point = point,

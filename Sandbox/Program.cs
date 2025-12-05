@@ -33,6 +33,7 @@ internal sealed class SimpleTestGame : Scene
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
         //_scene = new FancyShapesScene(AstrumCore.Width, AstrumCore.Height);
         //_scene = new TextureSoundDemoScene();
+        _scene = new LoadCheckScene(); // ← 新しい負荷可視化シーン
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }
@@ -119,7 +120,8 @@ internal sealed class SimpleTestGame : Scene
 
             KeyInput.DrawText(20, 430, inputText, Color.Black, _font);
         }
-        KeyBoard.Draw(800, 560, size: 8, KeyType.JPFull, _kbfont);
+        if (SceneName != "LoadCheckScene")
+            KeyBoard.Draw(800, 560, size: 8, KeyType.JPFull, _kbfont);
 
         Mouse.Draw(20);
     }
