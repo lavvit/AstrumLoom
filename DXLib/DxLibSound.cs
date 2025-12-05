@@ -25,6 +25,7 @@ public class DxLibSound : ISound
         }
         Handle = -1;
         _asyncState = -1;
+        GC.SuppressFinalize(this);
     }
     #region 読み込み
     public void Load()

@@ -13,11 +13,15 @@ internal sealed class RayLibTexture : ITexture
     public int Width { get; private set; } = 0;
     public int Height { get; private set; } = 0;
 
-    public RayLibTexture(Texture2D texture)
+    // RenderTexture の所有を持つ場合に保持する
+    private RenderTexture2D _renderTex;
+    // CreateTexture 経由で作られた RenderTexture2D を包むコンストラクタ
+    public RayLibTexture(RenderTexture2D renderTexture)
     {
-        Native = texture;
-        Width = texture.Width;
-        Height = texture.Height;
+        _renderTex = renderTexture;
+        Native = renderTexture.Texture;
+        Width = Native.Width;
+        Height = Native.Height;
         Volatile.Write(ref _asyncState, 1); // Ready
     }
     public RayLibTexture(string path)
@@ -26,24 +30,70 @@ internal sealed class RayLibTexture : ITexture
         Load();
     }
     private bool _disposed;
-    ~RayLibTexture() { Dispose(false); }
+    ~RayLibTexture() { Dispose(); }
 
-    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
-
-    private void Dispose(bool disposing)
+    public void Dispose()
     {
         if (_disposed) return;
-        _disposed = true;
+        if (!Raylib.IsWindowReady())
+        {
+            Log.Debug($"Texture dispose skipped: window not ready : {Path}");
+            // ウィンドウ未準備でもマネージ側は終了扱いにしてファイナライザ再入を避ける
+            _disposed = true;
+            Native = default;
+            _renderTex = default;
+            GC.SuppressFinalize(this);
+            return;
+        }
 
         // ネイティブ解放はメインスレッドかつウィンドウが有効な時のみ
-        if (Native.Id != 0 && IsMainThread && Raylib.IsWindowReady())
+        if (_renderTex.Id != 0)
         {
-            try { Raylib.UnloadTexture(Native); }
-            catch { Log.Error($"Failed to unload texture: {Path}"); }
+            if (IsMainThread)
+            {
+                try
+                {
+                    // RenderTexture の解放は内部の Texture も同時に解放される
+                    Raylib.UnloadRenderTexture(_renderTex);
+                    _disposed = true;
+                    Native = default;
+                    _renderTex = default;
+                    GC.SuppressFinalize(this);
+                }
+                catch { Log.Error($"Failed to unload render texture: {Path}"); }
+            }
+            else
+            {
+                AstrumLoom.AstrumCore.RequestDispose(this);
+            }
+            return;
         }
-        else if (Native.Id != 0)
-            Log.Debug($"Texture dispose skipped: not main thread or window not ready : {Path}");
-        Native = default;
+
+        if (Native.Id != 0)
+        {
+            if (IsMainThread)
+            {
+                try
+                {
+                    Raylib.UnloadTexture(Native);
+                    _disposed = true;
+                    Native = default;
+                    GC.SuppressFinalize(this);
+                }
+                catch { Log.Error($"Failed to unload texture: {Path}"); }
+            }
+            else
+            {
+                //Log.Debug($"Texture dispose skipped: not main thread : {Path}");
+                AstrumLoom.AstrumCore.RequestDispose(this);
+            }
+        }
+        else
+        {
+            _disposed = true;
+            Native = default;
+            GC.SuppressFinalize(this);
+        }
     }
     #region 読み込み
     public void Load()
@@ -109,7 +159,7 @@ internal sealed class RayLibTexture : ITexture
             return Volatile.Read(ref _asyncState) != 0;
         }
     }
-    public bool Enable => Native.Id > 0 && Loaded && !_disposed;
+    public bool Enable => Loaded && Native.Id > 0 && !_disposed;
     private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
     private bool _deferred;
     private long _startTicks;

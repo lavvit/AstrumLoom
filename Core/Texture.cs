@@ -48,6 +48,11 @@ public class Texture : IDisposable
     public ITexture Interface => _texture!;
 
     public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
+    public void Draw(double x, double y, LayoutUtil.Size size)
+    {
+        XYScale = (size.Width / Width, size.Height / Height);
+        _texture?.Draw(x, y);
+    }
 
     public void Pump() => _texture?.Pump();
 

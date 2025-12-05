@@ -31,6 +31,7 @@ public class RayLibSound : ISound
         Sfx = default;
         Music = default;
         _asyncState = -1;
+        GC.SuppressFinalize(this);
     }
     private bool _loaded => Sfx.FrameCount > 0;
     private bool _streamloaded => Music.FrameCount > 0;

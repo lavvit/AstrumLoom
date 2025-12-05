@@ -110,6 +110,8 @@ public class Mouse
     /// <param name="accent">アクセントカラー（nullならグレー）</param>
     public static void Draw(int size = 18, Color? color = null, Color? accent = null)
     {
+        if (AstrumCore.WindowConfig.ShowMouse)
+            return;
         double x = X;
         double y = Y;
 

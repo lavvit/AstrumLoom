@@ -1,7 +1,5 @@
 ﻿using System.Numerics;
 
-using Raylib_cs;
-
 using static Raylib_cs.Raylib;
 
 using RayBlend = Raylib_cs.BlendMode;
@@ -29,12 +27,6 @@ internal sealed class RayLibGraphics : IGraphics
             }
             return new LayoutUtil.Size(_size.w, _size.h);
         }
-    }
-    public ITexture LoadTexture(string path)
-    {
-        // 失敗時は Raylib が自前のエラーを出すので、ここではそのまま投げる
-        var tex = Raylib.LoadTexture(path);
-        return new RayLibTexture(tex);
     }
 
     public void BeginFrame() => BeginDrawing();

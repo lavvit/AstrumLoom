@@ -17,6 +17,7 @@ internal sealed class SimpleTestGame : Scene
 
     // 追加: 図形テストシーン
     private Scene? _scene;
+    internal string SceneName => _scene?.GetType().Name ?? "";
 
     public override void Enable()
     {
@@ -142,7 +143,7 @@ internal static class Program
             Width = 1280,
             Height = 720,
             VSync = false,
-            ShowMouse = false,
+            ShowMouse = true,
             SleepDurationMs = 60000,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限

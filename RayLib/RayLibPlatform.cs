@@ -94,7 +94,8 @@ public sealed class RayLibPlatform : IGamePlatform
         Raylib.BeginTextureMode(renderTex);
         callback?.Invoke();
         Raylib.EndTextureMode();
-        return new RayLibTexture(renderTex.Texture);
+        // RenderTexture を所有する RayLibTexture として返す
+        return new RayLibTexture(renderTex);
     }
 
     private bool VSync;

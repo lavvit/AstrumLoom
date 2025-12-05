@@ -182,6 +182,37 @@ public class AstrumCore
         }
     }
     public static bool MultiThreading => WindowConfig.UseMultiThreadUpdate;
+
+    #region メインスレッド破棄キュー
+    // 他スレッドからメインスレッドに依存するリソースの破棄を依頼するためのキュー
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<IDisposable> _disposeQueue = new();
+
+    /// <summary>
+    /// メインスレッドでの破棄が必要なリソースを登録します。
+    /// 例: Texture/Sound など、プラットフォームがメインスレッド要求を持つもの。
+    /// </summary>
+    public static void RequestDispose(IDisposable disposable)
+    {
+        if (disposable == null) return;
+        _disposeQueue.Enqueue(disposable);
+    }
+
+    /// <summary>
+    /// メインスレッドで保留中の破棄を処理します。ゲームループ内から呼び出されます。
+    /// </summary>
+    public static void ProcessPendingDisposals()
+    {
+        // メインスレッドでのみ処理
+        if (Environment.CurrentManagedThreadId != MainThreadId) return;
+
+        while (_disposeQueue.TryDequeue(out var d))
+        {
+            try { d.Dispose(); }
+            catch { /* 破棄失敗は握りつぶす（ログは各プラットフォーム側で対応）*/ }
+            finally { }
+        }
+    }
+    #endregion
 }
 
 public class Sleep

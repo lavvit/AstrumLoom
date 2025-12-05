@@ -40,6 +40,7 @@ internal sealed class DxLibTexture : ITexture
         }
         Handle = -1;
         _asyncState = -1;
+        GC.SuppressFinalize(this);
     }
 
     #region 読み込み
