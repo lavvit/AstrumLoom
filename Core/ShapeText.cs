@@ -1,4 +1,4 @@
-﻿namespace AstrumLoom.Extend;
+﻿namespace AstrumLoom;
 
 public static class ShapeText
 {
