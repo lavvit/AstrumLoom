@@ -141,6 +141,7 @@ public class AstrumCore
     }
     #endregion
 
+    public static double FPS => Platform.SystemFPS ?? DrawFPS.GetFPS();
     public static string NowFPS
     {
         get
@@ -213,6 +214,9 @@ public class AstrumCore
         }
     }
     #endregion
+
+    public static void AddExtendAction(string key, Action action, bool inEndStart = true)
+        => GameRunner.AddExtendAction(key, action, inEndStart);
 }
 
 public class Sleep

@@ -93,6 +93,7 @@ internal sealed class RayLibTexture : ITexture
         }
     }
     #region 読み込み
+    internal static RenderTexture2D RenderTexture2D { get; private set; }
     public void Load()
     {
         if (_renderInfo == null)
@@ -148,7 +149,9 @@ internal sealed class RayLibTexture : ITexture
                 }
                 var renderTex = Raylib.LoadRenderTexture(width, height);
                 Raylib.BeginTextureMode(renderTex);
+                RenderTexture2D = renderTex;
                 callback?.Invoke();
+                RenderTexture2D = default;
                 Raylib.EndTextureMode();
                 // RenderTexture を所有する RayLibTexture として返す
                 _renderTex = renderTex;

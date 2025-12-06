@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace AstrumLoom;
 
@@ -113,6 +114,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     {
         platform.Time.BeginFrame();
         MainUpdate(game);
+        ExtendAction(end: false);
 
         platform.Graphics.BeginFrame();
         platform.Graphics.Clear(BackgroundColor);
@@ -124,11 +126,38 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             Overlay.Current.Draw();
         Log.Draw();
 
+        ExtendAction(end: true);
         platform.Graphics.EndFrame();
         platform.Time.EndFrame();
         AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
     }
     public void MainUpdate(IGame game) => platform.PollEvents();
+
+    private static ConcurrentQueue<(string key, Action action)> _mainThreadBeginActions = new();
+    private static ConcurrentQueue<(string key, Action action)> _mainThreadEndActions = new();
+    internal static void AddExtendAction(string key, Action action, bool inEndStart = true)
+    {
+        var queue = inEndStart ? _mainThreadEndActions : _mainThreadBeginActions;
+        if (queue.Any(item => item.key == key))
+            return;
+        queue.Enqueue((key, action));
+    }
+    private static void ExtendAction(bool end)
+    {
+        var queue = end ? _mainThreadEndActions : _mainThreadBeginActions;
+        while (queue.TryDequeue(out var item))
+        {
+            try
+            {
+                item.action();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"ExtendAction error ({item.key}): {ex}");
+            }
+        }
+    }
+
     private static class HiResDelay
     {
         // 目安: sub-ms の仕上げに

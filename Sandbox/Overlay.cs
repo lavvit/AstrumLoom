@@ -32,7 +32,7 @@ internal sealed class SandboxOverlay : Overlay
         if (platform.Time.TotalTime - _fpsHistory.t >= 0.16666f)
         {
             _fpsHistory = (platform.Time.TotalTime,
-                (float)AstrumCore.DrawFPS.GetFPS(),
+                (float)AstrumCore.FPS,
                 (float)AstrumCore.UpdateFPS.GetFPS());
         }
 
@@ -42,7 +42,7 @@ internal sealed class SandboxOverlay : Overlay
             {
                 // 簡易描画のみ
                 int size = 10;
-                var color = Color.Lime;
+                var color = Sleep.Sleeping ? Color.Violet : AstrumCore.VSync ? Color.Cyan : Color.Lime;
                 ShapeText.Draw(10, 10, $"D:{_fpsHistory.draw:0}\nU:{_fpsHistory.update:0}",
                     size: size, color: color, thickness: 2);
                 return;

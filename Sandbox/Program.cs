@@ -146,7 +146,7 @@ internal static class Program
             Height = 720,
             VSync = false,
             ShowMouse = true,
-            SleepDurationMs = 60000,
+            SleepDurationMs = 30000,
             ShowFpsOverlay = true,
             TargetFps = 0, // 0 にすると無制限
             UseMultiThreadUpdate = true,

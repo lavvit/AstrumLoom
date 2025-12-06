@@ -258,6 +258,8 @@ internal sealed class RayLibFont : IFont
             Raylib.ClearBackground(new Raylib_cs.Color(0, 0, 0, 0));
             DrawEx(text, new(0, 0), Color.White, 1.0);
             Raylib.EndTextureMode();
+            if (RayLibTexture.RenderTexture2D.Id != 0)
+                Raylib.BeginTextureMode(RayLibTexture.RenderTexture2D);
 
             // 2. 基準点を考慮
             var off = LayoutUtil.GetAnchorOffset(options.Point, w, h);
@@ -276,6 +278,11 @@ internal sealed class RayLibFont : IFont
                 var dest = new Vector2(x1, dy);
                 Raylib.DrawTextureRec(rt.Texture, src, dest, tint);
             }
+        }
+        catch
+        {
+            // 失敗したら何もしない
+            Log.Error("DrawGrad: failed to draw gradation text.");
         }
         finally
         {

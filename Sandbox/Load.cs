@@ -13,15 +13,12 @@ internal class LoadCheckScene : Scene
     private bool _showShape = false;     // Box表示
     private bool _regenerate = false; // テクスチャ再生成フラグ
 
-    private TextSprite? _desc;
-
     public override void Enable()
     {
         // 計測用のフォントとテクスチャを準備
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 20, edge: 1);
         _tex = new Texture("Assets/font.png");
         Drawing.DefaultFont = _font!;
-        _desc = new("", _font, Color.AliceBlue);
     }
 
     public override void Update()
@@ -38,7 +35,7 @@ internal class LoadCheckScene : Scene
 
     public override void Draw()
     {
-        Drawing.Fill(Color.Black);
+        Drawing.Fill(Color.LightGray);
 
         // テクスチャ描画計測
         if (_showTexture)
@@ -48,7 +45,7 @@ internal class LoadCheckScene : Scene
             {
                 for (int i = 0; i < _samples; i++)
                 {
-                    int w = 80, h = 40;
+                    int w = 60, h = 20;
                     int x = 20 + w * (i / 30);
                     int y = 80 + h * (i % 30);
                     _tex.Draw(x, y, new LayoutUtil.Size(w, h));
@@ -65,7 +62,9 @@ internal class LoadCheckScene : Scene
             {
                 int x = 20 + 90 * (i / 100);
                 int y = 80 + 10 * (i % 100);
-                _font?.Draw(x, y, $"Draw #{i}");
+                string text = $"Draw #{i}";
+                //_font?.Draw(x, y, text);
+                TextSprites.Draw(_font, text, x, y);
             }
             Profiler.EndSection("FontDraw");
         }
@@ -96,10 +95,15 @@ internal class LoadCheckScene : Scene
         // レポート可視化（簡易バー描画）
         int rx = 20, ry = 60, rw = 400, rh = 24, gap = 6;
         // ヒント
-        _desc?.Draw($"[T]Texture: {(_showTexture ? "ON" : "OFF")}\n" +
+        TextSprites.Draw(_font, $"[T]Texture: {(_showTexture ? "ON" : "OFF")}\n" +
             $"[F]Font: {(_showFont ? "ON" : "OFF")}\n" +
             $"[B]Box: {(_showShape ? "ON" : "OFF")}\n" +
-            $"[R] Regenerate Texture", rx + rw + 20, ry);
+            $"[R] Regenerate Texture", rx + rw + 20, ry, Color.AliceBlue);
+
+        Gradation gradation = new([Color.Red, Color.Yellow, Color.Lime]);
+        DecorateText.DecorateOption decorate = new(gradation);
+        TextSprites.Draw(_font, "Render Load Profile:", rx, ry - rh - gap, decorate);
+
         foreach (var r in reports)
         {
             // バー背景
@@ -125,7 +129,7 @@ internal class LoadCheckScene : Scene
         if (_regenerate)
         {
             _regenerate = false;
-            _tex = new Texture(new LayoutUtil.Size(100, 40), () =>
+            _tex = new Texture(new LayoutUtil.Size(90, 30), () =>
             {
                 Drawing.Fill(Color.Blue);
                 Drawing.Text(0, 0, DateTime.Now.ToString("HHmmss"), Color.Yellow);
