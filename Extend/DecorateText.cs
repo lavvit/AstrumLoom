@@ -45,6 +45,15 @@ public static class DecorateText
         }
     }
 
+    public static void DrawGradient(this IFont? font,
+        double x, double y,
+        object? text, Gradation gradation,
+        ReferencePoint point = ReferencePoint.TopLeft,
+        Color? edgecolor = null,
+        BlendMode blend = BlendMode.None, double opacity = 1)
+        => (font ?? Drawing.DefaultFont).Draw(x, y, text, new DecorateOption(gradation),
+            point, edgecolor, blend, opacity);
+
     public class DecorateOption
     {
         public Gradation? Gradation { get; set; } = null;

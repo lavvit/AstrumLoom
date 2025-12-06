@@ -1,4 +1,6 @@
-﻿namespace AstrumLoom;
+﻿using static AstrumLoom.LayoutUtil;
+
+namespace AstrumLoom;
 
 public interface IResourse : IDisposable
 {
@@ -39,7 +41,7 @@ public class Texture : IDisposable
     private bool _disposed = false;
     public Texture() { }
 
-    public Texture(LayoutUtil.Size size, Action method)
+    public Texture(Size size, Action method)
         => _texture = AstrumCore.Platform?.CreateTexture((int)size.Width, (int)size.Height, method);
 
     public Texture(string path)
@@ -48,10 +50,20 @@ public class Texture : IDisposable
     public ITexture Interface => _texture!;
 
     public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
-    public void Draw(double x, double y, LayoutUtil.Size size)
+    public void Draw(Point point) => _texture?.Draw(point.X, point.Y);
+    public void Draw(double x, double y, Rect rectangle)
+        => DrawRect(x, y, rectangle);
+    public void DrawSize(double x, double y, Size size)
     {
         XYScale = (size.Width / Width, size.Height / Height);
         _texture?.Draw(x, y);
+    }
+    public void DrawRect(double x, double y, Rect rectangle)
+    {
+        Rect? before = Rectangle != null ? new Rect(Rectangle.Value.X, Rectangle.Value.Y, Rectangle.Value.Width, Rectangle.Value.Height) : null;
+        Rectangle = rectangle;
+        _texture?.Draw(x, y);
+        Rectangle = before;
     }
 
     public void Pump() => _texture?.Pump();
@@ -132,7 +144,7 @@ public class Texture : IDisposable
             }
         }
     }
-    public LayoutUtil.Point? Position
+    public Point? Position
     {
         get => _texture?.Option?.Position;
         set
@@ -164,7 +176,7 @@ public class Texture : IDisposable
             }
         }
     }
-    public LayoutUtil.Rect? Rectangle
+    public Rect? Rectangle
     {
         get => _texture?.Option?.Rectangle;
         set
@@ -237,8 +249,8 @@ public class Texture : IDisposable
     }
     #endregion
 
-    public LayoutUtil.Size Size => new(Width, Height);
-    public LayoutUtil.Size ScaledSize => new(
+    public Size Size => new(Width, Height);
+    public Size ScaledSize => new(
         (int)(Width * Scale * Drawing.DefaultScale),
         (int)(Height * Scale * Drawing.DefaultScale)
     );
@@ -288,7 +300,7 @@ public class Texture : IDisposable
         Flip = opt.Flip;
     }
 
-    public void Draw(double x, double y, LayoutUtil.Rect rectangle, LayoutUtil.Point? point = null)
+    public void Draw(double x, double y, Rect rectangle, Point? point = null)
     {
         var options = new DrawOptions()
         {
@@ -312,7 +324,7 @@ public class Texture : IDisposable
 public class TextureCathe
 {
     private Texture? Cathe;
-    public Texture Get(Action method, LayoutUtil.Size size)
+    public Texture Get(Action method, Size size)
     {
         if (Cathe != null) return Cathe;
         Cathe = new Texture(size, method);

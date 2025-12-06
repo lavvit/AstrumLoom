@@ -274,6 +274,8 @@ public sealed class ManagedSound : ISound, IDisposable
         if (!Enable) return;
         if (!Bass.ChannelPause(_stream))
         {
+            if (Bass.LastError == Errors.NotPlaying)
+                return; // 既に停止中なら無視
             throw new InvalidOperationException($"一時停止に失敗しました: {Bass.LastError}");
         }
     }
@@ -283,6 +285,8 @@ public sealed class ManagedSound : ISound, IDisposable
         if (!Enable) return;
         if (!Bass.ChannelStop(_stream))
         {
+            if (Bass.LastError == Errors.NotPlaying)
+                return; // 既に停止中なら無視
             throw new InvalidOperationException($"停止に失敗しました: {Bass.LastError}");
         }
         Bass.ChannelSetPosition(_stream, 0);
