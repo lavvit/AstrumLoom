@@ -8,11 +8,8 @@ public class SkinExtend
     private static Queue<string> InportQue = [];
     public static void Inport(bool inque = false)
     {
-        if (_loading)
-        {
-            ReadQueue();
+        if (_loading || Loaded)
             return;
-        }
         _loading = true;
         foreach (var sound in Skin.Sounds)
         {
@@ -28,11 +25,13 @@ public class SkinExtend
             }
         }
     }
-    public static bool Loaded => !_loading && InportQue.Count == 0 && SoundLoaded();
+    public static void FinishInport() => Loaded = true;
+    public static bool Loaded { get; private set; } = false;
     public static int QueueCount => InportQue.Count;
-    public static void ReadQueue()
+    public static void ReadQueue(int count = 1)
     {
-        while (InportQue.Count > 0)
+        if (Loaded) return;
+        while (InportQue.Count > 0 && count > 0)
         {
             string key = InportQue.Dequeue();
             if (key.StartsWith("exsnd"))
@@ -43,31 +42,56 @@ public class SkinExtend
                     AddSound(sndkey, value.Path);
                 }
             }
+            count--;
         }
+        foreach (var sound in ExSounds.Values.Where(s => !s.Loaded))
+        {
+            sound.Pump();
+        }
+        if (SoundLoaded() && InportQue.Count == 0)
+            FinishInport();
     }
     public static void AddSound(string key, string path)
     {
         if (ExSounds.ContainsKey(key))
             return;
-        var sound = new SoundExtend(path);
+        var s = Skin.Sound(key);
+        var sound = new SoundExtend(path, s?.Loop ?? false, true);
         ExSounds.Add(key, sound);
     }
     public static bool SoundLoaded()
     {
         if (ExSounds.Count < Skin.Sounds.Count)
             return false;
-        foreach (var sound in ExSounds)
+        foreach (var sound in ExSounds.Values)
         {
-            if (!sound.Value.Loaded)
+            if (!sound.Enable)
                 return false;
         }
         return true;
     }
 
     #region Sound
-    public static SoundExtend? GetSound(string key)
-        => ExSounds.TryGetValue(key, out var sound) ? sound : null;
-    public static SoundExtend SoundExtend(string key)
-        => GetSound(key) ?? new();
+    public static SoundExtend? SoundExtend(string name, string? subname = null)
+    {
+        name = name.ToLower();
+        SoundExtend? result = null;
+        if (ExSounds.TryGetValue(name, out var value))
+        {
+            value?.Pump();
+            result = value;
+        }
+        else if (!string.IsNullOrEmpty(subname))
+        {
+            if (ExSounds.TryGetValue(subname, out var subvalue))
+            {
+                subvalue?.Pump();
+                result = subvalue;
+            }
+        }
+        return result != null && result.Enable ? result : null;
+    }
+    public static SoundExtend GetSound(string key)
+        => GetSound(key.ToLowerInvariant()) ?? new("");
     #endregion
 }

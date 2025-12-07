@@ -2,57 +2,7 @@
 
 namespace AstrumLoom.Extend;
 
-public class SoundExtend : IDisposable
-{
-    private ManagedSound? _Sound { get; set; }
-
-    public SoundExtend() { }
-    public SoundExtend(string path, bool loop = false, bool prescan = false)
-        => _Sound = new ManagedSound(path, loop, prescan);
-    public void Play() => _Sound?.Play();
-    public void Stop() => _Sound?.Pause();
-    public void PlayStream() => _Sound?.PlayStream();
-    public void Pump() => _Sound?.Pump();
-    public void Dispose()
-    {
-        _Sound?.Dispose();
-        _Sound = null;
-        GC.SuppressFinalize(this);
-    }
-    public string Path => _Sound?.Path ?? "";
-    public int Length => _Sound?.Length ?? 0;
-    public bool IsReady => _Sound?.IsReady ?? false;
-    public bool IsFailed => _Sound?.IsFailed ?? false;
-    public bool Loaded => _Sound?.Loaded ?? false;
-    public bool Enable => _Sound?.Enable ?? false;
-    public double Time
-    {
-        get => _Sound?.Time ?? 0; set => _Sound?.Time = value;
-    }
-    public double Volume
-    {
-        get => _Sound?.Volume ?? 1.0; set => _Sound!.Volume = value;
-    }
-    public double Pan
-    {
-        get => _Sound?.Pan ?? 0.0; set => _Sound!.Pan = value;
-    }
-    public double Pitch
-    {
-        get => _Sound?.Pitch ?? 1.0; set => _Sound!.Pitch = value;
-    }
-    public double Speed
-    {
-        get => _Sound?.Speed ?? 1.0; set => _Sound!.Speed = value;
-    }
-    public bool Loop
-    {
-        get => _Sound?.Loop ?? false; set => _Sound!.Loop = value;
-    }
-    public bool Playing => _Sound?.IsPlaying ?? false;
-}
-
-public sealed class ManagedSound : ISound, IDisposable
+public sealed class SoundExtend : ISound, IDisposable
 {
     private static readonly object s_initLock = new();
     private static bool s_bassInitialized;
@@ -74,7 +24,7 @@ public sealed class ManagedSound : ISound, IDisposable
 
     private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
 
-    public ManagedSound(string filePath, bool loop = false, bool prescan = false)
+    public SoundExtend(string filePath, bool loop = false, bool prescan = false)
     {
         Path = filePath;
         _loopFlag = loop;
@@ -83,13 +33,14 @@ public sealed class ManagedSound : ISound, IDisposable
         if (string.IsNullOrWhiteSpace(filePath))
         {
             Volatile.Write(ref _asyncState, -1);
-            throw new ArgumentException("ファイルパスが無効です。", nameof(filePath));
+            return;
         }
 
         // ファイルが存在しない場合は失敗
         if (!File.Exists(Path))
         {
             Volatile.Write(ref _asyncState, -1);
+            Log.Warning($"サウンドファイルが見つかりません: {Path}");
             return;
         }
 
@@ -178,10 +129,12 @@ public sealed class ManagedSound : ISound, IDisposable
         EnsureNotDisposed();
         if (!Enable)
         {
-            throw new InvalidOperationException("サウンドが未ロードです。");
+            Log.Error($"サウンドが未ロードです。: {Path}");
+            return;
         }
     }
 
+    public bool Playing => IsPlaying;
     public bool IsPlaying => Enable && Bass.ChannelIsActive(_stream) == PlaybackState.Playing;
 
     public bool Loop
@@ -198,7 +151,7 @@ public sealed class ManagedSound : ISound, IDisposable
             {
                 // ロード前に意図だけ保存
                 // ロード時に反映される
-                typeof(ManagedSound)
+                typeof(SoundExtend)
                     .GetField("_loopFlag", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?
                     .SetValue(this, value);
                 return;
@@ -262,6 +215,7 @@ public sealed class ManagedSound : ISound, IDisposable
     public void Play(bool restart = false)
     {
         if (!Enable) return;
+        if (IsPlaying) Stop();
         if (!Bass.ChannelPlay(_stream, restart))
         {
             throw new InvalidOperationException($"再生に失敗しました: {Bass.LastError}");
@@ -347,7 +301,7 @@ public sealed class ManagedSound : ISound, IDisposable
     {
         if (_disposed)
         {
-            throw new ObjectDisposedException(nameof(ManagedSound));
+            throw new ObjectDisposedException(nameof(SoundExtend));
         }
     }
 
@@ -372,16 +326,18 @@ public sealed class ManagedSound : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
+            if (!Enable) return 0;
             Bass.ChannelGetAttribute(_stream, ChannelAttribute.Pan, out float pan);
             return pan;
         }
         set
         {
             EnsureReadyForChannel();
+            if (!Enable) return;
             float p = Math.Clamp((float)value, -1f, 1f);
             if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Pan, p))
             {
-                throw new InvalidOperationException($"パンの設定に失敗しました: {Bass.LastError}");
+                Log.Error($"パンの設定に失敗しました: {Bass.LastError}");
             }
         }
     }
@@ -390,12 +346,14 @@ public sealed class ManagedSound : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
+            if (!Enable) return 0;
             Bass.ChannelGetAttribute(_stream, ChannelAttribute.Pitch, out float pitch);
             return pitch;
         }
         set
         {
             EnsureReadyForChannel();
+            if (!Enable) return;
             float p = Math.Clamp((float)value, -12f, 12f); // BASS のピッチ範囲に合わせる
             if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Pitch, p))
             {
@@ -408,6 +366,7 @@ public sealed class ManagedSound : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
+            if (!Enable) return 1;
             Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out float freq);
             Bass.ChannelGetAttribute(_stream, ChannelAttribute.OpusOriginalFrequency, out float origFreq);
             return freq / origFreq;
@@ -415,6 +374,7 @@ public sealed class ManagedSound : ISound, IDisposable
         set
         {
             EnsureReadyForChannel();
+            if (!Enable) return;
             if (value <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(value), "速度は正の値でなければなりません。");
@@ -432,6 +392,7 @@ public sealed class ManagedSound : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
+            if (!Enable) return 0;
             long lengthBytes = Bass.ChannelGetLength(_stream);
             double seconds = Bass.ChannelBytes2Seconds(_stream, lengthBytes);
             return (int)(seconds * 1000); // ミリ秒単位で返す
@@ -442,6 +403,7 @@ public sealed class ManagedSound : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
+            if (!Enable) return 0;
             long posBytes = Bass.ChannelGetPosition(_stream);
             double seconds = Bass.ChannelBytes2Seconds(_stream, posBytes);
             return seconds * 1000.0;
@@ -449,6 +411,7 @@ public sealed class ManagedSound : ISound, IDisposable
         set
         {
             EnsureReadyForChannel();
+            if (!Enable) return;
             float targetTime = (float)Math.Clamp(value / 1000.0f, 0, Length / 1000.0 - 0.001);
             long bytes = Bass.ChannelSeconds2Bytes(_stream, targetTime);
             if (!Bass.ChannelSetPosition(_stream, bytes))

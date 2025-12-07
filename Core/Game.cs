@@ -40,6 +40,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             {
                 AstrumCore.ProcessPendingDisposals();
                 AstrumCore.InitDrop();
+                MainUpdate(game);
                 Update(game);
                 Draw(game);
             }
@@ -61,6 +62,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         {
             // 処理開始時にメインスレッドでの破棄要求を処理
             AstrumCore.ProcessPendingDisposals();
+            MainUpdate(game);
 
             // Drop 初期化は「Update 側で」やりたいなら UpdateLoop に移してもOK
             Draw(game);
@@ -114,7 +116,6 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     public void Draw(IGame game)
     {
         platform.Time.BeginFrame();
-        MainUpdate(game);
         ExtendAction(end: false);
 
         platform.Graphics.BeginFrame();
