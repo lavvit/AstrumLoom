@@ -15,6 +15,7 @@ public sealed class DxLibPlatform : IGamePlatform
     public ITime Time { get; }
     public TextEnter TextInput { get; }
     public IMouse Mouse { get; }
+    public IController Controller { get; }
 
     public bool ShouldClose { get; private set; }
 
@@ -51,6 +52,7 @@ public sealed class DxLibPlatform : IGamePlatform
         Input = new DxLibInput();
         TextInput = new(new DxLibTextInput(), Time);
         Mouse = new DxLibMouse();
+        Controller = new DxLibController();
     }
 
     public void PollEvents()
@@ -65,6 +67,7 @@ public sealed class DxLibPlatform : IGamePlatform
         }
         // キー状態の更新
         Input.Buffer();
+        Controller.Buffer();
     }
 
     public void Close() => ShouldClose = true;

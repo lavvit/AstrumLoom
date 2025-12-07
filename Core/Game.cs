@@ -105,6 +105,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         Sleep.Update();
         KeyInput.Update(platform.UTime.DeltaTime);
         Mouse.Update();
+        Pad.Update();
         lock (_gameLock)
             game.Update(platform.UTime.DeltaTime);
         platform.UTime.EndFrame();

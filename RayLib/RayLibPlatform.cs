@@ -16,6 +16,7 @@ public sealed class RayLibPlatform : IGamePlatform
     public ITime UTime { get; }
     public TextEnter TextInput { get; }
     public IMouse Mouse { get; }
+    public IController Controller { get; }
 
     public bool ShouldClose { get; private set; }
 
@@ -43,6 +44,7 @@ public sealed class RayLibPlatform : IGamePlatform
         Input = new RayLibInput();
         TextInput = new(new RayLibTextInput(), Time);
         Mouse = new RayLibMouse();
+        Controller = new RayLibController();
     }
 
     public void PollEvents()
@@ -56,6 +58,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
         // キー状態の更新
         Input.Buffer();
+        Controller.Buffer();
     }
 
     public void Close() => ShouldClose = true;

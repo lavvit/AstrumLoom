@@ -33,7 +33,8 @@ internal sealed class SimpleTestGame : Scene
         // 画面サイズは GameConfig に合わせて想定（DxLib の SetGraphMode と一致）
         //_scene = new FancyShapesScene(AstrumCore.Width, AstrumCore.Height);
         //_scene = new TextureSoundDemoScene();
-        _scene = new LoadCheckScene(); // ← 新しい負荷可視化シーン
+        //_scene = new LoadCheckScene(); // ← 新しい負荷可視化シーン
+        _scene = new GameTemplateScene();
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }

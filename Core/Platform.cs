@@ -10,6 +10,7 @@ public interface IGamePlatform : IDisposable
     ITime UTime { get; }// Update 用
     TextEnter TextInput { get; }
     IMouse Mouse { get; }
+    IController Controller { get; }
 
     bool ShouldClose { get; }
 

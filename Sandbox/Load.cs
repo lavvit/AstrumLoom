@@ -48,7 +48,7 @@ internal class LoadCheckScene : Scene
                     int w = 60, h = 20;
                     int x = 20 + w * (i / 30);
                     int y = 80 + h * (i % 30);
-                    _tex.Draw(x, y, new LayoutUtil.Size(w, h));
+                    _tex.DrawSize(x, y, new LayoutUtil.Size(w, h));
                 }
             }
             Profiler.EndSection("TextureDraw");
