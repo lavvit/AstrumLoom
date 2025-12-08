@@ -13,7 +13,7 @@ namespace AstrumLoom.RayLib;
 
 internal sealed class RayLibGraphics : IGraphics
 {
-    public RayLibGraphics() => DefaultFont = CreateFont(new FontSpec("", 24));
+    public RayLibGraphics() => DefaultFont = CreateFont(new FontSpec("", 12));
 
     private (int w, int h) _size;
     public LayoutUtil.Size Size

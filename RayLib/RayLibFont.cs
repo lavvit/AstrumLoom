@@ -78,16 +78,17 @@ internal sealed class RayLibFont : IFont
         if (size.X + size.Y == 0) size = new(MeasureText(text, Spec.Size), Spec.Size);
         return ((int)size.X, (int)size.Y);
     }
+    private const float sin45 = 0.70710678f;
     private static readonly Vector2[] EdgeDirs =
 [
     new( 1,  0),
     new(-1,  0),
     new( 0,  1),
-    new( 0, -1),/*
-    new( 1,  1),
-    new(-1,  1),
-    new( 1, -1),
-    new(-1, -1),*/
+    new( 0, -1),
+    new( sin45,  sin45),
+    new(-sin45,  sin45),
+    new( sin45, -sin45),
+    new(-sin45, -sin45),
 ];
     public void Draw(double x, double y, string text, DrawOptions options)
     {
@@ -117,7 +118,7 @@ internal sealed class RayLibFont : IFont
         {
             // 8方向の単位ベクトル（円形に均一配置）
             int r = _edgeThickness;
-            //for (int r = 1; r <= _edgeThickness; r++)
+            for (r = 1; r <= _edgeThickness; r++)
             {
                 foreach (var v in EdgeDirs)
                 {
@@ -162,7 +163,7 @@ internal sealed class RayLibFont : IFont
         var pos = new Point(drawX, drawY);
         // Edge（ふち）: オフセット描画
         int r = _edgeThickness;
-        //for (int r = 1; r <= _edgeThickness; r++)
+        for (r = 1; r <= _edgeThickness; r++)
         {
             foreach (var v in EdgeDirs)
             {

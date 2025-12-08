@@ -39,6 +39,12 @@ public class TextSprite : IDisposable
         RecreateRenderTextureIfNeeded();
         _dirty = true;
     }
+    public TextSprite(string text, IFont? font, Gradation gradation,
+        ReferencePoint? point = null, Color? edgeColor = null, BlendMode? blend = null, double? opacity = null)
+        : this(text, font, new DecorateText.DecorateOption(gradation), point, edgeColor, blend, opacity) { }
+    public TextSprite(string text, IFont? font, Texture texture,
+        ReferencePoint? point = null, Color? edgeColor = null, BlendMode? blend = null, double? opacity = null)
+        : this(text, font, new DecorateText.DecorateOption(texture), point, edgeColor, blend, opacity) { }
 
     private void Initialize()
     {
@@ -78,8 +84,9 @@ public class TextSprite : IDisposable
     {
         // テキストの想定サイズ
         var (width, height) = Font?.Measure(Text) ?? (0, 0);
-        int w = (int)MathF.Ceiling(width);
-        int h = (int)MathF.Ceiling(height);
+        int e = Font?.Spec.Edge ?? 0;
+        int w = (int)MathF.Ceiling(width + e * 2);
+        int h = (int)MathF.Ceiling(height + e * 2);
 
         if (w <= 0) w = 1;
         if (h <= 0) h = 1;
@@ -108,10 +115,11 @@ public class TextSprite : IDisposable
         _texture = new Texture(new LayoutUtil.Size(_width, _height), () =>
         {
             Drawing.Fill(Color.Transparent);
+            int e = Font?.Spec.Edge ?? 0;
             if (DecoOption != null)
-                Font?.Draw(0, 0, Text, DecoOption, edgecolor: EdgeColor);
+                Font?.Draw(e, e, Text, DecoOption, edgecolor: EdgeColor);
             else
-                Font?.Draw(0, 0, Text, Color, edgecolor: EdgeColor);
+                Font?.Draw(e, e, Text, Color, edgecolor: EdgeColor);
         });
 
         _dirty = false;

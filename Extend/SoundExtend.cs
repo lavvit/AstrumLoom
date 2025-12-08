@@ -129,7 +129,8 @@ public sealed class SoundExtend : ISound, IDisposable
         EnsureNotDisposed();
         if (!Enable)
         {
-            Log.Error($"サウンドが未ロードです。: {Path}");
+            if (!string.IsNullOrEmpty(Path) && !Loaded)
+                Log.Error($"サウンドが未ロードです。: {Path}");
             return;
         }
     }
@@ -267,10 +268,19 @@ public sealed class SoundExtend : ISound, IDisposable
         if (!Enable) return;
         if (_played)
         {
-            if (!Loop && Length - Time <= 16)
+            bool isPlaying = IsPlaying;
+            if (isPlaying)
             {
-                Bass.ChannelStop(_stream);
-                return;
+                if (!Loop && Length - Time <= 16)
+                {
+                    Bass.ChannelStop(_stream);
+                    return;
+                }
+            }
+            else
+            {
+                if (Loop) // ループ時にフラグをリセットして再生
+                    _played = false;
             }
         }
         else
