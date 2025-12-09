@@ -257,7 +257,7 @@ public class Skin
 
     public static void SetFont(string font)
     {
-        var f = FHandle.Create(font, 16);
+        var f = FHandle.Create(font, 12);
         if (f != null)// && f.Enable
             Drawing.DefaultFont = f;
     }

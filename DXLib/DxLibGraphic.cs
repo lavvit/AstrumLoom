@@ -5,8 +5,8 @@ namespace AstrumLoom.DXLib;
 internal sealed class DxLibGraphics : IGraphics
 {
     public DxLibGraphics() =>
-        // ここではとりあえず「Default」の 24px ぐらいを作っておく
-        DefaultFont = CreateFont(new FontSpec("", 24));
+        // ここではとりあえず「Default」の 12px ぐらいを作っておく
+        DefaultFont = CreateFont(new FontSpec("", 12));
 
     private (int w, int h) _size = (-1, -1);
     public LayoutUtil.Size Size

@@ -142,7 +142,8 @@ public class Drawing
 
     public static IFont DefaultFont
     {
-        get => field ?? Graphics.DefaultFont; set;
+        get => field ?? Graphics.DefaultFont;
+        set;
     } = null;
     public static (int width, int height) TextSize(object text)
         => DefaultFont.Measure(text.ToString() ?? "");
