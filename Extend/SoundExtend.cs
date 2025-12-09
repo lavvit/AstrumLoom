@@ -279,7 +279,7 @@ public sealed class SoundExtend : ISound, IDisposable
             }
             else
             {
-                if (Loop) // ループ時にフラグをリセットして再生
+                if (Loop || Time < 16) // ループ時にフラグをリセットして再生
                     _played = false;
             }
         }
