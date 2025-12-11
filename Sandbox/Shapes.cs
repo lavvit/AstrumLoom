@@ -12,10 +12,10 @@ internal sealed class FancyShapesScene : Scene
     private readonly Stopwatch _sw = Stopwatch.StartNew();
     private readonly Random _rand = new(12345);
 
-    public FancyShapesScene(int width, int height)
+    public FancyShapesScene()
     {
-        _width = width;
-        _height = height;
+        _width = AstrumCore.Width;
+        _height = AstrumCore.Height;
     }
 
     public override void Draw()
