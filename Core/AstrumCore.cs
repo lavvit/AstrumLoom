@@ -50,6 +50,22 @@ public class AstrumCore
     public static void End() => Platform.Close();
     public static FpsCounter DrawFPS = new();
     public static FpsCounter UpdateFPS = new();
+    private static FatalErrorInfo? _fatalError;
+    public static FatalErrorInfo? FatalError => Interlocked.CompareExchange(ref _fatalError, null, null);
+    public static bool HasFatalError => FatalError != null;
+
+    internal static void ReportFatalError(string phase, Exception exception)
+    {
+        var info = new FatalErrorInfo(phase, exception);
+        if (Interlocked.CompareExchange(ref _fatalError, info, null) == null)
+        {
+            Log.EmptyLine();
+            Log.Error($"{phase} にてエラーが発生しました。ごめんねなの！" +
+                $"\n{exception.GetType()}: {exception.Message}" +
+                $"\n発生時刻: {info.Timestamp:yyyy-MM-dd HH:mm:ss}" +
+                $"\nスタックトレース: \n{info.StackTrace}");
+        }
+    }
 
     #region ドラッグ＆ドロップ
     // ドラッグ＆ドロップを受け付けるかどうかを、一時的に有効化するためのカウンタとヘルパー
@@ -254,5 +270,89 @@ public class Sleep
     {
         if (!AstrumCore.Active) return;
         _lastWakeTime = Environment.TickCount64;
+    }
+}
+
+public sealed class FatalErrorInfo
+{
+    public FatalErrorInfo(string phase, Exception exception)
+    {
+        Phase = phase;
+        ExceptionType = exception.GetType().Name;
+        Message = exception.Message;
+        StackTrace = FormatStackTrace(exception.StackTrace);
+        Timestamp = DateTime.Now;
+        Details = FormatStackTrace(exception.ToString())
+            .Split(['\r', '\n']);
+    }
+
+    public string Phase { get; }
+    public string ExceptionType { get; }
+    public string Message { get; }
+    public string StackTrace { get; }
+    public DateTime Timestamp { get; }
+    public string[] Details { get; }
+
+    private static string FormatStackTrace(string? stackTrace)
+    {
+        if (string.IsNullOrWhiteSpace(stackTrace))
+            return string.Empty;
+
+        const string separator = " in ";
+        string[] lines = stackTrace.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var formatted = new List<string>(lines.Length * 2);
+
+        foreach (string rawLine in lines)
+        {
+            if (string.IsNullOrEmpty(rawLine))
+            {
+                formatted.Add(string.Empty);
+                continue;
+            }
+
+            int index = rawLine.IndexOf(separator, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                formatted.Add(rawLine);
+                continue;
+            }
+
+            string before = rawLine[..index];
+            string after = NormalizeStackTraceLocation(rawLine[(index + separator.Length)..]);
+            formatted.Add(before);
+
+            int indentLength = before.Length - before.TrimStart().Length;
+            string indent = indentLength > 0 ? before[..indentLength] : string.Empty;
+            formatted.Add($"{indent}    in {after}");
+        }
+
+        return string.Join('\n', formatted);
+    }
+
+    private static string NormalizeStackTraceLocation(string location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+            return string.Empty;
+
+        const string lineMarker = ":line ";
+        string trimmed = location.TrimStart();
+        int lineIndex = trimmed.IndexOf(lineMarker, StringComparison.Ordinal);
+        string lineSuffix = lineIndex >= 0 ? trimmed[lineIndex..] : string.Empty;
+        string filePart = lineIndex >= 0 ? trimmed[..lineIndex] : trimmed;
+
+        string normalized = filePart;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(filePart))
+                normalized = AstrumCore.FilePath(filePart.Trim());
+        }
+        catch
+        {
+            normalized = filePart;
+        }
+
+        return string.IsNullOrEmpty(lineSuffix)
+            ? normalized
+            : $"{normalized}{lineSuffix}";
     }
 }

@@ -144,6 +144,8 @@ public class Easing
             : counter.Value < start
             ? min
             : counter.Value > end ? max : Ease(counter.Value - start, end - start, min, max, type, inout, backrate);
+    public static double Ease(double t, EEasing type = 0, EInOut inout = 0, double min = 0, double max = 1, double backrate = 4)
+        => Ease(t, 1, min, max, type, inout, backrate);
     public static double Ease(double t, double totaltime, double min = 0, double max = 1,
         EEasing type = 0, EInOut inout = 0, double backrate = 4)
     {

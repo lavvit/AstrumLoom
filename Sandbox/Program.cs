@@ -30,7 +30,7 @@ internal sealed class SimpleTestGame : Scene
         _timer = new Counter(0, 2000, true);
         _timer.Start();
 
-        _scene = new GameTemplateScene();
+        //_scene = new GameTemplateScene();
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }
