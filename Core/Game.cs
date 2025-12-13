@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace AstrumLoom;
 
@@ -126,12 +125,12 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         finally
         {
             platform.UTime.EndFrame();
+
+            AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);
         }
 
         if (_fatalTriggered)
             return;
-
-        AstrumCore.UpdateFPS.Tick(platform.UTime.TotalTime);
     }
     public void Draw(IGame game)
     {
@@ -166,12 +165,11 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
                 catch { }
             }
             platform.Time.EndFrame();
+            AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
         }
 
         if (_fatalTriggered)
             return;
-
-        AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
     }
     public void MainUpdate(IGame game) => platform.PollEvents();
 
@@ -278,21 +276,5 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         double progress = Easing.Ease(-ms / FatalDisplayDuration.TotalMilliseconds, EEasing.Sine, EInOut.InOut);
         Drawing.Box(x, y, w * progress, 20, Color.DeepPink);
         Drawing.Text(x, y - fontSize - 10, "自動的に閉じます...", Color.DeepPink);
-    }
-
-    private static class HiResDelay
-    {
-        // 目安: sub-ms の仕上げに
-        public static void Delay(TimeSpan duration)
-        {
-            var sw = Stopwatch.StartNew();
-            // まずは大雑把に（1ms残すくらいまで）寝る
-            var sleepUntil = duration - TimeSpan.FromMilliseconds(1);
-            if (sleepUntil > TimeSpan.Zero)
-                Thread.Sleep(sleepUntil);
-
-            // 仕上げはスピンで追い込む
-            while (sw.Elapsed < duration) { /* busy wait */ }
-        }
     }
 }

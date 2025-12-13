@@ -33,6 +33,7 @@ public sealed class DxLibPlatform : IGamePlatform
         SetAlwaysRunFlag(1); // 非アクティブでも動かす
         SetWaitVSyncFlag(0); // VSync 無効
         VSync = config.VSync;
+        _targetFps = config.TargetFps;
 
         SetMultiThreadFlag(1); // マルチスレッド
         SetDoubleStartValidFlag(1); // 複数起動
@@ -107,6 +108,7 @@ public sealed class DxLibPlatform : IGamePlatform
         return new DxLibTexture(scr);
     }
 
+    private readonly int _targetFps;
     public void SetVSync(bool enabled)
     {
         if (VSync == enabled)
@@ -117,6 +119,20 @@ public sealed class DxLibPlatform : IGamePlatform
         Log.Debug("VSync切替: " + enabled);
         VSync = enabled;
         SetWaitVSyncFlag(enabled ? 1 : 0);
+        if (enabled)
+        {
+            int display = 0;
+            GetDisplayInfo(display, out _, out _, out _, out _, out _,
+                out int monitorFps);
+            int targetFps = _targetFps == 0 ? monitorFps : Math.Max(0, monitorFps);
+            Time.TargetFps = targetFps;
+            UTime.TargetFps = targetFps;
+        }
+        else
+        {
+            Time.TargetFps = _targetFps;
+            UTime.TargetFps = _targetFps;
+        }
     }
     private bool dragDrop = false;
     public void SetDragDrop(bool enabled)
@@ -153,7 +169,7 @@ public sealed class DxLibPlatform : IGamePlatform
         public float DeltaTime { get; private set; }
         public float TotalTime => (float)_sw.Elapsed.TotalSeconds;
         public float CurrentFps { get; private set; }
-        public float TargetFps { get; set; } = 60f;
+        public float TargetFps { get; set; } = 0f;
 
         public void BeginFrame()
         {
@@ -175,12 +191,40 @@ public sealed class DxLibPlatform : IGamePlatform
         public void EndFrame()
         {
             if (TargetFps <= 0) return;
+
             double ideal = 1.0 / TargetFps;
-            double remain = ideal - DeltaTime;
+            long now = _sw.ElapsedTicks;
+            long dtTicks = now - _lastTicks;
+            double delta = (float)dtTicks / Stopwatch.Frequency;
+            double remain = ideal - delta;
             if (remain > 0)
             {
-                int ms = (int)(remain * 1000.0);
-                if (ms > 0) Thread.Sleep(ms);
+                double ms = remain * 1000.0;
+                if (ms > 0)
+                    HiResDelay.Delay(TimeSpan.FromMilliseconds(ms));
+            }
+        }
+
+        private static class HiResDelay
+        {
+            // 目安: sub-ms の仕上げに
+            public static void Delay(TimeSpan duration)
+            {
+                var sw = Stopwatch.StartNew();
+                // まずは大雑把に（1ms残すくらいまで）寝る
+                var sleepUntil = duration - TimeSpan.FromMilliseconds(1);
+                if (sleepUntil > TimeSpan.Zero)
+                    Thread.Sleep(sleepUntil);
+
+                // 仕上げはスピンで追い込む
+                while (sw.Elapsed < duration)
+                {
+                    /* busy wait */
+                    var span = TimeSpan.FromMicroseconds(1);
+                    Thread.Sleep(span);
+                }
+                double actualMs = sw.Elapsed.TotalMilliseconds;
+                //Log.Debug($"HiResDelay actual: {actualMs} ms");
             }
         }
     }

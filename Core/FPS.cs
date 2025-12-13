@@ -22,6 +22,7 @@ public sealed class FpsCounter
         }
 
         double etime = timeMs - _prevTimeMs;
+        if (etime < 0) return;
         double fps = 1000.0 / Math.Max(0.001, etime);
 
         NowValue = Math.Round(fps, 3, MidpointRounding.AwayFromZero);
@@ -83,4 +84,44 @@ public sealed class FpsCounter
             ? 0
             : Math.Round(target.Select(t => t.value).Min(), 3, MidpointRounding.AwayFromZero);
     }
+}
+
+public class FPS
+{
+    private static (float t, float draw, float update) _fpsHistory = (0, 0, 0);
+    public static string GetFPSString() => $"FPS: {AstrumCore.NowFPS} / U: {AstrumCore.UpdateFPS.GetFPS():0.0}";
+    public static void Draw(ReferencePoint point = ReferencePoint.TopLeft)
+    {
+        var platform = AstrumCore.Platform;
+        float reloadFrame = 60f;
+        if (platform.Time.TotalTime - _fpsHistory.t >= 1f / reloadFrame)
+        {
+            _fpsHistory = (platform.Time.TotalTime,
+                (float)AstrumCore.NowFPSValue.draw,
+                (float)AstrumCore.NowFPSValue.update);
+        }
+
+        int size = 10;
+        int x = 10, y = 10;
+        switch (point)
+        {
+            case ReferencePoint.TopRight:
+                x = AstrumCore.Width - 20 - (Length + (AstrumCore.MultiThreading ? 2 : 0)) * size;
+                y = 10;
+                break;
+            case ReferencePoint.BottomLeft:
+                x = 10;
+                y = AstrumCore.Height - 10 - size * (AstrumCore.MultiThreading ? 2 : 1);
+                break;
+            case ReferencePoint.BottomRight:
+                x = AstrumCore.Width - 20 - (Length + 2) * size;
+                y = AstrumCore.Height - 10 - size * (AstrumCore.MultiThreading ? 2 : 1);
+                break;
+        }
+        var color = Sleep.Sleeping ? Color.Violet : AstrumCore.VSync ? Color.Cyan : Color.Lime;
+        ShapeText.Draw(x, y, AstrumCore.MultiThreading ? $"D:{_fpsHistory.draw:0}\nU:{_fpsHistory.update:0}" : $"{_fpsHistory.draw:0}",
+            size: size, color: color, thickness: 2);
+    }
+
+    private static int Length => Math.Max((int)_fpsHistory.draw, (int)_fpsHistory.update).ToString().Length;
 }

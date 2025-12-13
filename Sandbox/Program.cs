@@ -12,8 +12,6 @@ internal sealed class SimpleTestGame : Scene
     private IFont? _kbfont;
     private Movie? _movie;
     private bool _movieactive = false;
-    private SoundExtend? _soundExtend;
-    private Texture? _texture;
 
     // 追加: 図形テストシーン
     private Scene? _scene;
@@ -24,13 +22,11 @@ internal sealed class SimpleTestGame : Scene
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
         _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
         //_movie = new("Assets/campus労働.mp4");
-        _soundExtend = new("Assets/vs.VIGVANGS.ogg");
-        _texture = new Texture("Assets/font.png");
         Drawing.DefaultFont = _font!;
         _timer = new Counter(0, 2000, true);
         _timer.Start();
 
-        //_scene = new GameTemplateScene();
+        _scene = new LoadCheckScene();
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }
@@ -67,7 +63,6 @@ internal sealed class SimpleTestGame : Scene
                 else
                     _movie?.Play();
             }
-            _soundExtend?.PlayStream();
 
             if (Key.F1.Push())
             {
@@ -77,18 +72,12 @@ internal sealed class SimpleTestGame : Scene
             {
                 Log.Write("Input text: " + inputText);
             }
-            if (Key.G.Push())
-            {
-                _soundExtend?.Time = 60000;
-                _timer?.Value = 60000;
-            }
         }
     }
 
     private string inputText = "Type something...";
     public override void Draw()
     {
-        _soundExtend?.Pump();
         Drawing.Fill(Color.CornflowerBlue);
         // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
@@ -106,14 +95,12 @@ internal sealed class SimpleTestGame : Scene
             Drawing.Box(640 - 100, 360 - 30, 200, 60, Color.Black);
             Drawing.Box(640 - 98, 360 - 28, 196, 56, Color.White);
             Drawing.Box(640 - 98, 360 - 28, 196 * _timer?.Progress ?? 0, 56, Color.Green);
-            Drawing.Text(640 - 98, 440, $"{_timer?.Value}\n{_soundExtend?.Time}\n{_timer?.Value - _soundExtend?.Time}", Color.White);
 
             Drawing.Text(640, 360, "Hello, AstrumLoom!", Color.White, ReferencePoint.Center);
             Drawing.Text(20, 400, KeyInput.PressedFrameCount(Key.J));
 
             Gradation gradation = new([Color.Red, Color.Yellow]);
             _font?.Draw(200, 200, "Gradation", new DecorateText.DecorateOption(gradation));
-            _font?.Draw(400, 200, "Texture", new DecorateText.DecorateOption(_texture!));
 
             KeyInput.DrawText(20, 430, inputText, Color.Black, _font);
         }

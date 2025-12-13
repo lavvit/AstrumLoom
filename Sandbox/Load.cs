@@ -28,14 +28,14 @@ internal class LoadCheckScene : Scene
         if (Key.F.Push()) _showFont = !_showFont;
         if (Key.B.Push()) _showShape = !_showShape;
         if (Key.R.Push()) _regenerate = true;
-
-        // 1フレーム単位のプロファイル開始
-        Profiler.BeginLoop();
     }
 
     public override void Draw()
     {
         Drawing.Fill(Color.LightGray);
+
+        // 1フレーム単位のプロファイル開始
+        Profiler.BeginLoop();
 
         // テクスチャ描画計測
         if (_showTexture)
@@ -95,14 +95,14 @@ internal class LoadCheckScene : Scene
         // レポート可視化（簡易バー描画）
         int rx = 20, ry = 60, rw = 400, rh = 24, gap = 6;
         // ヒント
-        TextSprites.Draw(_font, $"[T]Texture: {(_showTexture ? "ON" : "OFF")}\n" +
+        ShapeText.Draw(rx + rw + 20, ry, $"[T]Texture: {(_showTexture ? "ON" : "OFF")}\n" +
             $"[F]Font: {(_showFont ? "ON" : "OFF")}\n" +
             $"[B]Box: {(_showShape ? "ON" : "OFF")}\n" +
-            $"[R] Regenerate Texture", rx + rw + 20, ry, Color.AliceBlue);
+            $"[R] Regenerate Texture", 16, Color.AliceBlue);
 
         Gradation gradation = new([Color.Red, Color.Yellow, Color.Lime]);
         DecorateText.DecorateOption decorate = new(gradation);
-        TextSprites.Draw(_font, "Render Load Profile:", rx, ry - rh - gap, decorate);
+        ShapeText.Draw(rx, ry - rh - gap, "Render Load Profile:", 16, Color.Black);
 
         foreach (var r in reports)
         {
@@ -121,7 +121,7 @@ internal class LoadCheckScene : Scene
             };
             Drawing.Box(rx, ry, bw, rh, bar);
             // テキスト
-            ShapeText.Draw(rx + 6, ry + 7, $"{r.Name}: {r.Milliseconds:F2} ms ({r.Percent:F1}%)", size: 10, color: Color.VisibleColor(bar));
+            ShapeText.Draw(rx + 6, ry + 7, $"{r.Name}: {r.Milliseconds:F3} ms ({r.Percent:F1}%)", size: 10, color: Color.VisibleColor(bar));
             ry += rh + gap;
         }
 

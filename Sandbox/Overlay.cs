@@ -24,31 +24,19 @@ internal sealed class SandboxOverlay : Overlay
         _small = FontHandle.Create(fontName, 16);
     }
 
-    private (float t, float draw, float update) _fpsHistory = (0, 0, 0);
-
     public override void Draw()
     {
-        var platform = AstrumCore.Platform;
-        if (platform.Time.TotalTime - _fpsHistory.t >= 0.16666f)
-        {
-            _fpsHistory = (platform.Time.TotalTime,
-                (float)AstrumCore.FPS,
-                (float)AstrumCore.UpdateFPS.GetFPS());
-        }
-
         if (Scene.NowScene is SimpleTestGame s)
         {
             if (s.SceneName == "LoadCheckScene")
             {
                 // 簡易描画のみ
-                int size = 10;
-                var color = Sleep.Sleeping ? Color.Violet : AstrumCore.VSync ? Color.Cyan : Color.Lime;
-                ShapeText.Draw(10, 10, $"D:{_fpsHistory.draw:0}\nU:{_fpsHistory.update:0}",
-                    size: size, color: color, thickness: 2);
+                FPS.Draw(ReferencePoint.TopRight);
                 return;
             }
         }
 
+        var platform = AstrumCore.Platform;
         // FPS / 時刻 を描く
         string fps = $"{platform.BackendKind} {AstrumCore.NowFPS}";
         string time = $"{DateTime.Now:G}";

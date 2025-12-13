@@ -158,14 +158,13 @@ public class AstrumCore
     #endregion
 
     public static double FPS => Platform.SystemFPS ?? DrawFPS.GetFPS();
+    internal static (double draw, double update) NowFPSValue
+        => (DrawFPS.GetFPS(0.2), UpdateFPS.GetFPS(0.2));
     public static string NowFPS
     {
         get
         {
-            double range = 0.3;
-            double d = VSync || Sleep.Sleeping ? FPS
-                : DrawFPS.GetFPS(range);
-            double u = UpdateFPS.GetFPS(range);
+            (double d, double u) = NowFPSValue;
             return MultiThreading ?
                 $"Draw: {d:0.#}\nUpdate: {u:0.#}" :
                 $"FPS: {d:0.#}";

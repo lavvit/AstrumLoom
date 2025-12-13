@@ -103,11 +103,15 @@ public sealed class RayLibPlatform : IGamePlatform
             int monitorFps = GetMonitorRefreshRate(GetCurrentMonitor());
             int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
             SetTargetFPS(targetFps);
+            Time.TargetFps = targetFps;
+            UTime.TargetFps = targetFps;
         }
         else
         {
             ClearWindowState(ConfigFlags.VSyncHint);
             SetTargetFPS(_targetFps);
+            Time.TargetFps = _targetFps;
+            UTime.TargetFps = _targetFps;
         }
     }
     private bool dragDrop = false;
@@ -157,11 +161,38 @@ public sealed class RayLibPlatform : IGamePlatform
             if (TargetFps <= 0) return;
 
             double ideal = 1.0 / TargetFps;
-            double remain = ideal - DeltaTime;
+            long now = _sw.ElapsedTicks;
+            long dtTicks = now - _lastTicks;
+            double delta = (float)dtTicks / Stopwatch.Frequency;
+            double remain = ideal - delta;
             if (remain > 0)
             {
-                int ms = (int)(remain * 1000.0);
-                if (ms > 0) Thread.Sleep(ms);
+                double ms = remain * 1000.0;
+                if (ms > 0)
+                    HiResDelay.Delay(TimeSpan.FromMilliseconds(ms));
+            }
+        }
+
+        private static class HiResDelay
+        {
+            // 目安: sub-ms の仕上げに
+            public static void Delay(TimeSpan duration)
+            {
+                var sw = Stopwatch.StartNew();
+                // まずは大雑把に（1ms残すくらいまで）寝る
+                var sleepUntil = duration - TimeSpan.FromMilliseconds(1);
+                if (sleepUntil > TimeSpan.Zero)
+                    Thread.Sleep(sleepUntil);
+
+                // 仕上げはスピンで追い込む
+                while (sw.Elapsed < duration)
+                {
+                    /* busy wait */
+                    var span = TimeSpan.FromMicroseconds(1);
+                    Thread.Sleep(span);
+                }
+                double actualMs = sw.Elapsed.TotalMilliseconds;
+                //Log.Debug($"HiResDelay actual: {actualMs} ms");
             }
         }
     }
