@@ -122,7 +122,7 @@ public sealed class SoundExtend : ISound, IDisposable
             return Volatile.Read(ref _asyncState) != 0;
         }
     }
-    public bool Enable => _stream != 0 && Loaded;
+    public bool Enable => Loaded && _stream != 0;
 
     private void EnsureReadyForChannel()
     {

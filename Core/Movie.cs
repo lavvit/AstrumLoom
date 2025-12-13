@@ -7,76 +7,75 @@ public interface IMovie : ISound, ITexture
 
 public class Movie : IDisposable
 {
-    private IMovie? _movie;
     private bool _disposed;
 
     public Movie() { }
 
-    public Movie(string path)
-    {
-        _movie = AstrumCore.Platform?.LoadMovie(path);
-    }
+    public Movie(string path) => Inner = AstrumCore.Platform?.LoadMovie(path);
 
-    public IMovie? Inner => _movie;
+    public IMovie? Inner { get; private set; }
 
-    public string? Path => _movie?.Path;
-    public int Width => _movie?.Width ?? 0;
-    public int Height => _movie?.Height ?? 0;
-    public int Length => _movie?.Length ?? 0;
+    public string? Path => Inner?.Path;
+    public int Width => Inner?.Width ?? 0;
+    public int Height => Inner?.Height ?? 0;
+    public int Length => Inner?.Length ?? 0;
 
-    public bool IsReady => _movie?.IsReady ?? false;
-    public bool IsFailed => _movie?.IsFailed ?? false;
-    public bool Loaded => _movie?.Loaded ?? false;
-    public bool Enable => _movie?.Enable ?? false;
+    public bool IsReady => Inner?.IsReady ?? false;
+    public bool IsFailed => Inner?.IsFailed ?? false;
+    public bool Loaded => Inner?.Loaded ?? false;
+    public bool Enable => Inner?.Enable ?? false;
 
     public double Time
     {
-        get => _movie?.Time ?? 0;
-        set { if (_movie != null) _movie.Time = value; }
+        get => Inner?.Time ?? 0; set => Inner?.Time = value;
     }
 
     public double Volume
     {
-        get => _movie?.Volume ?? 1.0;
-        set { if (_movie != null) _movie.Volume = value; }
+        get => Inner?.Volume ?? 1.0; set => Inner?.Volume = value;
     }
 
-    public bool IsPlaying => _movie?.IsPlaying ?? false;
+    public bool IsPlaying => Inner?.IsPlaying ?? false;
 
     public bool Loop
     {
-        get => _movie?.Loop ?? false;
-        set { if (_movie != null) _movie.Loop = value; }
+        get => Inner?.Loop ?? false; set => Inner?.Loop = value;
     }
 
     public DrawOptions? Option
     {
-        get => _movie?.Option;
-        set { if (_movie != null) _movie.Option = value; }
+        get => Inner?.Option; set => Inner?.Option = value;
     }
 
     public double Speed
     {
-        get => _movie?.Speed ?? 1.0;
-        set { if (_movie != null) _movie.Speed = value; }
+        get => Inner?.Speed ?? 1.0; set => Inner?.Speed = value;
     }
 
     public (double X, double Y)? Scale
     {
-        get => _movie?.Option?.Scale;
+        get => Option?.Scale;
         set
         {
-            if (_movie?.Option != null && value != null)
+            if (Option != null && value != null)
             {
-                var opt = _movie.Option.Value;
+                var opt = Option.Value;
                 opt.Scale = value.Value;
-                _movie.Option = opt;
+                Option = opt;
             }
-            else if (_movie?.Option != null)
+            else if (Option != null)
             {
-                var opt = _movie.Option.Value;
+                var opt = Option.Value;
                 opt.Scale = (1.0, 1.0);
-                _movie.Option = opt;
+                Option = opt;
+            }
+            else if (value != null)
+            {
+                var opt = new DrawOptions
+                {
+                    Scale = value.Value
+                };
+                Option = opt;
             }
         }
     }
@@ -86,35 +85,34 @@ public class Movie : IDisposable
     {
         get
         {
-            if (_movie == null) return 0;
-            if (_movie.Length <= 0) return 0;
-            return _movie.Time / _movie.Length;
+            if (Inner == null) return 0;
+            return Inner.Length <= 0 ? 0 : Inner.Time / Inner.Length;
         }
         set
         {
-            if (_movie == null) return;
-            if (_movie.Length <= 0) return;
+            if (Inner == null) return;
+            if (Inner.Length <= 0) return;
             value = Math.Clamp(value, 0.0, 1.0);
-            _movie.Time = _movie.Length * value;
+            Inner.Time = Inner.Length * value;
         }
     }
 
-    public void Play() => _movie?.Play();
-    public void Stop() => _movie?.Stop();
+    public void Play() => Inner?.Play();
+    public void Stop() => Inner?.Stop();
 
-    public void Pump() => _movie?.Pump();
+    public void Pump() => Inner?.Pump();
 
-    public void Draw(double x = 0, double y = 0) => _movie?.Draw(x, y);
+    public void Draw(double x = 0, double y = 0) => Inner?.Draw(x, y);
 
     public void Draw(double x, double y, DrawOptions? options)
-        => _movie?.Draw(x, y, options);
+        => Inner?.Draw(x, y, options);
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        _movie?.Dispose();
-        _movie = null;
+        Inner?.Dispose();
+        Inner = null;
         GC.SuppressFinalize(this);
     }
 

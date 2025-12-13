@@ -163,10 +163,10 @@ public class AstrumCore
         get
         {
             double range = 0.3;
-            double d = Platform.SystemFPS ?? DrawFPS.GetFPS(range);
+            double d = VSync || Sleep.Sleeping ? FPS
+                : DrawFPS.GetFPS(range);
             double u = UpdateFPS.GetFPS(range);
-            double ratio = d > u ? d / u : u / d;
-            return ratio > 1.2 && MultiThreading ?
+            return MultiThreading ?
                 $"Draw: {d:0.#}\nUpdate: {u:0.#}" :
                 $"FPS: {d:0.#}";
         }

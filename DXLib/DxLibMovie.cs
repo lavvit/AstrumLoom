@@ -1,7 +1,4 @@
-﻿using System.IO;
-using System.Threading;
-
-using static AstrumLoom.DXLib.DxLibGraphics;
+﻿using static AstrumLoom.DXLib.DxLibGraphics;
 using static AstrumLoom.LayoutUtil;
 using static DxLibDLL.DX;
 
@@ -80,7 +77,7 @@ internal sealed class DxLibMovie : IMovie
         if (totalFrames > 0 && frameTimeUs > 0)
         {
             // µ秒 → ms
-            Length = (int)((totalFrames * frameTimeUs) / 1000L);
+            Length = (int)(totalFrames * frameTimeUs / 1000L);
         }
 
         Volatile.Write(ref _asyncState,
@@ -100,7 +97,7 @@ internal sealed class DxLibMovie : IMovie
         }
     }
 
-    public bool Enable => Handle > 0 && Loaded;
+    public bool Enable => Loaded && Handle > 0;
 
     private static bool IsMainThread
         => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
@@ -187,18 +184,17 @@ internal sealed class DxLibMovie : IMovie
         }
     }
 
-    private double _volume = 1.0;
     public double Volume
     {
-        get => _volume;
+        get;
         set
         {
-            _volume = Math.Clamp(value, 0.0, 1.0);
+            field = Math.Clamp(value, 0.0, 1.0);
             if (Handle <= 0) return;
-            int vol = (int)(_volume * 10000.0); // 0〜10000:contentReference[oaicite:5]{index=5}
+            int vol = (int)(field * 10000.0); // 0〜10000:contentReference[oaicite:5]{index=5}
             SetMovieVolumeToGraph(vol, Handle);
         }
-    }
+    } = 1.0;
 
     public bool IsPlaying
         => Handle > 0 && GetMovieStateToGraph(Handle) == 1;
@@ -213,17 +209,17 @@ internal sealed class DxLibMovie : IMovie
         get => Speed;
         set => Speed = value;
     }
-    private double _speed = 1.0;
+
     public double Speed
     {
-        get => _speed;
+        get;
         set
         {
             if (Handle <= 0) return;
-            _speed = Math.Max(0.0, value);
-            SetPlaySpeedRateMovieToGraph(Handle, _speed);
+            field = Math.Max(0.0, value);
+            SetPlaySpeedRateMovieToGraph(Handle, field);
         }
-    }
+    } = 1.0;
 
     public bool Loop { get; set; }
 
