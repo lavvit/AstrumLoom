@@ -254,6 +254,9 @@ public static class LayoutUtil
         public static Point operator -(Point a, Point b) => new(a.X - b.X, a.Y - b.Y);
         public static Point operator *(Point a, double b) => new(a.X * b, a.Y * b);
         public static Point operator /(Point a, double b) => new(a.X / b, a.Y / b);
+        public static Point operator *(Point a, Point b) => new(a.X * b.X, a.Y * b.Y);
+        public static Point operator /(Point a, Point b) => new(a.X / b.X, a.Y / b.Y);
+
         public static bool operator ==(Point a, Point b) => a.X == b.X && a.Y == b.Y;
         public static bool operator !=(Point a, Point b) => !(a == b);
         public override readonly bool Equals(object? obj) => obj is Point p && this == p;
@@ -289,8 +292,12 @@ public static class LayoutUtil
         public static Size operator -(Size a, Size b) => new(a.Width - b.Width, a.Height - b.Height);
         public static Size operator *(Size a, double b) => new(a.Width * b, a.Height * b);
         public static Size operator /(Size a, double b) => new(a.Width / b, a.Height / b);
+        public static Size operator *(Size a, Size b) => new(a.Width * b.Width, a.Height * b.Height);
+        public static Size operator /(Size a, Size b) => new(a.Width / b.Width, a.Height / b.Height);
+
         public static bool operator ==(Size a, Size b) => a.Width == b.Width && a.Height == b.Height;
         public static bool operator !=(Size a, Size b) => !(a == b);
+
         public override readonly bool Equals(object? obj) => obj is Size s && this == s;
         public override readonly string ToString() => $"({Width}, {Height})";
         public override int GetHashCode() => HashCode.Combine(Width, Height);

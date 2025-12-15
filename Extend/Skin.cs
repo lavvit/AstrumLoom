@@ -4,16 +4,15 @@ using static AstrumLoom.AstrumCore;
 
 using FHandle = AstrumLoom.FontHandle;
 
-namespace AstrumLoom;
+namespace AstrumLoom.Extend;
 
 public class Skin
 {
-    public class ExoDummy { }
     public static Dictionary<string, Texture> Textures { get; set; } = [];
     public static Dictionary<string, Sound> Sounds { get; set; } = [];
     public static Dictionary<string, Number> Numbers { get; set; } = [];
     public static Dictionary<string, IFont> Fonts { get; set; } = [];
-    public static Dictionary<string, ExoDummy> ExoDatas { get; set; } = [];
+    public static Dictionary<string, Exo> ExoDatas { get; set; } = [];
 
     public static Dictionary<string, string> Configs { get; set; } = [];
 
@@ -353,7 +352,7 @@ public class Skin
                     break;
                 case "exo":
                     {
-                        //ExoDatas.TryAdd(name, new(file, true));
+                        ExoDatas.TryAdd(name, new(file, true));
                     }
                     break;
             }
@@ -380,7 +379,7 @@ public class Skin
         }
         foreach (var exo in ExoDatas.Values)
         {
-            //if (exo.Loaded()) count++;
+            if (exo.Loaded()) count++;
         }
         count += Fonts.Count;
         ReadedCount = count;
@@ -490,8 +489,8 @@ public class Skin
             {
                 if (inque)
                     SkinQue.Enqueue(("exo" + name, file));
-                // else
-                //    ExoDatas[name] = new Exo(file, true);
+                else
+                    ExoDatas[name] = new Exo(file, true);
             }
         }
     }
@@ -662,13 +661,8 @@ public class Skin
     }
     #endregion
     #region Exo
-    public static ExoDummy GetExo(string name) => Exo(name) ?? new();
-    public static ExoDummy? Exo(string name)
-    {
-        return new();
-        name = name.ToLower();
-        //return ExoDatas.TryGetValue(name, out var value) && value.Enable ? value : null;
-    }
+    public static Exo GetExo(string name) => Exo(name) ?? new("");
+    public static Exo? Exo(string name) => ExoDatas.TryGetValue(name.ToLower(), out var value) && value.Enable ? value : null;
     #endregion
     #endregion
     #region Config

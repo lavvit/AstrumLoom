@@ -485,3 +485,101 @@ public enum EInOut
     InOut,
     OutIn
 }
+
+public readonly struct BigNum
+{
+    public readonly double Mantissa; // [1,1000) に保つ
+    public readonly int Digit;        // カンマの個数
+
+    public BigNum(double mantissa, int digit)
+    {
+        int tier = digit;
+        double m = mantissa;
+
+        while (m >= 1000.0) { m /= 1000.0; tier++; }
+        while (m < 1.0 && tier > 0) { m *= 1000.0; tier--; }
+
+        Mantissa = m;
+        Digit = tier;
+    }
+    public BigNum(double value)
+    {
+        int tier = 0;
+        double m = value;
+
+        while (m >= 1000.0) { m /= 1000.0; tier++; }
+        while (m < 1.0 && tier > 0) { m *= 1000.0; tier--; }
+
+        Mantissa = m;
+        Digit = tier;
+    }
+
+    public override readonly string ToString()
+    {
+        // tierが大きすぎたら AA/AB… に逃がすなども可能
+        string suffix = GetSuffix(Digit);
+
+        // “放置ゲーっぽい”のは「有効桁を揃える」こと
+        int dec =
+            Mantissa >= 100 ? 0 :
+            Mantissa >= 10 ? 1 : 2;
+
+        return $"{Math.Round(Mantissa, dec).ToString($"F{dec}")}{suffix}";
+    }
+
+    private static string GetSuffix(int tier)
+    {
+        // よくあるセット（好みで増やしてOK）
+        string[] s = { "", "K", "M", "B", "T", "Q" };
+        if (tier < s.Length) return s[tier];
+
+        // それ以上は aa, ab, ac... みたいな“アルファベットSuffix”にする例
+        int x = tier - s.Length;
+        char a = (char)('a' + x / 26 % 26);
+        char b = (char)('a' + x % 26);
+        return $"{a}{b}";
+    }
+
+    public static BigNum operator +(BigNum a, BigNum b)
+    {
+        if (a.Digit == b.Digit)
+        {
+            return new BigNum(a.Mantissa + b.Mantissa, a.Digit);
+        }
+        else if (a.Digit > b.Digit)
+        {
+            double adjusted = b.Mantissa / Math.Pow(1000.0, a.Digit - b.Digit);
+            return new BigNum(a.Mantissa + adjusted, a.Digit);
+        }
+        else
+        {
+            double adjusted = a.Mantissa / Math.Pow(1000.0, b.Digit - a.Digit);
+            return new BigNum(b.Mantissa + adjusted, b.Digit);
+        }
+    }
+    public static BigNum operator +(BigNum a, double b) => new(a.Mantissa + b, a.Digit);
+    public static BigNum operator -(BigNum a, BigNum b)
+    {
+        if (a.Digit == b.Digit)
+        {
+            return new BigNum(a.Mantissa - b.Mantissa, a.Digit);
+        }
+        else if (a.Digit > b.Digit)
+        {
+            double adjusted = b.Mantissa / Math.Pow(1000.0, a.Digit - b.Digit);
+            return new BigNum(a.Mantissa - adjusted, a.Digit);
+        }
+        else
+        {
+            double adjusted = a.Mantissa / Math.Pow(1000.0, b.Digit - a.Digit);
+            return new BigNum(-adjusted + b.Mantissa, b.Digit);
+        }
+    }
+    public static BigNum operator -(BigNum a, double b) => new(a.Mantissa - b, a.Digit);
+    public static BigNum operator *(BigNum a, BigNum b) => new(a.Mantissa * b.Mantissa, a.Digit + b.Digit);
+    public static BigNum operator *(BigNum a, double b) => new(a.Mantissa * b, a.Digit);
+    public static BigNum operator /(BigNum a, BigNum b) => new(a.Mantissa / b.Mantissa, a.Digit - b.Digit);
+    public static BigNum operator /(BigNum a, double b) => new(a.Mantissa / b, a.Digit);
+
+    public static implicit operator BigNum(double value) => new(value);
+}

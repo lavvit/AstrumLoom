@@ -1,4 +1,6 @@
-﻿namespace AstrumLoom;
+﻿using AstrumLoom.Extend;
+
+namespace AstrumLoom;
 
 public class Animation : IDisposable
 {
