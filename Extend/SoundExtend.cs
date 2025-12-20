@@ -127,9 +127,9 @@ public sealed class SoundExtend : ISound, IDisposable
     private void EnsureReadyForChannel()
     {
         EnsureNotDisposed();
-        if (!Enable)
+        if (!Enable && !IsFailed)
         {
-            if (!string.IsNullOrEmpty(Path) && !IsReady)
+            if (File.Exists(Path) && !string.IsNullOrEmpty(Path))
                 Log.Warning($"サウンドが未ロードです。: {Path}");
             return;
         }
