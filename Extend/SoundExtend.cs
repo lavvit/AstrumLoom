@@ -129,8 +129,8 @@ public sealed class SoundExtend : ISound, IDisposable
         EnsureNotDisposed();
         if (!Enable)
         {
-            if (!string.IsNullOrEmpty(Path) && !Loaded)
-                Log.Error($"サウンドが未ロードです。: {Path}");
+            if (!string.IsNullOrEmpty(Path) && !IsReady)
+                Log.Warning($"サウンドが未ロードです。: {Path}");
             return;
         }
     }

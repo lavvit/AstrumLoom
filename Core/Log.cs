@@ -14,7 +14,8 @@ public class Log
         };
         Console.WriteLine(logEntry.ToFileString());
         if (logEntry.Level != LogLevel.Info) Trace.WriteLine(logEntry.ToFileString());
-        LogMessages.Add(logEntry);
+        if (!LogMessages.Any(level => level.Message == message && DateTime.Now - level.Timestamp < TimeSpan.FromSeconds(1)))
+            LogMessages.Add(logEntry);
     }
     public static void Write(string message, bool timestamp) => Write(message, LogLevel.Info, timestamp);
     public static void Write(Exception ex) => Error($"{ex.GetType()}: {ex.Message}\n{ex.StackTrace}");
