@@ -1,8 +1,6 @@
-﻿using AstrumLoom.Extend;
+﻿namespace AstrumLoom.Extend;
 
-namespace AstrumLoom;
-
-public class Animation : IDisposable
+public class NumAnimation : IDisposable
 {
     public string Name = "";
     private Counter _counter = new();
@@ -13,7 +11,7 @@ public class Animation : IDisposable
     /// dir は末尾に区切り文字を含めて渡してください。
     /// ファイル名は dir + prefix + index + ext の形式で連番を想定します。
     /// </summary>
-    public Animation(string dir, string prefix = "\\", string ext = ".png", long interval = 1000000 / 60, bool isLoop = true)
+    public NumAnimation(string dir, string prefix = "\\", string ext = ".png", long interval = 1000000 / 60, bool isLoop = true)
     {
         int count = GetCount(dir, prefix, ext);
         Name = Path.GetFileNameWithoutExtension(dir);
@@ -182,7 +180,7 @@ public class Animation : IDisposable
         foreach (var f in Frames) f.SetColor(color, add);
     }
 
-    ~Animation()
+    ~NumAnimation()
     {
         Dispose();
     }
