@@ -235,10 +235,10 @@ public static class LayoutUtil
             ReferencePoint.BottomRight => new Point(-w, -h),
             _ => new Point()
         };
-    public struct Point
+    public struct Point : IDisposable
     {
-        public double X;
-        public double Y;
+        public double X { get; set; }
+        public double Y { get; set; }
         public Point() { X = 0; Y = 0; }
         public Point(double x, double y)
         {
@@ -271,12 +271,14 @@ public static class LayoutUtil
         public (double x, double y) ToTuple() => (X, Y);
 
         public override int GetHashCode() => HashCode.Combine(X, Y);
+
+        public readonly void Dispose() => GC.SuppressFinalize(this);
     }
 
-    public struct Size
+    public struct Size : IDisposable
     {
-        public double Width;
-        public double Height;
+        public double Width { get; set; }
+        public double Height { get; set; }
         public Size() { Width = 0; Height = 0; }
         public Size(double w, double h)
         {
@@ -301,14 +303,15 @@ public static class LayoutUtil
         public override readonly bool Equals(object? obj) => obj is Size s && this == s;
         public override readonly string ToString() => $"({Width}, {Height})";
         public override int GetHashCode() => HashCode.Combine(Width, Height);
+        public readonly void Dispose() => GC.SuppressFinalize(this);
     }
 
-    public struct Rect
+    public struct Rect : IDisposable
     {
-        public double X;
-        public double Y;
-        public double Width;
-        public double Height;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
         public Rect()
         {
             X = 0; Y = 0; Width = 0; Height = 0;
@@ -339,5 +342,6 @@ public static class LayoutUtil
         public override readonly bool Equals(object? obj) => obj is Rect r && this == r;
         public override readonly string ToString() => $"({X}, {Y}, {Width}, {Height})";
         public override int GetHashCode() => HashCode.Combine(X, Y, Width, Height);
+        public readonly void Dispose() => GC.SuppressFinalize(this);
     }
 }

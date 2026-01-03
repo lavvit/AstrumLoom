@@ -61,7 +61,7 @@ public static class MathExtend
 }
 
 // ---- 有理数表現 ----
-public readonly struct Rational
+public readonly struct Rational : IDisposable
 {
     // 分子・分母は互いに素、分母は正
     public int Num { get; }
@@ -130,6 +130,7 @@ public readonly struct Rational
             }
         }
     }
+    public readonly void Dispose() => GC.SuppressFinalize(this);
 }
 
 public class Easing
@@ -486,7 +487,7 @@ public enum EInOut
     OutIn
 }
 
-public readonly struct BigNum
+public readonly struct BigNum : IDisposable
 {
     public readonly double Mantissa; // [1,1000) に保つ
     public readonly int Digit;        // カンマの個数
@@ -582,4 +583,5 @@ public readonly struct BigNum
     public static BigNum operator /(BigNum a, double b) => new(a.Mantissa / b, a.Digit);
 
     public static implicit operator BigNum(double value) => new(value);
+    public readonly void Dispose() => GC.SuppressFinalize(this);
 }

@@ -57,7 +57,7 @@ public sealed class SoundExtend : ISound, IDisposable
 
     private void Load()
     {
-        if (Volatile.Read(ref _asyncState) == 1) return; // 既に Ready
+        if (IsReady) return; // 既に Ready
         if (!File.Exists(Path))
         {
             Volatile.Write(ref _asyncState, -1);
