@@ -107,6 +107,8 @@ return;
     /// <param name="scene">子シーン。</param>
     public void AddChildScene(Scene scene) => ChildScene.Add(scene);
 
+    public string Name => GetType().Name ?? "";
+
     public static void Set(Scene scene, Scene[]? child = null)
     {
         GC.Collect();

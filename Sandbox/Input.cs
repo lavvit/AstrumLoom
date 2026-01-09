@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using AstrumLoom;
+﻿using AstrumLoom;
 
 namespace Sandbox;
 
@@ -13,6 +10,7 @@ internal sealed class InputTestScene : Scene
     private readonly List<Key> _pressedKeys = new();
     private readonly TextInputOptions _textOptions = new() { MaxLength = 64 };
 
+    private IFont? _kbfont;
     private string _textBuffer = string.Empty;
     private bool _textActive;
     private int _selectedPad;
@@ -20,6 +18,7 @@ internal sealed class InputTestScene : Scene
 
     public override void Enable()
     {
+        _kbfont = FontHandle.Create("Noto Sans JP", 8, bold: true);
         _eventLog.Clear();
         _pressedKeys.Clear();
         _textBuffer = string.Empty;
@@ -138,6 +137,8 @@ internal sealed class InputTestScene : Scene
         DrawLogPanel();
 
         Drawing.Text(50, 640, "[T] text input  [←/→] select controller  [Space] vibrate", Color.White);
+
+        KeyBoard.Draw(800, 560, size: 8, KeyType.JPFull, _kbfont);
     }
 
     private void DrawKeyboardPanel()

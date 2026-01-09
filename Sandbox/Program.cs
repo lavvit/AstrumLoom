@@ -1,67 +1,31 @@
 ﻿using AstrumLoom;
 using AstrumLoom.DXLib;
-using AstrumLoom.Extend;
 using AstrumLoom.RayLib;
 
 namespace Sandbox;
 
 internal sealed class SimpleTestGame : Scene
 {
-    private Counter? _timer;
-    private IFont? _font;
-    private IFont? _kbfont;
-    private Movie? _movie;
-    private bool _movieactive = false;
-
-    // 追加: 図形テストシーン
     private Scene? _scene;
-    internal string SceneName => _scene?.GetType().Name ?? "";
 
     public override void Enable()
     {
-        _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
-        _kbfont = FontHandle.Create("Noto Sans JP", 6, bold: true);
-        //_movie = new("Assets/campus労働.mp4");
-        Drawing.DefaultFont = _font!;
-        _timer = new Counter(0, 2000, true);
-        _timer.Start();
+        var ft = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
+        if (ft != null) Drawing.DefaultFont = ft;
 
-        _scene = new LoadCheckScene();
+        //_scene = new InputTestScene();
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }
 
     public override void Update()
     {
-        _timer?.Tick();
-        if (Key.Esc.Push())
-        {
-            AstrumCore.End();
-        }
+        if (Key.Esc.Push()) AstrumCore.End();
 
-        // 今は特にシーンの更新ロジックは不要（描画のみおしゃれ表現）
         _scene?.Update();
-
         if (_scene == null)
         {
             AstrumCore.Droppable();
-            if (Key.T.Push())
-            {
-                if (_timer?.Running ?? false)
-                    _timer?.Stop();
-                else
-                    _timer?.Start();
-            }
-            if (Key.N.Push())
-            {
-                _movieactive = !_movieactive;
-            }
-            if (Key.M.Push() && _movieactive)
-            {
-                if (_movie?.IsPlaying ?? false)
-                    _movie?.Stop();
-                else
-                    _movie?.Play();
             }
 
             if (Key.F1.Push())
@@ -73,39 +37,12 @@ internal sealed class SimpleTestGame : Scene
                 Log.Write("Input text: " + inputText);
             }
         }
-    }
 
-    private string inputText = "Type something...";
     public override void Draw()
     {
         Drawing.Fill(Color.CornflowerBlue);
-        // 先に図形シーンを描く（背景＋デコレーション）
         _scene?.Draw();
-
-        if (_scene == null)
-        {
-            // 映像を中央に表示
-            if (_movie != null && _movieactive)
-            {
-                int mw = _movie.Width;
-                int mh = _movie.Height;
-                _movie.Scale = (1280.0 / mw, 720.0 / mh);
-                _movie.Draw();
-            }
-            Drawing.Box(640 - 100, 360 - 30, 200, 60, Color.Black);
-            Drawing.Box(640 - 98, 360 - 28, 196, 56, Color.White);
-            Drawing.Box(640 - 98, 360 - 28, 196 * _timer?.Progress ?? 0, 56, Color.Green);
-
-            Drawing.Text(640, 360, "Hello, AstrumLoom!", Color.White, ReferencePoint.Center);
-            Drawing.Text(20, 400, KeyInput.PressedFrameCount(Key.J));
-
-            Gradation gradation = new([Color.Red, Color.Yellow]);
-            _font?.Draw(200, 200, "Gradation", new DecorateText.DecorateOption(gradation));
-
-            KeyInput.DrawText(20, 430, inputText, Color.Black, _font);
-        }
-        if (SceneName != "LoadCheckScene")
-            KeyBoard.Draw(800, 560, size: 8, KeyType.JPFull, _kbfont);
+        Drawing.Text(180, 10, _scene?.Name ?? "Hello, AstrumLoom!");
 
         Mouse.Draw(20);
     }

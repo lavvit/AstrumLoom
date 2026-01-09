@@ -28,7 +28,7 @@ internal sealed class SandboxOverlay : Overlay
     {
         if (Scene.NowScene is SimpleTestGame s)
         {
-            if (s.SceneName == "LoadCheckScene")
+            if (s.Name == "LoadCheckScene")
             {
                 // 簡易描画のみ
                 FPS.Draw(ReferencePoint.TopRight);
@@ -36,9 +36,8 @@ internal sealed class SandboxOverlay : Overlay
             }
         }
 
-        var platform = AstrumCore.Platform;
         // FPS / 時刻 を描く
-        string fps = $"{platform.BackendKind} {AstrumCore.NowFPS}";
+        string fps = $"{AstrumCore.Platform.BackendKind} {AstrumCore.NowFPS}";
         string time = $"{DateTime.Now:G}";
         _small.Draw(10, 10, fps, Color.White);
         _small.Draw(10, 50, time, new Color(180, 200, 220));

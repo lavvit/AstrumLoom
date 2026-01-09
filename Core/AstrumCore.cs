@@ -216,7 +216,7 @@ public class AstrumCore
     /// <summary>
     /// メインスレッドで保留中の破棄を処理します。ゲームループ内から呼び出されます。
     /// </summary>
-    public static void ProcessPendingDisposals()
+    internal static void ProcessPendingDisposals()
     {
         // メインスレッドでのみ処理
         if (Environment.CurrentManagedThreadId != MainThreadId) return;
