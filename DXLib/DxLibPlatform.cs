@@ -35,6 +35,7 @@ public sealed class DxLibPlatform : IGamePlatform
         VSync = config.VSync;
         _targetFps = config.TargetFps;
 
+        SetDragFileValidFlag(1);
         SetMultiThreadFlag(1); // マルチスレッド
         SetDoubleStartValidFlag(1); // 複数起動
         SetUseDirectInputFlag(0); // DirectInputコントローラー(重いため一時無効化)

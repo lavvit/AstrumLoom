@@ -264,6 +264,9 @@ public class Texture : IDisposable
         }
     }
 
+    public void Expand(double width, double height)
+        => XYScale = (width / Width, height / Height);
+
     public Texture Clone()
     {
         var tex = new Texture(Path);

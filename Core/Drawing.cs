@@ -155,14 +155,14 @@ public class Drawing
         var (w, h) = Graphics.MeasureText(text.ToString() ?? "", size);
         return (w, h);
     }
-    public static void Text(double x, double y, object text)
+    public static void Text(double x, double y, object? text)
         => Text(x, y, text, Color.White);
-    public static void Text(double x, double y, object text,
+    public static void Text(double x, double y, object? text,
         Color color,
         ReferencePoint point = ReferencePoint.TopLeft,
         Color? edgecolor = null,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => DefaultFont.Draw(x, y, text, color, point, edgecolor, blend, opacity);
+        => DefaultFont.Draw(x, y, text?.ToString() ?? "", color, point, edgecolor, blend, opacity);
     public static void Text(double x, double y, object text,
         Color color,
         Color edgecolor,

@@ -14,7 +14,7 @@ public class Skin
     public static Dictionary<string, IFont> Fonts { get; set; } = [];
     public static Dictionary<string, Exo> ExoDatas { get; set; } = [];
 
-    public static Dictionary<string, string> Configs { get; set; } = [];
+    public static TextConf Configs { get; set; } = new();
 
     public static int Width, Height;
 
@@ -26,6 +26,7 @@ public class Skin
 
     public static string DefaultSkin { get; set; } = "";
     public static string DefaultFont { get; set; } = "";
+    public static string? DefaultWindowSize { get; set; } = null;
     public static int? DefaultSize { get; set; } = null;
     public static string SkinPath
     {
@@ -154,39 +155,23 @@ public class Skin
                 Log.Write($"Skin: 読み込みキューに追加しました。({SkinQue.Count} items)", true);
             else FinishLoad();
         }
-        var size = WindowSize(SkinConfig("SkinSize"));
-        Width = size.width > 0 ? size.width : (int)SkinConfigValue("Width");
-        Height = size.height > 0 ? size.height : (int)SkinConfigValue("Height");
+        var size = WindowSize(SkinConfig("SkinSize") ?? DefaultWindowSize);
+        int w, h;
+        w = (int)(size.Width > 0 ? size.Width : SkinConfigValue("Width"));
+        h = (int)(size.Height > 0 ? size.Height : SkinConfigValue("Height"));
 
         if (Width == 0 || Height == 0)
         {
             var tex = GetTexture("Title");
-            Width = tex.Width;
-            Height = tex.Height;
+            w = tex.Width;
+            h = tex.Height;
         }
-        if (InitCompleted)
-        {
-            int w1 = Width > 0 ? Width : 1280;
-            int h1 = Height > 0 ? Height : 720;
-            int h2 = DefaultSize ?? w1;
-            double s = (double)h2 / h1;
-            if (Width == w1 && Height == h1 && Math.Abs(WindowScale - s) < 0.01)
-            {
-                Log.Write($"Skin: ウィンドウサイズは変更されていません。({w1}x{h1}, {s:0.00}倍)", true);
-                return;
-            }
-            Log.Write($"Skin: ウィンドウサイズを {w1}x{h1} に変更します...", true);
-            //SetSize(w1, h1, s);
-            //Drawing.DefaultHandle = new();
-            if (!inque) Load(); // 再読み込み
-        }
-        else
-            Log.Write($"Skin: {Width}x{Height}でウィンドウを開始します...", true);
+        SetSize(w, h, inque);
     }
     public static (List<(string name, string path)> names, List<(string name, string data)> nums) LoadConfig(string file = "Skin.ini")
     {
         _configCache.Clear();
-        Configs = [];
+        Configs.Clear();
         string skinPath = SkinPath;
         string inipath = Path.Combine(skinPath, file);
         if (!Directory.Exists(skinPath) || !File.Exists(inipath))
@@ -196,6 +181,7 @@ public class Skin
 
         List<(string name, string path)> namedic = [];
         List<(string name, string data)> numdic = [];
+        List<string> confline = [];
         if (File.Exists(inipath))
         {
             var list = Text.Read(inipath);
@@ -235,21 +221,10 @@ public class Skin
                         numdic.Add((name, data));
                     }
                 }
-                else if (line.Contains(':') && !line.StartsWith(';'))
-                {
-                    string[] parts = line.Split(':', 2);
-                    if (parts.Length == 2)
-                    {
-                        string key = parts[0].Trim().ToLower();
-                        string value = parts[1].Trim();
-                        if (!Configs.ContainsKey(key))
-                        {
-                            Configs[key] = value;
-                        }
-                    }
-                }
+                else confline.Add(line);
             }
         }
+        Configs.Load([.. confline], separator: ':', path: inipath);
         Log.Write($"Skin: 設定ファイル {FilePath(inipath)} を読み込みました。", true);
         return (namedic, numdic);
     }
@@ -259,6 +234,29 @@ public class Skin
         var f = FHandle.Create(font, 12);
         if (f != null)// && f.Enable
             Drawing.DefaultFont = f;
+    }
+    public static void SetSize(int width, int height, bool inque = false)
+    {
+        Width = width;
+        Height = height;
+        if (InitCompleted)
+        {
+            int w1 = Width > 0 ? Width : 1280;
+            int h1 = Height > 0 ? Height : 720;
+            int h2 = DefaultSize ?? w1;
+            double s = (double)h2 / h1;
+            if (Width == w1 && Height == h1 && Math.Abs(WindowScale - s) < 0.01)
+            {
+                Log.Write($"Skin: ウィンドウサイズは変更されていません。({w1}x{h1}, {s:0.00}倍)", true);
+                return;
+            }
+            Log.Write($"Skin: ウィンドウサイズを {w1}x{h1} に変更します...", true);
+            //SetSize(w1, h1, s);
+            //Drawing.DefaultHandle = new();
+            if (!inque) Load(); // 再読み込み
+        }
+        else
+            Log.Write($"Skin: {Width}x{Height}でウィンドウを開始します...", true);
     }
 
     private static int _logcount = 0;
@@ -666,53 +664,27 @@ public class Skin
     #endregion
     #endregion
     #region Config
-    public static string? SkinConfig(string key)
-    {
-        key = key.ToLower();
-        if (_configCache.TryGetValue(key, out string? cached)) return cached;
-        string result = "";
-        if (Configs.TryGetValue(key, out string? value))
-        {
-            result = value;
-        }
-        _configCache[key] = result;
-        return !string.IsNullOrEmpty(result) ? result : null;
-    }
+    public static string? SkinConfig(string key) => Configs.GetString(key);
     public static bool ExitsConfig(string key)
-        => !string.IsNullOrEmpty(SkinConfig(key));
-    public static double SkinConfigValue(string key, double nulldefault = 0) => double.TryParse(SkinConfig(key)?.Trim(), out double value) ? value : nulldefault;
+        => Configs.HasItem(key);
+    public static double SkinConfigValue(string key, double nulldefault = 0)
+        => Configs.GetDouble(key, nulldefault);
     public static double[] SkinConfigArray(string key, char separator = ',', double[]? defaults = null)
-    {
-        string? value = SkinConfig(key);
-        if (string.IsNullOrEmpty(value)) return defaults ?? [];
-        string[] parts = value.Split(separator);
-        double[] result = new double[parts.Length];
-        for (int i = 0; i < parts.Length; i++)
-        {
-            if (double.TryParse(parts[i].Trim(), out double v))
-            {
-                result[i] = v;
-            }
-        }
-        return result;
-    }
-    public static System.Drawing.Point SkinConfigPoint(string key, char separator = ',', double defaultx = 0, double defaulty = 0)
-    {
-        double x = SkinConfigValue(key + "X", defaultx);
-        double y = SkinConfigValue(key + "Y", defaulty);
-        double[] value = SkinConfigArray(key, separator);
-        return value.Length < 2 ? new((int)x, (int)y) : new((int)value[0], (int)value[1]);
-    }
-    public static bool SkinConfigBool(string key) => SkinConfigValue(key) > 0;
+        => Configs.GetDoubleArray(key, separator, defaults);
+    public static LayoutUtil.Point SkinConfigPoint(string key, char separator = ',', double defaultx = 0, double defaulty = 0)
+        => Configs.GetPoint(key, separator, defaultx, defaulty);
+    public static bool SkinConfigBool(string key)
+        => Configs.GetBool(key);
     #endregion
 
     public static List<string> LogExport()
     {
         List<string> log = [];
         log.Add($"Skin Config:");
-        foreach (string key in Configs.Keys)
+        var conf = Configs.ItemDictionary;
+        foreach (string key in conf.Keys)
         {
-            log.Add($"{key}: {Configs[key]}");
+            log.Add($"{key}: {conf[key]}");
         }
         log.Add("");
         log.Add($"Textures: {Textures.Count}");
@@ -779,14 +751,14 @@ public class Skin
     public static string WindowSize((int, int) value) => value == (1280, 720)
             ? "HD"
             : value == (1920, 1080) ? "FHD" : value == (2560, 1440) ? "WQHD" : value == (3840, 2160) ? "4K" : $"{value.Item1}*{value.Item2}";
-    public static (int width, int height) WindowSize(string? value)
+    public static LayoutUtil.Size WindowSize(string? value)
     {
-        if (value == "HD" || string.IsNullOrEmpty(value)) return (1280, 720);
-        if (value == "FHD") return (1920, 1080);
-        if (value == "WQHD") return (2560, 1440);
-        if (value == "4K") return (3840, 2160);
-        string[] split = value.Split(new char[] { ',', '*' });
-        return (int.Parse(split[0]), int.Parse(split[1]));
+        if (value == "HD" || string.IsNullOrEmpty(value)) return new(1280, 720);
+        if (value == "FHD") return new(1920, 1080);
+        if (value == "WQHD") return new(2560, 1440);
+        if (value == "4K") return new(3840, 2160);
+        string[] split = value.Split([',', '*']);
+        return new(int.Parse(split[0]), int.Parse(split[1]));
     }
     public static int WindowSizeInt((int, int) value) => value == (1280, 720) ? 1 : value == (1920, 1080) ? 2 : value == (2560, 1440) ? 3 : value == (3840, 2160) ? 4 : 0;
     public static (int width, int height) WindowSizeInt(int value)
