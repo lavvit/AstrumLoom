@@ -6,11 +6,21 @@ public class Drawing
 {
     internal static IGraphics Graphics => AstrumCore.Graphic;
 
+    public static void Point(double x, double y,
+        Color? color = null,
+        int thickness = 1,
+        BlendMode blend = BlendMode.None, double opacity = 1)
+        => Circle(x, y, thickness / 2, color, 0, blend, opacity);
     public static void Line(double x1, double y1, double dx, double dy,
         Color? color = null,
         int thickness = 1,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => Graphics.Line(x1, y1, dx, dy,
+    {
+        if (dx == 0 && dy == 0)
+            if (thickness > 1)
+            { Point(x1, y1, color, thickness, blend, opacity); return; }
+            else dy++;
+        Graphics.Line(x1, y1, dx, dy,
             new DrawOptions
             {
                 Color = color,
@@ -18,6 +28,7 @@ public class Drawing
                 Blend = blend,
                 Opacity = opacity
             });
+    }
     public static void LineZ(double x1, double y1, double x2, double y2,
         Color? color = null,
         int thickness = 1,

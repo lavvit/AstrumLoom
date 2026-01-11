@@ -672,7 +672,7 @@ public class Skin
     public static double[] SkinConfigArray(string key, char separator = ',', double[]? defaults = null)
         => Configs.GetDoubleArray(key, separator, defaults);
     public static LayoutUtil.Point SkinConfigPoint(string key, char separator = ',', double defaultx = 0, double defaulty = 0)
-        => Configs.GetPoint(key, separator, defaultx, defaulty);
+        => Configs.GetPoint(key, defaultx, defaulty, separator);
     public static bool SkinConfigBool(string key)
         => Configs.GetBool(key);
     #endregion

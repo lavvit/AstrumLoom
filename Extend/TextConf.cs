@@ -56,9 +56,9 @@ public class TextConf : IDisposable
         }
         return result;
     }
-    public LayoutUtil.Point GetPoint(string key, char separator = ',', LayoutUtil.Point? defaultValue = null)
-        => GetPoint(key, separator, defaultValue?.X ?? 0, defaultValue?.Y ?? 0);
-    public LayoutUtil.Point GetPoint(string key, char separator = ',', double defaultx = 0, double defaulty = 0)
+    public LayoutUtil.Point GetPoint(string key, LayoutUtil.Point? defaultValue, char separator = ',')
+        => GetPoint(key, defaultValue?.X ?? 0, defaultValue?.Y ?? 0, separator);
+    public LayoutUtil.Point GetPoint(string key, double defaultx = 0, double defaulty = 0, char separator = ',')
     {
         double x = GetDouble(key + "X", defaultx);
         double y = GetDouble(key + "Y", defaulty);
