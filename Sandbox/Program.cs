@@ -26,17 +26,8 @@ internal sealed class SimpleTestGame : Scene
         if (_scene == null)
         {
             AstrumCore.Droppable();
-            }
-
-            if (Key.F1.Push())
-            {
-                KeyInput.ActivateText(ref inputText);
-            }
-            if (KeyInput.Enter(ref inputText))
-            {
-                Log.Write("Input text: " + inputText);
-            }
         }
+    }
 
     public override void Draw()
     {

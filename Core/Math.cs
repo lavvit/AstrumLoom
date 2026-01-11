@@ -123,8 +123,9 @@ public readonly struct Rational : IDisposable
                     return new Rational(sign * n1, d1);
                 frac = 1.0 / diff;
             }
-            catch (OverflowException)
+            catch (OverflowException e)
             {
+                Log.Error($"Rational: Overflowed ({x})\n  {e.StackTrace}");
                 // オーバーフローしたら前のを返す
                 return new Rational(sign * n1, d1);
             }

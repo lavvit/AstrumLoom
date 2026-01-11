@@ -35,7 +35,7 @@ public class Sound : IDisposable
 
     public void Dispose()
     {
-        Dispose(true);
+        AstrumCore.RequestDispose(_sound!);
         GC.SuppressFinalize(this);
     }
 

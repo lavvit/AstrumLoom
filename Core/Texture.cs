@@ -2,15 +2,6 @@
 
 namespace AstrumLoom;
 
-public interface IResourse : IDisposable
-{
-    string Path { get; }
-    bool IsReady { get; }
-    bool IsFailed { get; }
-    bool Loaded { get; }
-    bool Enable { get; }
-    void Pump();
-}
 public interface ITexture : IResourse
 {
     int Width { get; }
@@ -38,7 +29,6 @@ public static class TextureExtensions
 public class Texture : IDisposable
 {
     private ITexture? _texture { get; set; } = null;
-    private bool _disposed = false;
     public Texture() { }
 
     public Texture(Size size, Action method)
@@ -68,25 +58,12 @@ public class Texture : IDisposable
 
     public void Pump() => _texture?.Pump();
 
-    ~Texture() => Dispose(false);
+    ~Texture() => Dispose();
 
     public void Dispose()
     {
-        Dispose(true);
+        AstrumCore.RequestDispose(_texture!);
         GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed)
-        {
-            if (disposing)
-            {
-                _texture?.Dispose();
-            }
-            _texture = null;
-            _disposed = true;
-        }
     }
 
     public string Path => _texture?.Path ?? "";
