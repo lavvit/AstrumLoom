@@ -36,8 +36,8 @@ public abstract class AsyncLoadableBase
     public int TimeoutMs { get; set; } = DefaultTimeoutMs;
     protected static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
 
-    public enum LoadState { Failed = -1, Loading = 0, Ready = 1, Disposed = -2 }
-    public LoadState State
+    protected enum LoadState { Failed = -1, Loading = 0, Ready = 1, Disposed = -2 }
+    protected LoadState State
     {
         get
         {
@@ -46,10 +46,11 @@ public abstract class AsyncLoadableBase
         }
     }
     private int _state => Volatile.Read(ref _asyncState);
-    public bool LoadReady => State == LoadState.Ready;
-    public bool LoadFailed => State == LoadState.Failed;
-    public bool LoadFinished => State != LoadState.Loading && !Disposed;
-    public bool Disposed => (LoadState)_state == LoadState.Disposed;
+    protected bool LoadReady => State == LoadState.Ready;
+    protected bool LoadFailed => State == LoadState.Failed;
+    protected bool LoadFinished => State != LoadState.Loading && !Disposed;
+    protected bool Disposed => (LoadState)_state == LoadState.Disposed;
+    protected bool Loading => (LoadState)_state == LoadState.Loading;
 
     protected const int State_Failed = (int)LoadState.Failed;
     protected const int State_Loading = (int)LoadState.Loading;
@@ -59,7 +60,7 @@ public abstract class AsyncLoadableBase
 
     private IDisposable? _obj;
     private Func<bool>? _disposefunc;
-    public void DisposeAsync(Func<bool>? disposeAction = null)
+    protected void DisposeAsync(Func<bool>? disposeAction = null)
     {
         if (disposeAction != null)
             _disposefunc = disposeAction;
@@ -97,13 +98,13 @@ public abstract class AsyncLoadableBase
 
     private Func<bool>? _loadfunc;
     private (Func<bool>? Load, Func<bool>? Check)? _bgloadfuncs;
-    public void LoadAsync(IDisposable obj, Func<bool>? loadAction,
+    protected void LoadAsync(IDisposable obj, Func<bool>? loadAction,
         Func<bool>? bgloadAction, Func<bool>? bgcheckFunc = null)
     {
         _bgloadfuncs = (bgloadAction, bgcheckFunc);
         LoadAsync(obj, loadAction);
     }
-    public void LoadAsync(IDisposable obj, Func<bool>? loadAction = null)
+    protected void LoadAsync(IDisposable obj, Func<bool>? loadAction = null)
     {
         _obj = obj;
         LoadAsync(loadAction);
@@ -153,7 +154,8 @@ public abstract class AsyncLoadableBase
                 WriteState(State_Failed);
                 return;
             }
-            WriteState(State_Success);
+            if (_state != State_Loading)
+                WriteState(State_Success);
         }
         catch (Exception ex)
         {
@@ -163,7 +165,7 @@ public abstract class AsyncLoadableBase
         }
     }
 
-    public void PumpAsync()
+    protected void PumpAsync()
     {
         // メインスレッドのみが状態更新
         if (!IsMainThread) return;

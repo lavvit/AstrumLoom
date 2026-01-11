@@ -3,7 +3,7 @@ using static AstrumLoom.LayoutUtil;
 using static DxLibDLL.DX;
 namespace AstrumLoom.DXLib;
 
-internal sealed class DxLibTexture : ITexture
+internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
 {
     public string Path { get; private set; } = "";
     public int Handle { get; private set; } = -1;
@@ -21,7 +21,7 @@ internal sealed class DxLibTexture : ITexture
         Handle = handle;
         Width = w;
         Height = h;
-        Volatile.Write(ref _asyncState, 1); // Ready
+        WriteState(State_Success);
     }
     public DxLibTexture(string path)
     {
@@ -34,85 +34,80 @@ internal sealed class DxLibTexture : ITexture
     }
     public void Dispose()
     {
-        if (Handle > 0)
-        {
-            DeleteGraph(Handle);
-        }
-        Handle = -1;
-        _asyncState = -1;
+        DisposeAsync(DisposeTx);
         GC.SuppressFinalize(this);
     }
-
-    #region 読み込み
-    public void Load()
+    private bool DisposeTx()
     {
-        if (!File.Exists(Path))
+        if (IsMainThread)
         {
-            Log.Debug($"Texture: not found: {Path}");
-            Volatile.Write(ref _asyncState, -1);
-            Handle = -1;
-            return;
-        }
-        // メインスレッドでのみ触る
-        if (!IsMainThread)
-        {
-            _deferred = true;
-            _asyncState = 0;   // Loading扱い
-            return;
+            try
+            {
+                if (Handle > 0)
+                    DeleteGraph(Handle);
+                Handle = -1;
+                return true;
+            }
+            catch { Log.Error($"Failed to unload texture: {Path}"); }
         }
         else
         {
-            int handle = LoadGraph(Path);
-            if (handle < 0)
-            {
-                Log.Debug($"Texture: Load failed: {Path}");
-                Volatile.Write(ref _asyncState, -1);
-                Handle = -1;
-                return;
-            }
-            SetUseTransColor(FALSE);                 // 色キー透過は使わない
-            SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);   // 念のため標準ブレンドに戻す
-            SetDrawBright(255, 255, 255);
-            SetDrawAddColor(0, 0, 0);
-            Handle = handle;
-            _startTicks = Environment.TickCount64;
-            // サイズ取得
-            if (GetGraphSize(handle, out int w, out int h) != 0)
-            {
-                // 失敗してもとりあえず 0 のまま返す
-                w = h = 0;
-            }
-            Width = w;
-            Height = h;
-            // 非同期かどうかを即チェック（ここはメインスレッド想定）
-            Volatile.Write(ref _asyncState, (CheckHandleASyncLoad(Handle) == 0) ? 1 : 0);
+            //Log.Debug($"Texture dispose skipped: not main thread : {Path}");
+            AstrumCore.RequestDispose(this);
+            return true;
         }
+        return false;
     }
 
-    // 0=Loading, 1=Ready, -1=Failed
-    private int _asyncState = -1;
-    public bool IsReady => Volatile.Read(ref _asyncState) == 1;
-    public bool IsFailed => Volatile.Read(ref _asyncState) == -1;
-    public bool Loaded
+    #region 読み込み
+    public void Load() => LoadAsync(LoadTx);
+    private bool LoadTx()
     {
-        get
+        bool file = FileCheck(Path);
+        if (!file) return false;
+
+        int handle = LoadGraph(Path);
+        if (handle < 0)
         {
-            Pump(); // 毎フレーム呼ぶのを忘れた場合に備えてここでも呼ぶ
-            return Volatile.Read(ref _asyncState) != 0;
+            Log.Debug($"Texture: Load failed: {Path}");
+            Handle = -1;
+            return false;
         }
+        SetUseTransColor(FALSE);                 // 色キー透過は使わない
+        SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);   // 念のため標準ブレンドに戻す
+        SetDrawBright(255, 255, 255);
+        SetDrawAddColor(0, 0, 0);
+        Handle = handle;
+        // サイズ取得
+        if (GetGraphSize(handle, out int w, out int h) != 0)
+        {
+            // 失敗してもとりあえず 0 のまま返す
+            w = h = 0;
+        }
+        Width = w;
+        Height = h;
+        // 非同期かどうかを即チェック（ここはメインスレッド想定）
+        WriteState((CheckHandleASyncLoad(Handle) == 0) ? State_Success : State_Loading);
+        return true;
     }
-    public bool Enable => Handle > 0 && Loaded;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
-    private bool _deferred;
-    private long _startTicks;
-    private const int DefaultTimeoutMs = 15000;
-    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+
+    public bool Enable => LoadFinished && Handle > 0;
+    public bool IsReady => LoadReady;
+    public bool IsFailed => LoadFailed;
+    public bool Loaded => LoadFinished;
 
     public void Pump()
     {
-        // メインスレッドでのみ触る
-        if (!IsMainThread) return;
+        PumpAsync();
+        if (!IsMainThread) return; // メインスレッドでのみ触る
+
+        // 非同期ロードの完了待ち
+        if (Loading && CheckHandleASyncLoad(Handle) == 0)
+        {
+            WriteState(State_Success);
+            return;
+        }
 
         if (Handle > 0 && Width + Height == 0)
         {
@@ -124,30 +119,6 @@ internal sealed class DxLibTexture : ITexture
             }
             Width = w;
             Height = h;
-        }
-
-        // 保留中ならメインスレッドでロード開始
-        if (_deferred)
-        {
-            _deferred = false;
-            Load();
-            return;
-        }
-        if (Volatile.Read(ref _asyncState) != 0) return; // Loading 以外は何もしない
-
-        // 非同期ロードの完了待ち
-        if (CheckHandleASyncLoad(Handle) == 0)
-        {
-            Volatile.Write(ref _asyncState, 1); // Ready
-            return;
-        }
-        // タイムアウト判定
-        long elapsed = Environment.TickCount64 - _startTicks;
-        if (TimeoutMs > 0 && elapsed >= TimeoutMs)
-        {
-            Log.Debug($"Texture: Load timeout: {Path}");
-            Dispose();
-            return;
         }
     }
     #endregion

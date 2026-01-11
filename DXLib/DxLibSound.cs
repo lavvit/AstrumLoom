@@ -1,7 +1,7 @@
 ﻿using static DxLibDLL.DX;
 namespace AstrumLoom.DXLib;
 
-public class DxLibSound : ISound
+public class DxLibSound : AsyncLoadableBase, ISound
 {
     public string Path { get; private set; } = "";
     public int Handle { get; private set; } = -1;
@@ -19,77 +19,71 @@ public class DxLibSound : ISound
     }
     public void Dispose()
     {
-        if (Handle > 0)
-        {
-            DeleteSoundMem(Handle);
-        }
-        Handle = -1;
-        _asyncState = -1;
+        DisposeAsync(DisposeSfx);
         GC.SuppressFinalize(this);
     }
-    #region 読み込み
-    public void Load()
+    private bool DisposeSfx()
     {
-        if (!File.Exists(Path))
+        if (IsMainThread)
         {
-            Log.Debug($"Sound: not found: {Path}");
-            Volatile.Write(ref _asyncState, -1);
-            Handle = -1;
-            return;
-        }
-        // メインスレッドでのみ触る
-        if (!IsMainThread)
-        {
-            _deferred = true;
-            _asyncState = 0;   // Loading扱い
-            return;
+            try
+            {
+                if (Handle > 0)
+                    DeleteSoundMem(Handle);
+                Handle = -1;
+                return true;
+            }
+            catch { Log.Error($"Failed to unload texture: {Path}"); }
         }
         else
         {
-            int handle = LoadSoundMem(Path);
-            if (handle < 0)
-            {
-                Log.Debug($"Sound: Load failed: {Path}");
-                Volatile.Write(ref _asyncState, -1);
-                Handle = -1;
-                return;
-            }
-
-            Handle = handle;
-            _startTicks = Environment.TickCount64;
-
-            // 長さ取得
-            long l = GetSoundTotalTime(Handle);
-            Length = (int)l;
-            Frequency = GetFrequency();
-
-            Volatile.Write(ref _asyncState, (CheckHandleASyncLoad(Handle) == 0) ? 1 : 0);
+            //Log.Debug($"Texture dispose skipped: not main thread : {Path}");
+            AstrumCore.RequestDispose(this);
+            return true;
         }
+        return false;
     }
-
-    // 0=Loading, 1=Ready, -1=Failed
-    private int _asyncState = -1;
-    public bool IsReady => Volatile.Read(ref _asyncState) == 1;
-    public bool IsFailed => Volatile.Read(ref _asyncState) == -1;
-    public bool Loaded
+    #region 読み込み
+    public void Load() => LoadAsync(LoadSfx);
+    private bool LoadSfx()
     {
-        get
+        bool file = FileCheck(Path);
+        if (!file) return false;
+
+        int handle = LoadSoundMem(Path);
+        if (handle < 0)
         {
-            Pump(); // 毎フレーム呼ぶのを忘れた場合に備えてここでも呼ぶ
-            return Volatile.Read(ref _asyncState) != 0;
+            Log.Debug($"Sound: Load failed: {Path}");
+            Handle = -1;
+            return false;
         }
+
+        Handle = handle;
+
+        // 長さ取得
+        long l = GetSoundTotalTime(Handle);
+        Length = (int)l;
+        Frequency = GetFrequency();
+
+        WriteState((CheckHandleASyncLoad(Handle) == 0) ? State_Success : State_Loading);
+        return true;
     }
-    public bool Enable => Handle > 0 && Loaded;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
-    private bool _deferred;
-    private long _startTicks;
-    private const int DefaultTimeoutMs = 60000;
-    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+    public bool Enable => LoadFinished && Handle > 0;
+    public bool IsReady => LoadReady;
+    public bool IsFailed => LoadFailed;
+    public bool Loaded => LoadFinished;
 
     public void Pump()
     {
-        // メインスレッドでのみ触る
-        if (!IsMainThread) return;
+        PumpAsync();
+        if (!IsMainThread) return; // メインスレッドでのみ触る
+
+        // 非同期ロードの完了待ち
+        if (Loading && CheckHandleASyncLoad(Handle) == 0)
+        {
+            WriteState(State_Success);
+            return;
+        }
 
         if (Handle > 0)
         {
@@ -103,30 +97,6 @@ public class DxLibSound : ISound
             {
                 Frequency = GetFrequency();
             }
-        }
-
-        // 保留中ならメインスレッドでロード開始
-        if (_deferred)
-        {
-            _deferred = false;
-            Load();
-            return;
-        }
-        if (Volatile.Read(ref _asyncState) != 0) return; // Loading 以外は何もしない
-
-        // 非同期ロードの完了待ち
-        if (CheckHandleASyncLoad(Handle) == 0)
-        {
-            Volatile.Write(ref _asyncState, 1); // Ready
-            return;
-        }
-        // タイムアウト判定
-        long elapsed = Environment.TickCount64 - _startTicks;
-        if (TimeoutMs > 0 && elapsed >= TimeoutMs)
-        {
-            Log.Debug($"Sound: Load timeout: {Path}");
-            Dispose();
-            return;
         }
     }
     #endregion
