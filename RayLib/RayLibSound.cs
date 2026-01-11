@@ -5,7 +5,7 @@ using static Raylib_cs.Raylib;
 using RSound = Raylib_cs.Sound;
 namespace AstrumLoom.RayLib;
 
-public class RayLibSound : ISound
+public class RayLibSound : AsyncLoadableBase, ISound
 {
     public string Path { get; private set; } = "";
     public RSound Sfx { get; private set; }
@@ -24,125 +24,96 @@ public class RayLibSound : ISound
     }
     public void Dispose()
     {
-        if (_loaded)
-            UnloadSound(Sfx);
-        if (_streamloaded)
-            UnloadMusicStream(Music);
-        Sfx = default;
-        Music = default;
-        _asyncState = -1;
+        DisposeAsync(DisposeSfx);
         GC.SuppressFinalize(this);
+    }
+    public bool DisposeSfx()
+    {
+        if (!Raylib.IsWindowReady())
+        {
+            Log.Debug($"Sound dispose skipped: window not ready : {Path}");
+            // ウィンドウ未準備でもマネージ側は終了扱いにしてファイナライザ再入を避ける
+            Sfx = default;
+            Music = default;
+            return true;
+        }
+
+        if (IsMainThread)
+        {
+            try
+            {
+                if (_loaded)
+                    UnloadSound(Sfx);
+                if (_streamloaded)
+                    UnloadMusicStream(Music);
+                Sfx = default;
+                Music = default;
+            }
+            catch { Log.Error($"Failed to unload sound: {Path}"); }
+        }
+        else
+            AstrumCore.RequestDispose(this);
+        return true;
     }
     private bool _loaded => Sfx.FrameCount > 0;
     private bool _streamloaded => Music.FrameCount > 0;
 
     #region 読み込み
     public void Load(bool streaming = true)
+        => LoadAsync(this, () => LoadSfx(streaming), () => LoadBackGround(streaming));
+    private bool LoadSfx(bool streaming)
     {
-        if (!File.Exists(Path))
+        bool file = FileCheck(Path);
+        if (!file) return false;
+
+        // PNG/JPG/BMP等そのままOK
+        Sfx = LoadSound(Path);
+        Music = LoadMusicStream(Path);
+
+        // 初期状態をセット
+        if (!_loaded)
         {
-            Log.Debug($"Sound: not found: {Path}");
-            Volatile.Write(ref _asyncState, -1);
-            return;
+            return false;
         }
-        // メインスレッドでのみ触る
-        if (!IsMainThread)
+
+        // 長さ取得
+        float l = GetMusicTimeLength(Music) * 1000.0f;
+        Length = (int)l;
+
+        if (!streaming)
         {
-            Task.Run(() =>
-            {
-                try
-                {
-                    _startTicks = Environment.TickCount64;
-                    _pendingBytes = File.ReadAllBytes(Path);
-                    _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
-                }
-                catch
-                {
-                    _pendingBytes = null;
-                    _asyncState = -1;   // Failed
-                }
-            });
-            _deferred = true;
-            _asyncState = 0;   // Loading扱い
-            return;
+            // メモリを節約するために Music を解放
+            UnloadMusicStream(Music);
+            Music = default;
         }
-        else
+        return true;
+    }
+    private bool LoadBackGround(bool streaming)
+    {
+        try
         {
-            // PNG/JPG/BMP等そのままOK
-            Sfx = LoadSound(Path);
-            Music = LoadMusicStream(Path);
-            _startTicks = Environment.TickCount64;
-
-            // 初期状態をセット
-            if (!_loaded)
-            {
-                _asyncState = -1;
-                return;
-            }
-
-            // 長さ取得
-            float l = GetMusicTimeLength(Music) * 1000.0f;
-            Length = (int)l;
-
-            if (!streaming)
-            {
-                // メモリを節約するために Music を解放
-                UnloadMusicStream(Music);
-                Music = default;
-            }
-
-            Volatile.Write(ref _asyncState, 1); // Ready
+            _pendingBytes = File.ReadAllBytes(Path);
+            _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
+            return true;
+        }
+        catch
+        {
+            _pendingBytes = null;
+            return false;
         }
     }
-
-    // 0=Loading, 1=Ready, -1=Failed
-    private int _asyncState = -1;
-    public bool IsReady => Volatile.Read(ref _asyncState) == 1;
-    public bool IsFailed => Volatile.Read(ref _asyncState) == -1;
-    public bool Loaded
-    {
-        get
-        {
-            Pump(); // 毎フレーム呼ぶのを忘れた場合に備えてここでも呼ぶ
-            return Volatile.Read(ref _asyncState) != 0;
-        }
-    }
-    public bool Enable => _loaded && Loaded;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
-    private bool _deferred;
-    private long _startTicks;
-    private const int DefaultTimeoutMs = 60000;
     private byte[]? _pendingBytes;
     private string? _pendingExt; // ".png" ".ogg" など
-    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+
+    public bool Enable => LoadFinished && _loaded;
+    public bool IsReady => LoadReady;
+    public bool IsFailed => LoadFailed;
+    public bool Loaded => LoadFinished;
 
     public void Pump()
     {
-        // メインスレッドでのみ触る
-        if (!IsMainThread) return;
-
-        if (_loaded)
-        {
-            if (Length == 0)
-            {
-                // サイズ取得
-                float l = GetMusicTimeLength(Music) * 1000.0f;
-                Length = (int)l;
-            }
-            if (Frequency == 0)
-            {
-                //Frequency = GetFrequency();
-            }
-        }
-
-        // 保留中ならメインスレッドでロード開始
-        if (_deferred)
-        {
-            _deferred = false;
-            Load();
-            return;
-        }
-        if (Volatile.Read(ref _asyncState) != 0) return; // Loading 以外は何もしない
+        PumpAsync();
+        if (!IsMainThread) return; // メインスレッドでのみ触る
 
         // 非同期ロードの完了待ち
         if (_pendingBytes != null)
@@ -157,19 +128,25 @@ public class RayLibSound : ISound
                 // BGM用に Music も（ファイルパスからでOK）※必要なら別APIに分けても良い
                 Music = LoadMusicStream(Path);
 
-                Volatile.Write(ref _asyncState, 1);
+                WriteState(State_Success);
             }
-            catch { _asyncState = -1; }
+            catch { WriteState(State_Failed); }
             finally { _pendingBytes = null; _pendingExt = null; }
             return;
         }
-        // タイムアウト判定
-        long elapsed = Environment.TickCount64 - _startTicks;
-        if (TimeoutMs > 0 && elapsed >= TimeoutMs)
+
+        if (_loaded)
         {
-            Log.Debug($"Sound: Load timeout: {Path}");
-            Dispose();
-            return;
+            if (Length == 0)
+            {
+                // サイズ取得
+                float l = GetMusicTimeLength(Music) * 1000.0f;
+                Length = (int)l;
+            }
+            if (Frequency == 0)
+            {
+                //Frequency = GetFrequency();
+            }
         }
     }
     #endregion

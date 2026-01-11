@@ -6,7 +6,7 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
-internal sealed class RayLibTexture : ITexture
+internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
 {
     public string Path { get; private set; } = "";
     public Texture2D Native { get; private set; }
@@ -26,21 +26,22 @@ internal sealed class RayLibTexture : ITexture
         Path = path;
         Load();
     }
-    private bool _disposed;
     ~RayLibTexture() { Dispose(); }
 
     public void Dispose()
     {
-        if (_disposed) return;
+        DisposeAsync(DisposeTx);
+        GC.SuppressFinalize(this);
+    }
+    private bool DisposeTx()
+    {
         if (!Raylib.IsWindowReady())
         {
             Log.Debug($"Texture dispose skipped: window not ready : {Path}");
             // ウィンドウ未準備でもマネージ側は終了扱いにしてファイナライザ再入を避ける
-            _disposed = true;
             Native = default;
             _renderTex = default;
-            GC.SuppressFinalize(this);
-            return;
+            return true;
         }
 
         // ネイティブ解放はメインスレッドかつウィンドウが有効な時のみ
@@ -52,18 +53,14 @@ internal sealed class RayLibTexture : ITexture
                 {
                     // RenderTexture の解放は内部の Texture も同時に解放される
                     Raylib.UnloadRenderTexture(_renderTex);
-                    _disposed = true;
                     Native = default;
                     _renderTex = default;
-                    GC.SuppressFinalize(this);
                 }
                 catch { Log.Error($"Failed to unload render texture: {Path}"); }
             }
             else
-            {
-                AstrumLoom.AstrumCore.RequestDispose(this);
-            }
-            return;
+                AstrumCore.RequestDispose(this);
+            return true;
         }
 
         if (Native.Id != 0)
@@ -73,152 +70,92 @@ internal sealed class RayLibTexture : ITexture
                 try
                 {
                     Raylib.UnloadTexture(Native);
-                    _disposed = true;
                     Native = default;
-                    GC.SuppressFinalize(this);
                 }
                 catch { Log.Error($"Failed to unload texture: {Path}"); }
             }
             else
             {
                 //Log.Debug($"Texture dispose skipped: not main thread : {Path}");
-                AstrumLoom.AstrumCore.RequestDispose(this);
+                AstrumCore.RequestDispose(this);
             }
         }
         else
         {
-            _disposed = true;
             Native = default;
-            GC.SuppressFinalize(this);
+            return true;
         }
+        return false;
     }
     #region 読み込み
     internal static RenderTexture2D RenderTexture2D { get; private set; }
-    public void Load()
+    public void Load() => LoadAsync(this, LoadTx, LoadBackGround);
+    private bool LoadTx()
     {
-        if (_renderInfo == null)
-        {
-            if (string.IsNullOrEmpty(Path))
-            {
-                Volatile.Write(ref _asyncState, -1);
-                return;
-            }
-            if (!File.Exists(Path))
-            {
-                Log.Debug($"Texture: not found: {Path}");
-                Volatile.Write(ref _asyncState, -1);
-                return;
-            }
-        }
+        bool file = FileCheck(Path);
+        if (_renderInfo == null && !file)
+            return false;
 
-        bool pathLoad = !string.IsNullOrEmpty(Path) && File.Exists(Path) && _renderInfo == null;
-        if (!IsMainThread)
+        bool pathLoad = file && _renderInfo == null;
+        if (_renderInfo != null)
         {
-            Task.Run(() =>
-            {
-                if (pathLoad)
-                {
-                    try
-                    {
-                        _startTicks = Environment.TickCount64;
-                        _pendingBytes = File.ReadAllBytes(Path);
-                        _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
-                    }
-                    catch
-                    {
-                        _pendingBytes = null;
-                        _asyncState = -1;   // Failed
-                    }
-                }
-            });
-            _deferred = true;
-            _asyncState = 0;   // Loading扱い
-            return;
+            int width = (int)_renderInfo.Value.size.Width;
+            int height = (int)_renderInfo.Value.size.Height;
+            var callback = _renderInfo.Value.callback;
+            if (width <= 0 || height <= 0)
+                return false;
+            var renderTex = Raylib.LoadRenderTexture(width, height);
+            Raylib.BeginTextureMode(renderTex);
+            RenderTexture2D = renderTex;
+            callback?.Invoke();
+            RenderTexture2D = default;
+            Raylib.EndTextureMode();
+            // RenderTexture を所有する RayLibTexture として返す
+            _renderTex = renderTex;
+            Native = renderTex.Texture;
         }
         else
         {
-            if (_renderInfo != null)
-            {
-                int width = (int)_renderInfo.Value.size.Width;
-                int height = (int)_renderInfo.Value.size.Height;
-                var callback = _renderInfo.Value.callback;
-                if (width <= 0 || height <= 0)
-                {
-                    Volatile.Write(ref _asyncState, -1);
-                    return;
-                }
-                var renderTex = Raylib.LoadRenderTexture(width, height);
-                Raylib.BeginTextureMode(renderTex);
-                RenderTexture2D = renderTex;
-                callback?.Invoke();
-                RenderTexture2D = default;
-                Raylib.EndTextureMode();
-                // RenderTexture を所有する RayLibTexture として返す
-                _renderTex = renderTex;
-                Native = renderTex.Texture;
-            }
-            else
-            {
-                // PNG/JPG/BMP等そのままOK
-                Native = Raylib.LoadTexture(Path);
-            }
-            _startTicks = Environment.TickCount64;
-
-            // 初期状態をセット
-            if (Native.Id == 0)
-            {
-                _asyncState = -1;
-                return;
-            }
-
-            // サイズ取得
-            int w = Native.Width, h = Native.Height;
-            Width = w;
-            Height = h;
-
-            Volatile.Write(ref _asyncState, 1); // Ready
+            // PNG/JPG/BMP等そのままOK
+            Native = Raylib.LoadTexture(Path);
         }
+
+        // 初期状態をセット
+        if (Native.Id == 0)
+            return false;
+
+        // サイズ取得
+        int w = Native.Width, h = Native.Height;
+        Width = w;
+        Height = h;
+
+        return true;
     }
 
-    // 0=Loading, 1=Ready, -1=Failed
-    private int _asyncState = -1;
-    public bool IsReady => Volatile.Read(ref _asyncState) == 1;
-    public bool IsFailed => Volatile.Read(ref _asyncState) == -1;
-    public bool Loaded
+    public bool LoadBackGround()
     {
-        get
+        bool file = FileCheck(Path);
+        bool pathLoad = file && _renderInfo == null;
+        if (pathLoad)
         {
-            Pump(); // 毎フレーム呼ぶのを忘れた場合に備えてここでも呼ぶ
-            return Volatile.Read(ref _asyncState) != 0;
+            try
+            {
+                _pendingBytes = File.ReadAllBytes(Path);
+                _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
+            }
+            catch
+            {
+                _pendingBytes = null;
+            }
+            return true;
         }
+        return false;
     }
-    public bool Enable => Loaded && Native.Id > 0 && !_disposed;
-    private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
-    private bool _deferred;
-    private long _startTicks;
-    private const int DefaultTimeoutMs = 15000;
-    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
 
     public void Pump()
     {
-        // メインスレッドでのみ触る
-        if (!IsMainThread) return;
-
-        if (Native.Id > 0 && Width + Height == 0)
-        {
-            int w = Native.Width, h = Native.Height;
-            Width = w;
-            Height = h;
-        }
-
-        // 保留中ならメインスレッドでロード開始
-        if (_deferred)
-        {
-            _deferred = false;
-            Load();
-            return;
-        }
-        if (Volatile.Read(ref _asyncState) != 0) return; // Loading 以外は何もしない
+        PumpAsync();
+        if (!IsMainThread) return; // メインスレッドでのみ触る
 
         // 非同期ロードの完了待ち
         if (_pendingBytes != null)
@@ -230,23 +167,28 @@ internal sealed class RayLibTexture : ITexture
                 Native = Raylib.LoadTextureFromImage(img);
                 Raylib.UnloadImage(img);
 
-                Volatile.Write(ref _asyncState, 1);
+                WriteState(State_Success);
             }
-            catch { _asyncState = -1; }
+            catch { WriteState(State_Failed); }
             finally { _pendingBytes = null; _pendingExt = null; }
             return;
         }
-        // タイムアウト判定
-        long elapsed = Environment.TickCount64 - _startTicks;
-        if (TimeoutMs > 0 && elapsed >= TimeoutMs)
+
+        if (Native.Id > 0 && Width + Height == 0)
         {
-            Log.Debug($"Texture: Load timeout: {Path}");
-            Dispose();
-            return;
+            int w = Native.Width, h = Native.Height;
+            Width = w;
+            Height = h;
         }
     }
     private byte[]? _pendingBytes;
     private string? _pendingExt; // ".png" ".ogg" など
+
+    public bool Enable => LoadFinished && Native.Id > 0;
+    public bool IsReady => LoadReady;
+    public bool IsFailed => LoadFailed;
+    public bool Loaded => LoadFinished;
+
     #endregion
     public DrawOptions? Option { get; set; } = new DrawOptions();
     public void Draw(double x, double y, DrawOptions? options)

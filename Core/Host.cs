@@ -119,12 +119,15 @@ public abstract class AsyncLoadableBase
             // メインスレッドで後からロード
             if (_bgloadfuncs != null && _bgloadfuncs?.Load != null)
             {
-                bool result = _bgloadfuncs?.Load() ?? false;
-                if (result)
+                Task.Run(() =>
                 {
-                    WriteState(State_Loading); // Loading
-                    return;
-                }
+                    bool result = _bgloadfuncs?.Load() ?? false;
+                    if (result)
+                    {
+                        WriteState(State_Loading); // Loading
+                        return;
+                    }
+                });
             }
             if (!_deferred)
             {
@@ -193,6 +196,7 @@ public abstract class AsyncLoadableBase
         {
             if (Path.GetFileName(path).Length > 0)
                 Log.Debug($"{GetType().Name}: not found: {path}");
+            WriteState(State_Failed);
             return false;
         }
     }
