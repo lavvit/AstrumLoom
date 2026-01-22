@@ -160,7 +160,7 @@ public class Skin
         w = (int)(size.Width > 0 ? size.Width : SkinConfigValue("Width"));
         h = (int)(size.Height > 0 ? size.Height : SkinConfigValue("Height"));
 
-        if (Width == 0 || Height == 0)
+        if (w == 0 || h == 0)
         {
             var tex = GetTexture("Title");
             w = tex.Width;
@@ -387,7 +387,8 @@ public class Skin
     public static void CheckResource()
     {
         // Remove invalid or disposed Textures
-        foreach (string? key in Textures.Keys.ToList())
+        List<string> texlist = [.. Textures.Keys];
+        foreach (string? key in texlist)
         {
             var tex = Textures[key];
             // Pump may update internal state; keep minimal side effects
@@ -401,7 +402,8 @@ public class Skin
         }
 
         // Remove invalid or disposed Sounds
-        foreach (string? key in Sounds.Keys.ToList())
+        List<string> sndlist = [.. Sounds.Keys];
+        foreach (string? key in sndlist)
         {
             var snd = Sounds[key];
             snd?.Pump();
@@ -413,7 +415,8 @@ public class Skin
         }
 
         // Remove invalid Numbers (based on Enable or internal texture state if any)
-        foreach (string? key in Numbers.Keys.ToList())
+        List<string> nblist = [.. Numbers.Keys];
+        foreach (string? key in nblist)
         {
             var num = Numbers[key];
             if (num == null || !num.Loaded)
@@ -424,7 +427,8 @@ public class Skin
         }
 
         // Fonts: keep DefaultFont fallback; remove entries that are null
-        foreach (string? key in Fonts.Keys.ToList())
+        List<string> fntlist = [.. Fonts.Keys];
+        foreach (string? key in fntlist)
         {
             var fon = Fonts[key];
             if (fon == null)

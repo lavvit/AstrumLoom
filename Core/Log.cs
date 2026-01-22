@@ -18,9 +18,11 @@ public class Log
             LogMessages.Add(logEntry);
     }
     public static void Write(string message, bool timestamp) => Write(message, LogLevel.Info, timestamp);
-    public static void Write(Exception ex) => Error($"{ex.GetType()}: {ex.Message}\n{ex.StackTrace}");
+    public static void Write(Exception ex) => Error(ex);
     public static void Warning(string message, bool timestamp = false) => Write(message, LogLevel.Warning, timestamp);
     public static void Error(string message) => Write(message, LogLevel.Error, true);
+    public static void Error(Exception ex, string message = "") => Write(message +
+        $"{(!string.IsNullOrEmpty(message) ? "\n" : "")}{ex.GetType()}: {ex.Message}\n{ex.StackTrace}", LogLevel.Error, true);
     public static void Debug(string message, bool timestamp = false) => Write(message, LogLevel.Debug, timestamp);
     public static void EmptyLine() => Write("");
 
@@ -79,14 +81,18 @@ public class Log
 
         int size = Drawing.FontSize();
         int width = Drawing.TextSize(string.Join("\n", loglist).Trim()).width;
-        int height = size * loglist.Count;
+        int height = size * logCount(loglist);
         Drawing.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
+        int h = 0;
         for (int i = 0; i < loglist.Count; i++)
         {
             var log = loglist[i];
-            Drawing.Text(x, y + i * size, log, log.Color);
+            Drawing.Text(x, y + h * size, log, log.Color);
+            h += log.Message.Split('\n').Length;
         }
     }
+
+    private static int logCount(List<LogEntry> logs) => logs.Sum(l => l.Message.Split('\n').Length);
 }
 
 public class LogEntry(string message, LogLevel level)
