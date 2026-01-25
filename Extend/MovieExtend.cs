@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+
 using FFMpegCore;
 
 namespace AstrumLoom.Extend;
@@ -6,14 +7,12 @@ namespace AstrumLoom.Extend;
 internal sealed class MovieExtend : IMovie, IDisposable
 {
     private const int TextureCacheLimit = 6;
-
-    private readonly string _path;
     private readonly string _workDir = string.Empty;
     private readonly string _framesDir = string.Empty;
     private readonly CancellationTokenSource _cts = new();
     private readonly object _stateLock = new();
     private readonly object _cacheLock = new();
-    private readonly Dictionary<int, ITexture> _textureCache = new();
+    private readonly Dictionary<int, ITexture> _textureCache = [];
     private readonly LinkedList<int> _recentFrames = new();
 
     private Task? _prepareTask;
@@ -22,8 +21,6 @@ internal sealed class MovieExtend : IMovie, IDisposable
     private IReadOnlyList<string> _frameFiles = Array.Empty<string>();
     private double _frameDurationMs = 33.34;
     private double _timeMs;
-    private bool _loop;
-    private bool _playing;
     private double _volume = 1.0;
     private double _pan;
     private double _pitch = 1.0;
@@ -35,10 +32,10 @@ internal sealed class MovieExtend : IMovie, IDisposable
 
     public MovieExtend(string path)
     {
-        _path = path ?? throw new ArgumentNullException(nameof(path));
-        if (!File.Exists(_path))
+        Path = path ?? throw new ArgumentNullException(nameof(path));
+        if (!File.Exists(Path))
         {
-            Log.Warning($"MovieExtend: file not found: {_path}");
+            Log.Warning($"MovieExtend: file not found: {Path}");
             _asyncState = -1;
             return;
         }
@@ -54,7 +51,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _prepareTask = PrepareAsync(_cts.Token);
     }
 
-    public string Path => _path;
+    public string Path { get; }
     public int Width { get; private set; }
     public int Height { get; private set; }
     public int Length { get; private set; }
@@ -77,7 +74,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         set
         {
             _volume = Math.Clamp(value, 0.0, 1.0);
-            if (_sound != null) _sound.Volume = _volume;
+            _sound?.Volume = _volume;
         }
     }
 
@@ -87,7 +84,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         set
         {
             _pan = Math.Clamp(value, -1.0, 1.0);
-            if (_sound != null) _sound.Pan = _pan;
+            _sound?.Pan = _pan;
         }
     }
 
@@ -97,7 +94,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         set
         {
             _pitch = value;
-            if (_sound != null) _sound.Pitch = _pitch;
+            _sound?.Pitch = _pitch;
         }
     }
 
@@ -107,26 +104,25 @@ internal sealed class MovieExtend : IMovie, IDisposable
         set
         {
             _speed = value <= 0 ? 1.0 : value;
-            if (_sound != null) _sound.Speed = _speed;
+            _sound?.Speed = _speed;
         }
     }
 
-    public bool IsPlaying => _playing;
+    public bool IsPlaying { get; private set; }
 
     public bool Loop
     {
-        get => _loop;
-        set
+        get; set
         {
-            _loop = value;
-            if (_sound != null) _sound.Loop = value;
+            field = value;
+            _sound?.Loop = value;
         }
     }
 
     public void Play()
     {
         if (!Enable) return;
-        if (_playing) return;
+        if (IsPlaying) return;
 
         if (_sound != null)
         {
@@ -143,15 +139,15 @@ internal sealed class MovieExtend : IMovie, IDisposable
             _clock.Restart();
         }
 
-        _playing = true;
+        IsPlaying = true;
     }
 
     public void Stop()
     {
-        if (!_playing) return;
+        if (!IsPlaying) return;
         _sound?.Stop();
         if (_clock.IsRunning) _clock.Reset();
-        _playing = false;
+        IsPlaying = false;
     }
 
     public void PlayStream() => Play();
@@ -167,7 +163,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
             return;
         }
 
-        if (_playing)
+        if (IsPlaying)
         {
             if (_sound != null && _sound.Enable)
             {
@@ -201,11 +197,11 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
-    public void Draw(double x, double y, DrawOptions? options)
+    public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
         var tex = GetTextureForCurrentFrame();
-        tex?.Draw(x, y, options ?? Option);
+        tex?.Draw(x, y, option);
     }
 
     public void Dispose()
@@ -246,7 +242,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
     {
         try
         {
-            var analysis = await FFProbe.AnalyseAsync(_path).ConfigureAwait(false);
+            var analysis = await FFProbe.AnalyseAsync(Path).ConfigureAwait(false);
             Width = analysis.PrimaryVideoStream?.Width ?? Width;
             Height = analysis.PrimaryVideoStream?.Height ?? Height;
             Length = analysis.Duration != TimeSpan.Zero
@@ -291,20 +287,17 @@ internal sealed class MovieExtend : IMovie, IDisposable
     {
         string pattern = System.IO.Path.Combine(_framesDir, "frame_%08d.png");
         var args = FFMpegArguments
-            .FromFileInput(_path)
-            .OutputToFile(pattern, overwrite: true, options =>
-            {
-                options.WithCustomArgument("-an")
+            .FromFileInput(Path)
+            .OutputToFile(pattern, overwrite: true, options => options.WithCustomArgument("-an")
                     .WithCustomArgument("-vcodec png")
                     .WithCustomArgument("-pix_fmt rgba")
                     .WithCustomArgument("-vsync 0")
-                    .ForceFormat("image2");
-            });
+                    .ForceFormat("image2"));
 
         await args.ProcessAsynchronously(true).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
 
-        var files = Directory.GetFiles(_framesDir, "frame_*.png", SearchOption.TopDirectoryOnly);
+        string[] files = Directory.GetFiles(_framesDir, "frame_*.png", SearchOption.TopDirectoryOnly);
         Array.Sort(files, StringComparer.Ordinal);
         _frameFiles = files;
     }
@@ -313,17 +306,14 @@ internal sealed class MovieExtend : IMovie, IDisposable
     {
         _audioPath = System.IO.Path.Combine(_workDir, "audio.wav");
         var args = FFMpegArguments
-            .FromFileInput(_path)
-            .OutputToFile(_audioPath, overwrite: true, options =>
-            {
-                options.WithCustomArgument("-vn")
+            .FromFileInput(Path)
+            .OutputToFile(_audioPath, overwrite: true, options => options.WithCustomArgument("-vn")
                     .WithCustomArgument("-acodec pcm_s16le")
-                    .ForceFormat("wav");
-            });
+                    .ForceFormat("wav"));
 
         await args.ProcessAsynchronously(true).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        _sound = new SoundExtend(_audioPath, loop: _loop, prescan: true);
+        _sound = new SoundExtend(_audioPath, loop: Loop, prescan: true);
     }
 
     private void ApplyAudioState()
@@ -333,7 +323,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _sound.Pan = _pan;
         _sound.Pitch = _pitch;
         _sound.Speed = _speed;
-        _sound.Loop = _loop;
+        _sound.Loop = Loop;
     }
 
     private void Seek(double targetMs)
@@ -423,12 +413,9 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
-    private static double GetFrameRate(VideoStream? stream)
-    {
-        if (stream == null) return 0;
-        if (stream.AverageFrameRate > 0) return stream.AverageFrameRate;
-        if (stream.AvgFrameRate > 0) return stream.AvgFrameRate;
-        if (stream.FrameRate > 0) return stream.FrameRate;
-        return 0;
-    }
+    private static double GetFrameRate(VideoStream? stream) => stream == null
+            ? 0
+            : stream.AverageFrameRate > 0
+            ? stream.AverageFrameRate
+            : stream.AvgFrameRate > 0 ? stream.AvgFrameRate : stream.FrameRate > 0 ? stream.FrameRate : 0;
 }

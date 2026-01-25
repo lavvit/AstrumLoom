@@ -93,6 +93,48 @@ public struct DrawOptions
     // フォント用
     public IFont? Font { get; set; } = null;
     public Color? EdgeColor { get; set; } = null;
+
+    public readonly DrawOptions Temp(DrawOption? option)
+    {
+        if (option == null) return this;
+        var result = this;
+        var opt = option.Value;
+        if (opt.Color != null) result.Color = opt.Color;
+        if (opt.Opacity != null) result.Opacity = opt.Opacity.Value;
+        if (opt.Thickness != null) result.Thickness = opt.Thickness.Value;
+        if (opt.Blend != null) result.Blend = opt.Blend.Value;
+        if (opt.Point != null) result.Point = opt.Point.Value;
+        if (opt.Scale != null) result.Scale = opt.Scale.Value;
+        if (opt.Angle != null) result.Angle = opt.Angle.Value;
+        if (opt.Flip != null) result.Flip = opt.Flip.Value;
+        if (opt.Position != null) result.Position = opt.Position;
+        if (opt.Rectangle != null) result.Rectangle = opt.Rectangle;
+        if (opt.Font != null) result.Font = opt.Font;
+        if (opt.EdgeColor != null) result.EdgeColor = opt.EdgeColor;
+        return result;
+    }
+}
+public struct DrawOption
+{
+    public DrawOption() { }
+    public Color? Color { get; set; }
+    public double? Opacity { get; set; }
+    public readonly bool? Fill => Thickness <= 0;
+    public int? Thickness { get; set; }
+    public BlendMode? Blend { get; set; }
+    public ReferencePoint? Point { get; set; }
+
+    // テクスチャ用
+    public (double W, double H)? Scale { get; set; }
+    public double? Angle { get; set; }
+    public (bool X, bool Y)? Flip { get; set; }
+
+    public Point? Position { get; set; } = null;
+    public Rect? Rectangle { get; set; } = null;
+
+    // フォント用
+    public IFont? Font { get; set; } = null;
+    public Color? EdgeColor { get; set; } = null;
 }
 
 public static class GraphicsExtensions

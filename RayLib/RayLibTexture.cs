@@ -190,11 +190,10 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     public bool Loaded => LoadFinished;
 
     #endregion
-    public DrawOptions? Option { get; set; } = new DrawOptions();
-    public void Draw(double x, double y, DrawOptions? options)
+    public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
-        var use = options ?? Option ?? new DrawOptions();
+        var use = option;
         SetOptions(use);
         (double width, double height) = use.Rectangle.HasValue
             ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)

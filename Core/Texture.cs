@@ -7,24 +7,13 @@ public interface ITexture : IResourse
     int Width { get; }
     int Height { get; }
 
-    DrawOptions? Option { get; set; }
-
-    void Draw(double x, double y, DrawOptions? options);
+    void Draw(double x, double y, DrawOptions option);
 }
 
 public static class TextureExtensions
 {
     public static void Draw(this ITexture texture, double x = 0, double y = 0)
-        => texture.Draw(x, y, null);
-
-    public static void Draw(this ITexture texture, double x, double y,
-        Color color = default,
-        BlendMode blend = BlendMode.None, double opacity = 1)
-        => texture.Draw(x, y, new DrawOptions
-        {
-            Color = color,
-            Opacity = opacity
-        });
+        => texture.Draw(x, y, new());
 }
 public class Texture : IDisposable
 {
@@ -39,8 +28,41 @@ public class Texture : IDisposable
 
     public ITexture Interface => _texture!;
 
-    public void Draw(double x = 0, double y = 0) => _texture?.Draw(x, y);
-    public void Draw(Point point) => _texture?.Draw(point.X, point.Y);
+    public void Draw(double x = 0, double y = 0)
+        => _texture?.Draw(x, y, Option);
+    public void Draw(double x, double y, DrawOption? option)
+        => _texture?.Draw(x, y, Option.Temp(option));
+    public void Draw(Point point, DrawOption? option = null) => _texture?.Draw(point.X, point.Y, Option);
+
+    public void Draw(double x, double y,
+        txScale? s = null,
+        ReferencePoint? point = null,
+        double? opacity = null,
+        Color? color = null,
+        BlendMode? blend = null)
+    {
+        var opt = new DrawOption()
+        {
+            Point = point,
+            Color = color,
+            Blend = blend,
+            Opacity = opacity,
+            Scale = s,
+        };
+        Draw(x, y, opt);
+    }
+    public struct txScale
+    {
+        public double X;
+        public double Y;
+        public static implicit operator txScale(double value)
+            => new() { X = value, Y = value };
+        public static implicit operator txScale((double x, double y) value)
+            => new() { X = value.x, Y = value.y };
+        public static implicit operator (double W, double H)(txScale value)
+            => (value.X, value.Y);
+    }
+
     public void Draw(double x, double y, Rect rectangle)
         => DrawRect(x, y, rectangle);
     public void DrawSize(double x, double y, Size size)
@@ -103,153 +125,56 @@ public class Texture : IDisposable
     public bool Enable => _texture?.Enable ?? false;
 
     #region DrawOptions Proxy
+    private DrawOptions Option = new();
     public double Opacity
     {
-        get => _texture?.Option?.Opacity ?? 1.0;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Opacity = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Opacity;
+        set => Option.Opacity = value;
     }
     public double Scale
     {
-        get => _texture?.Option?.Scale.W ?? 1.0;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Scale = (value, value);
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Scale.W;
+        set => Option.Scale = (value, value);
     }
     public (double X, double Y)? XYScale
     {
-        get => _texture?.Option?.Scale;
-        set
-        {
-            if (_texture?.Option != null && value != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Scale = value.Value;
-                _texture.Option = opt;
-            }
-            else if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Scale = (1.0, 1.0);
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Scale;
+        set => Option.Scale = value != null ? value.Value : (1.0, 1.0);
     }
     public Point? Position
     {
-        get => _texture?.Option?.Position;
-        set
-        {
-            if (_texture?.Option != null && value != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Position = value.Value;
-                _texture.Option = opt;
-            }
-            else if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Position = null;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Position;
+        set => Option.Position = value;
     }
     public ReferencePoint Point
     {
-        get => _texture?.Option?.Point ?? ReferencePoint.TopLeft;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Point = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Point;
+        set => Option.Point = value;
     }
     public Rect? Rectangle
     {
-        get => _texture?.Option?.Rectangle;
-        set
-        {
-            if (_texture?.Option != null && value != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Rectangle = value;
-                _texture.Option = opt;
-            }
-            else if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Rectangle = null;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Rectangle;
+        set => Option.Rectangle = value;
     }
     public Color Color
     {
-        get => _texture?.Option?.Color ?? Color.White;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Color = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Color ?? Color.White;
+        set => Option.Color = value;
     }
     public BlendMode BlendMode
     {
-        get => _texture?.Option?.Blend ?? BlendMode.None;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Blend = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Blend;
+        set => Option.Blend = value;
     }
     public double Angle
     {
-        get => _texture?.Option?.Angle ?? 0.0;
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Angle = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Angle;
+        set => Option.Angle = value;
     }
     public (bool X, bool Y) Flip
     {
-        get => _texture?.Option?.Flip ?? (false, false);
-        set
-        {
-            if (_texture?.Option != null)
-            {
-                var opt = _texture.Option.Value;
-                opt.Flip = value;
-                _texture.Option = opt;
-            }
-        }
+        get => Option.Flip;
+        set => Option.Flip = value;
     }
     #endregion
 
@@ -320,9 +245,9 @@ public class Texture : IDisposable
             Point = Point,
             Rectangle = rectangle,
             Flip = Flip,
-            EdgeColor = _texture?.Option?.EdgeColor,
-            Font = _texture?.Option?.Font,
-            Thickness = _texture?.Option?.Thickness ?? 0,
+            EdgeColor = Option.EdgeColor,
+            Font = Option.Font,
+            Thickness = Option.Thickness,
         };
         _texture?.Draw(x, y, options);
     }

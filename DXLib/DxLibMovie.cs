@@ -14,8 +14,6 @@ internal sealed class DxLibMovie : IMovie
     /// <summary>再生時間(ミリ秒)。取れない場合は 0。</summary>
     public int Length { get; private set; } = 0;
 
-    public DrawOptions? Option { get; set; }
-
     public DxLibMovie(string path)
     {
         Path = path;
@@ -253,18 +251,18 @@ internal sealed class DxLibMovie : IMovie
 
     #region 描画
 
-    public void Draw(double x, double y, DrawOptions? options)
+    public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
 
-        var use = options ?? Option ?? new DrawOptions();
+        var use = option;
         SetOptions(use);
 
         (double width, double height) = use.Rectangle.HasValue
             ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
             : (Width, Height);
 
-        var point = use.Position ?? Point(use.Rectangle);
+        var point = use.Position ?? Point(use.Point, use.Rectangle);
         point = new(Math.Abs(point.X), Math.Abs(point.Y));
 
         float defscale = (float)Drawing.DefaultScale;
@@ -301,10 +299,10 @@ internal sealed class DxLibMovie : IMovie
         ResetOptions(use);
     }
 
-    private Point Point(Rect? rectangle = null)
+    private Point Point(ReferencePoint point, Rect? rectangle = null)
     {
         if (!rectangle.HasValue) rectangle = new(0, 0, Width, Height);
-        return (Option?.Point ?? ReferencePoint.TopLeft) switch
+        return point switch
         {
             ReferencePoint.TopCenter => new(rectangle.Value.Width / 2, 0),
             ReferencePoint.TopRight => new(rectangle.Value.Width, 0),

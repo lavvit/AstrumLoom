@@ -123,17 +123,16 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     }
     #endregion
 
-    public DrawOptions? Option { get; set; } = new DrawOptions();
-    public void Draw(double x, double y, DrawOptions? options)
+    public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
-        var use = options ?? Option ?? new DrawOptions();
+        var use = option;
         SetOptions(use);
         (double width, double height) = use.Rectangle.HasValue
             ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
             : (Width, Height);
 
-        var point = use.Position ?? Point(use.Rectangle);// (GetAnchorOffset(use.Point, width, height) * -1);
+        var point = use.Position ?? Point(use.Point, use.Rectangle);// (GetAnchorOffset(use.Point, width, height) * -1);
         point = new(Math.Abs(point.X),
                  Math.Abs(point.Y));
         float defscale = (float)Drawing.DefaultScale;
@@ -158,10 +157,10 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         }
         ResetOptions(use);
     }
-    private Point Point(Rect? rectangle = null)
+    private Point Point(ReferencePoint point, Rect? rectangle = null)
     {
         if (!rectangle.HasValue) rectangle = new(0, 0, Width, Height);
-        return (Option?.Point ?? ReferencePoint.TopLeft) switch
+        return point switch
         {
             ReferencePoint.TopCenter => new(rectangle.Value.Width / 2, 0),
             ReferencePoint.TopRight => new(rectangle.Value.Width, 0),

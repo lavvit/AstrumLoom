@@ -1,6 +1,4 @@
-﻿using AstrumLoom;
-
-namespace AstrumLoom.RayLib;
+﻿namespace AstrumLoom.RayLib;
 
 public class RayLibMovie : IMovie
 {
@@ -11,11 +9,7 @@ public class RayLibMovie : IMovie
 
     public DrawOptions? Option { get; set; }
 
-    public RayLibMovie(string path)
-    {
-        Path = path;
-        // ここは後で FFmpeg 等で実装する想定
-    }
+    public RayLibMovie(string path) => Path = path;// ここは後で FFmpeg 等で実装する想定
 
     public bool IsReady => false;
     public bool IsFailed => true;
@@ -36,7 +30,7 @@ public class RayLibMovie : IMovie
     public void Pump() { }
     public void PlayStream() { }
 
-    public void Draw(double x, double y, DrawOptions? options) { }
+    public void Draw(double x, double y, DrawOptions option) { }
 
     public void Dispose() { }
 }

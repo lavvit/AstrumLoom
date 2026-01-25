@@ -42,10 +42,7 @@ public class Movie : IDisposable
         get => Inner?.Loop ?? false; set => Inner?.Loop = value;
     }
 
-    public DrawOptions? Option
-    {
-        get => Inner?.Option; set => Inner?.Option = value;
-    }
+    public DrawOptions Option = new();
 
     public double Speed
     {
@@ -54,40 +51,14 @@ public class Movie : IDisposable
 
     public (double X, double Y)? Scale
     {
-        get => Option?.Scale;
-        set
-        {
-            if (Option != null && value != null)
-            {
-                var opt = Option.Value;
-                opt.Scale = value.Value;
-                Option = opt;
-            }
-            else if (Option != null)
-            {
-                var opt = Option.Value;
-                opt.Scale = (1.0, 1.0);
-                Option = opt;
-            }
-            else if (value != null)
-            {
-                var opt = new DrawOptions
-                {
-                    Scale = value.Value
-                };
-                Option = opt;
-            }
-        }
+        get => Option.Scale;
+        set => Option.Scale = value ?? (1.0, 1.0);
     }
 
     /// <summary>0.0〜1.0 の再生位置。Length==0 のときは 0 扱い。</summary>
     public double Progress
     {
-        get
-        {
-            if (Inner == null) return 0;
-            return Inner.Length <= 0 ? 0 : Inner.Time / Inner.Length;
-        }
+        get => Inner == null ? 0 : Inner.Length <= 0 ? 0 : Inner.Time / Inner.Length;
         set
         {
             if (Inner == null) return;
@@ -104,8 +75,8 @@ public class Movie : IDisposable
 
     public void Draw(double x = 0, double y = 0) => Inner?.Draw(x, y);
 
-    public void Draw(double x, double y, DrawOptions? options)
-        => Inner?.Draw(x, y, options);
+    public void Draw(double x, double y, DrawOptions option)
+        => Inner?.Draw(x, y, option);
 
     public void Dispose()
     {
