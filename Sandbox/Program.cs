@@ -13,7 +13,7 @@ internal sealed class SimpleTestGame : Scene
         var ft = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
         if (ft != null) Drawing.DefaultFont = ft;
 
-        _scene = new TextureSoundDemoScene();
+        //_scene = new TextureSoundDemoScene();
         _scene?.Enable();
         Overlay.Set(new SandboxOverlay());
     }

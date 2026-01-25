@@ -7,7 +7,7 @@ internal sealed class InputTestScene : Scene
     private static readonly MouseButton[] MouseButtons = Enum.GetValues<MouseButton>();
 
     private readonly Queue<string> _eventLog = new();
-    private readonly List<Key> _pressedKeys = new();
+    private readonly List<Key> _pressedKeys = [];
     private readonly TextInputOptions _textOptions = new() { MaxLength = 64 };
 
     private IFont? _kbfont;
@@ -117,7 +117,7 @@ internal sealed class InputTestScene : Scene
             AddLog("Text input started");
         }
 
-        if (_textActive && KeyInput.Enter(ref _textBuffer, out var committed))
+        if (_textActive && KeyInput.Enter(ref _textBuffer, out string? committed))
         {
             if (!string.IsNullOrEmpty(committed))
             {
@@ -168,7 +168,7 @@ internal sealed class InputTestScene : Scene
         Drawing.Box(40, 360, 1200, 220, Color.Black);
         Drawing.Text(50, 370, $"Controllers: {Pad.Count}", Color.White);
 
-        var names = Pad.List ?? Array.Empty<string>();
+        string[] names = Pad.List ?? Array.Empty<string>();
         for (int i = 0; i < names.Length; i++)
         {
             string marker = i == _selectedPad ? "> " : "  ";
@@ -191,17 +191,17 @@ internal sealed class InputTestScene : Scene
         Drawing.Text(500, 390, $"Pad {_selectedPad}: {pad.Name}", Color.White);
         Drawing.Text(500, 410, $"Product: {pad.Product}  Type: {pad.Type}", Color.White);
 
-        var buttonStates = pad.Button
+        string?[] buttonStates = pad.Button
             .Select((value, index) => value != 0 ? index.ToString() : null)
             .Where(static value => value != null)
             .ToArray();
-        var triggerStates = pad.Trigger
+        string[] triggerStates = pad.Trigger
             .Select((value, index) => $"T{index}:{value:0.00}")
             .ToArray();
-        var stickStates = pad.Stick
+        string[] stickStates = pad.Stick
             .Select((state, index) => $"S{index}:(X:{state.X:0.00},Y:{state.Y:0.00})")
             .ToArray();
-        var deadZones = pad.Stick
+        string[] deadZones = pad.Stick
             .Select((state, index) => $"S{index}:{state.DeadZone}")
             .ToArray();
 
@@ -216,20 +216,14 @@ internal sealed class InputTestScene : Scene
         Drawing.Box(800, 40, 440, 310, Color.Black);
         Drawing.Text(810, 50, "Event Log", Color.White);
         int y = 70;
-        foreach (var entry in _eventLog.Reverse())
+        foreach (string? entry in _eventLog.Reverse())
         {
             Drawing.Text(810, y, entry, Color.White);
             y += 18;
         }
     }
 
-    private static string DescribeMouseButton(MouseButton button)
-    {
-        if (Mouse.Push(button)) return "Push";
-        if (Mouse.Left(button)) return "Release";
-        if (Mouse.Hold(button)) return "Hold";
-        return "Idle";
-    }
+    private static string DescribeMouseButton(MouseButton button) => Mouse.Push(button) ? "Push" : Mouse.Left(button) ? "Release" : Mouse.Hold(button) ? "Hold" : "Idle";
 
     private void AddLog(string message)
     {

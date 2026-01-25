@@ -29,6 +29,6 @@ public class Overlay
             new Color(230, 240, 255), point: ReferencePoint.TopLeft);
 
         // 2行目: 現在時刻
-        Drawing.Text(10, 32, $"{DateTime.Now:G}", new Color(180, 200, 220), point: ReferencePoint.TopLeft);
+        Drawing.Text(10, 48, $"{DateTime.Now:G}", new Color(180, 200, 220), point: ReferencePoint.TopLeft);
     }
 }

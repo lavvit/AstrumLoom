@@ -33,8 +33,8 @@ public class AstrumCore
     public static IGraphics? Graphic => Platform?.Graphics;
 
     public static GameConfig WindowConfig { get; private set; } = null!;
-    public static int Width => (int)WindowConfig.Width;
-    public static int Height => (int)WindowConfig.Height;
+    public static int Width => WindowConfig.Width;
+    public static int Height => WindowConfig.Height;
     public static int WindowWidth => (int)Platform.Graphics.Size.Width;
     public static int WindowHeight => (int)Platform.Graphics.Size.Height;
 

@@ -55,6 +55,20 @@ public class Texture : IDisposable
         _texture?.Draw(x, y);
         Rectangle = before;
     }
+    public void Grid(double x, double y)
+    {
+        var tplt = LayoutUtil.GetAnchorOffset(Point, Width * Scale, Height * Scale);
+        x += tplt.X; y += tplt.Y;
+        Drawing.Box(x, y, Width, Height, Color.DarkGray, 1);
+        for (int i = 0; i < Width; i += 20)
+        {
+            Drawing.Line(x + i, y, 0, Height, Color.Gray);
+        }
+        for (int j = 0; j < Height; j += 20)
+        {
+            Drawing.Line(x, y + j, Width, 0, Color.Gray);
+        }
+    }
 
     public void Pump() => _texture?.Pump();
 
@@ -64,6 +78,19 @@ public class Texture : IDisposable
     {
         AstrumCore.RequestDispose(_texture!);
         GC.SuppressFinalize(this);
+    }
+
+    public override string ToString()
+    {
+        string name = Enable && string.IsNullOrEmpty(Path) ? "Manual draw" : System.IO.Path.GetFileName(Path);
+        return !Loaded
+            ? "Loading Texture\n" + name
+            : !Enable
+            ? "Disabled Texture\n" + name
+            : $"Texture : {name}\n" +
+               $"Size: {Width} x {Height}\n" +
+               $"Opacity: {Opacity:F2}, Scale: {Scale:F2}\n" +
+               $"Color: {Color}, BlendMode: {BlendMode}";
     }
 
     public string Path => _texture?.Path ?? "";

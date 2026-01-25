@@ -250,6 +250,8 @@ public static class LayoutUtil
             X = p.X;
             Y = p.Y;
         }
+        public static implicit operator Point((double x, double y) a)
+            => new(a.x, a.y);
         public static Point operator +(Point a, Point b) => new(a.X + b.X, a.Y + b.Y);
         public static Point operator -(Point a, Point b) => new(a.X - b.X, a.Y - b.Y);
         public static Point operator *(Point a, double b) => new(a.X * b, a.Y * b);
@@ -290,6 +292,8 @@ public static class LayoutUtil
             Width = s.Width;
             Height = s.Height;
         }
+        public static implicit operator Size((double w, double h) a)
+            => new(a.w, a.h);
         public static Size operator +(Size a, Size b) => new(a.Width + b.Width, a.Height + b.Height);
         public static Size operator -(Size a, Size b) => new(a.Width - b.Width, a.Height - b.Height);
         public static Size operator *(Size a, double b) => new(a.Width * b, a.Height * b);
@@ -332,6 +336,8 @@ public static class LayoutUtil
         {
             X = r.X; Y = r.Y; Width = r.Width; Height = r.Height;
         }
+        public static implicit operator Rect((double x, double y, double w, double h) a)
+            => new(a.x, a.y, a.w, a.h);
         public static Rect operator +(Rect a, Point b)
             => new(a.X + b.X, a.Y + b.Y, a.Width, a.Height);
         public static Rect operator -(Rect a, Point b)

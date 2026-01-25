@@ -36,8 +36,8 @@ public class TextConf : IDisposable
     public int GetInt(string name, int defaultValue = 0) => (int)GetDouble(name, defaultValue);
     public double GetDouble(string name, double defaultValue = 0)
     {
-        var str = GetString(name);
-        return str != null && double.TryParse(str, out var result) ? result : defaultValue;
+        string? str = GetString(name);
+        return str != null && double.TryParse(str, out double result) ? result : defaultValue;
     }
     public int[] GetIntArray(string key, char separator = ',', double[]? defaults = null)
         => [.. GetDoubleArray(key, separator, defaults).Select(v => (int)v)];
@@ -108,7 +108,7 @@ public class TextConf : IDisposable
         FilePath = path;
         Items.Clear();
         string? lastComment = null;
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
             if (line.StartsWith("//") || string.IsNullOrWhiteSpace(line))
                 continue;
@@ -119,11 +119,11 @@ public class TextConf : IDisposable
                 else lastComment = line;
                 continue;
             }
-            var parts = line.Split(separator, 2);
+            string[] parts = line.Split(separator, 2);
             if (parts.Length != 2)
                 continue;
-            var key = parts[0].Trim();
-            var value = parts[1].Trim();
+            string key = parts[0].Trim();
+            string value = parts[1].Trim();
             Items.Add(new(key, value, lastComment ?? ""));
         }
     }

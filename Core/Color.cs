@@ -270,6 +270,10 @@ public readonly struct Color : IEquatable<Color>
     public static Color FromHSB(double hue, double saturation, double brightness, float alpha = 1f)
         => new HSBColor(hue, saturation, brightness).ToColor(alpha);
 
+    public double Hue => ToHSB().Hue;
+    public double Saturation => ToHSB().Saturation;
+    public double Brightness => ToHSB().Brightness;
+
     // 背景色と被らない色
     public static Color VisibleColor(Color color)
     {
@@ -278,11 +282,20 @@ public readonly struct Color : IEquatable<Color>
         int brightness = (int)MathF.Round((color.R * 299 + color.G * 587 + color.B * 114) / 1000f);
         return brightness >= 128 ? Black : White;
     }
+    public Color VisibleColor() => VisibleColor(this);
     public static Color Invert(Color color) => new(255 - color.R, 255 - color.G, 255 - color.B, color.A);
+    public Color Invert() => Invert(this);
     public static Color Grayscale(Color color)
     {
         int gray = (int)MathF.Round(color.R * 0.299f + color.G * 0.587f + color.B * 0.114f);
         return new Color(gray, gray, gray, color.A);
+    }
+    public Color Grayscale() => Grayscale(this);
+
+    public Color Shift(double h = 0, double s = 1, double b = 1, double staticS = 0, double staticB = 0)
+    {
+        var hsb = ToHSB();
+        return FromHSB(hsb.Hue + h, hsb.Saturation * s + staticS, hsb.Brightness * b + staticB);
     }
 
     public override string ToString() => $"R:{R} G:{G} B:{B} A:{A}";

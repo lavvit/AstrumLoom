@@ -1,6 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Numerics;
+﻿using System.Numerics;
+
 using AstrumLoom;
 
 namespace Sandbox;
@@ -14,9 +13,9 @@ internal class GameTemplateScene : Scene
     private const float EnemyRadius = 22f;
 
     private readonly Random _random = new();
-    private readonly List<Enemy> _enemies = new();
-    private readonly List<Bullet> _bullets = new();
-    private readonly List<Item> _items = new();
+    private readonly List<Enemy> _enemies = [];
+    private readonly List<Bullet> _bullets = [];
+    private readonly List<Item> _items = [];
 
     private Vector2 _playerPos;
     private float _enemySpawnTimer;
@@ -100,7 +99,7 @@ internal class GameTemplateScene : Scene
 
     private void HandleMovement(float delta)
     {
-        Vector2 input = Vector2.Zero;
+        var input = Vector2.Zero;
         if (Key.W.Hold() || Key.Up.Hold()) input.Y -= 1f;
         if (Key.S.Hold() || Key.Down.Hold()) input.Y += 1f;
         if (Key.A.Hold() || Key.Left.Hold()) input.X -= 1f;
@@ -127,7 +126,7 @@ internal class GameTemplateScene : Scene
             return;
 
         Vector2 target = new((float)Mouse.X, (float)Mouse.Y);
-        Vector2 direction = target - _playerPos;
+        var direction = target - _playerPos;
         direction = direction.LengthSquared() < 0.001f ? new Vector2(1f, 0f) : Vector2.Normalize(direction);
 
         _bullets.Add(new Bullet
@@ -165,7 +164,7 @@ internal class GameTemplateScene : Scene
         for (int i = _enemies.Count - 1; i >= 0; i--)
         {
             var enemy = _enemies[i];
-            Vector2 toPlayer = _playerPos - enemy.Position;
+            var toPlayer = _playerPos - enemy.Position;
             if (toPlayer.LengthSquared() > 0.001f)
             {
                 toPlayer = Vector2.Normalize(toPlayer);
@@ -344,7 +343,7 @@ internal class GameTemplateScene : Scene
 
     private void DrawPlayer()
     {
-        Color baseColor = _invincibleTimer > 0f ? Color.Cyan : new Color(90, 190, 255);
+        var baseColor = _invincibleTimer > 0f ? Color.Cyan : new Color(90, 190, 255);
         Drawing.Circle(_playerPos.X, _playerPos.Y, PlayerRadius, baseColor);
         Drawing.Circle(_playerPos.X, _playerPos.Y, PlayerRadius + 4, new Color(255, 255, 255, 80), thickness: 3);
     }
