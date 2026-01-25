@@ -66,6 +66,14 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
                 // 処理開始時にメインスレッドでの破棄要求を処理
                 AstrumCore.ProcessPendingDisposals();
                 MainUpdate(game);
+                if (_mainThreadActions.TryDequeue(out var action))
+                {
+                    try { action(); }
+                    catch (Exception ex)
+                    {
+                        HandleFatal(ex, "MainThreadAction");
+                    }
+                }
 
                 // Drop 初期化は「Update 側で」やりたいなら UpdateLoop に移してもOK
                 Draw(game);
@@ -172,6 +180,17 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             return;
     }
     public void MainUpdate(IGame game) => platform.PollEvents();
+
+    private static ConcurrentQueue<Action> _mainThreadActions = new();
+    internal static void RequestToMainThread(Action action)
+    {
+        if (Environment.CurrentManagedThreadId == AstrumCore.MainThreadId)
+        {
+            action();
+            return;
+        }
+        _mainThreadActions.Enqueue(action);
+    }
 
     private static ConcurrentQueue<(string key, Action action)> _mainThreadBeginActions = new();
     private static ConcurrentQueue<(string key, Action action)> _mainThreadEndActions = new();

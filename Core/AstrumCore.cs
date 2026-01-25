@@ -232,6 +232,9 @@ public class AstrumCore
     }
     #endregion
 
+    public static void RequestToMainThread(Action action)
+        => GameRunner.RequestToMainThread(action);
+
     public static void AddExtendAction(string key, Action action, bool inEndStart = true)
         => GameRunner.AddExtendAction(key, action, inEndStart);
 }

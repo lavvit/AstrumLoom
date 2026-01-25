@@ -60,6 +60,7 @@ public readonly struct Color : IEquatable<Color>
 
     private static byte ToByte(float f) => ClipToByte((int)MathF.Round(f * 255f));
     private static byte ClipToByte(int v) => (byte)(v < 0 ? 0 : (v > 255 ? 255 : v));
+    public uint ToARGB() => (uint)((a << 24) | (r << 16) | (g << 8) | b);
 
     public DrawingColor ToDrawingColor() => DrawingColor.FromArgb(a, r, g, b);
 

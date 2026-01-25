@@ -197,22 +197,22 @@ internal sealed class DxLibTextInput : ITextInput
         if (Handle > 0)
         {
             SetActiveKeyInput(Handle);
-            SetUseIMEFlag(TRUE);
+            SetUseIMEFlag(opt.EnableKana ? 1 : 0);
             SetKeyInputStringColor(
-                (ulong)DxLibGraphics.ToDxColor(Color.Snow),
-                (ulong)DxLibGraphics.ToDxColor(Color.White),
-                (ulong)DxLibGraphics.ToDxColor(Color.Snow),
-                (ulong)DxLibGraphics.ToDxColor(Color.Yellow),
-                (ulong)DxLibGraphics.ToDxColor(Color.Cyan),
-                (ulong)DxLibGraphics.ToDxColor(Color.Yellow),
-                (ulong)DxLibGraphics.ToDxColor(Color.Green),
-                (ulong)DxLibGraphics.ToDxColor(Color.LightGray),
-                (ulong)DxLibGraphics.ToDxColor(Color.Gray),
-                (ulong)DxLibGraphics.ToDxColor(Color.White),
-                (ulong)DxLibGraphics.ToDxColor(Color.Black),
-                (ulong)DxLibGraphics.ToDxColor(Color.WhiteSmoke),
-                (ulong)DxLibGraphics.ToDxColor(Color.Blue),
-                (ulong)DxLibGraphics.ToDxColor(Color.Cyan)
+                opt.IMEColorScheme.CompositionFontColor.ToARGB(),
+                Color.Green.ToARGB(),
+                opt.IMEColorScheme.InputBackColor.ToARGB(),
+                opt.IMEColorScheme.InputCursorColor.ToARGB(),
+                Color.Green.ToARGB(),
+                opt.IMEColorScheme.CompositionSelectFontColor.ToARGB(),
+                Color.Green.ToARGB(),
+                opt.IMEColorScheme.CompositionEdgeColor.ToARGB(),
+                opt.IMEColorScheme.CompositionSelectEdgeColor.ToARGB(),
+                Color.Green.ToARGB(),
+                opt.IMEColorScheme.CompositionFrameColor.ToARGB(),
+                opt.IMEColorScheme.CompositionBackColor.ToARGB(),
+                Color.Blue.ToARGB(),
+                Color.Cyan.ToARGB()
             );
             SetKeyInputString(Builder.ToString(), Handle);
             Cursor = Builder.Length;
@@ -334,7 +334,7 @@ internal sealed class DxLibTextInput : ITextInput
         {
             if (!IsActive || Builder == null || Handle <= 0) return "";
             GetKeyInputString(Builder, Handle);
-            return Builder.ToString();
+            return Builder?.ToString() ?? "";
         }
 
         set

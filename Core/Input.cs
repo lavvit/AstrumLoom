@@ -129,10 +129,10 @@ public static class KeyInput
         else font.Draw((int)x, (int)y, text, color, point: ReferencePoint.TopLeft);
     }
 
-    public static string GetText(ref string value)
+    public static string? GetText(ref string value)
     {
         string text = value;
-        return !Typing ? "" : _textEnter.Update(ref value) ? text != value ? value : "" : "";
+        return !Typing ? null : _textEnter.Update(ref value) ? text != value ? value : null : null;
     }
 
     public static bool Enter(ref string value)
@@ -144,8 +144,14 @@ public static class KeyInput
             result = "";
             return false;
         }
-        result = GetText(ref value);
-        return !string.IsNullOrEmpty(result);
+        string? r = GetText(ref value);
+        result = r ?? "";
+        return r != null;
+    }
+    public static void Cancel()
+    {
+        if (Typing)
+            _textEnter.IsCancel = true;
     }
 }
 public enum Key
@@ -335,6 +341,13 @@ public sealed class TextEnter
             _impl.Begin(Option);
             return false;
         }
+        if (Key.Esc.Push() && Option.EscapeCancelable)
+        {
+            // ESC キーでキャンセル
+            _impl.Cancel();
+            IsActive = false;
+            return false;
+        }
 
         // 入力中の更新
         _impl.Update();
@@ -346,8 +359,13 @@ public sealed class TextEnter
         if (_caretTimer > 1.0)
             _caretTimer -= 1.0;
 
+        var state = _impl.KeyState;
+        if (IsCancel)
+            // 外部からキャンセル要求が来た場合
+            state = KeyInputState.Canceled;
+
         // バックエンドの状態を見る
-        switch (_impl.KeyState)
+        switch (state)
         {
             case KeyInputState.Typing:
                 // まだ入力中
@@ -377,6 +395,7 @@ public sealed class TextEnter
     }
 
     public bool IsActive { get; private set; }
+    public bool IsCancel { get; set; }
 }
 
 public sealed record TextInputOptions
@@ -388,6 +407,9 @@ public sealed record TextInputOptions
     public bool NumberOnly { get; init; } = false;
     public bool DoubleOnly { get; init; } = false;
     public bool MultiLine { get; init; } = false;
+    public bool EnableKana { get; init; } = false;
+    public IMEColors IMEColorScheme { get; init; } = IMEColors.Light;
+
 }
 
 public readonly struct TextSelection
@@ -399,6 +421,41 @@ public readonly struct TextSelection
         Start = start;
         End = end;
     }
+}
+
+public readonly struct IMEColors(
+    Color compositionBackColor, //変換候補
+    Color compositionFrameColor, //変換候補
+    Color compositionFontColor,
+    Color compositionSelectFontColor,
+    Color inputBackColor,
+    Color inputCursorColor)
+{
+    public Color CompositionBackColor { get; } = compositionBackColor;
+    public Color CompositionFrameColor { get; } = compositionFrameColor;
+    public Color CompositionFontColor { get; } = compositionFontColor;
+    public Color CompositionSelectFontColor { get; } = compositionSelectFontColor;
+
+    public Color CompositionEdgeColor => CompositionFontColor.VisibleColor();
+    public Color CompositionSelectEdgeColor => CompositionSelectFontColor.VisibleColor();
+
+    public Color InputBackColor { get; } = inputBackColor;
+    public Color InputCursorColor { get; } = inputCursorColor;
+
+    public static IMEColors Light => new(
+        Color.White,
+        Color.Gold,
+        Color.Snow,
+        Color.Khaki,
+        Color.LightYellow,
+        Color.Yellow);
+    public static IMEColors Dark => new(
+        Color.Black,
+        Color.Blue,
+        Color.AliceBlue,
+        Color.MidnightBlue,
+        Color.LightCyan,
+        Color.Yellow);
 }
 
 /// <summary>
