@@ -74,7 +74,7 @@ public class Texture : IDisposable
     {
         Rect? before = Rectangle != null ? new Rect(Rectangle.Value.X, Rectangle.Value.Y, Rectangle.Value.Width, Rectangle.Value.Height) : null;
         Rectangle = rectangle;
-        _texture?.Draw(x, y);
+        _texture?.Draw(x, y, Option);
         Rectangle = before;
     }
     public void Grid(double x, double y)
