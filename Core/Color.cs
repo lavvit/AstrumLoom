@@ -153,7 +153,8 @@ public readonly struct Color : IEquatable<Color>
         return false;
     }
     public static Color Parse(string? input) => TryParse(input, out var color) ? color : White;
-    public static Color Parse(int hex) => FromDrawing(DrawingColor.FromArgb(hex));
+    public static Color Parse(int hex) => FromDrawing(DrawingColor.FromArgb(hex |
+        (hex < 0x01000000 ? unchecked((int)0xFF000000) : 0)));
 
     public static Color Lerp(Color a, Color b, float t)
     {

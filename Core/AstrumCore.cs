@@ -200,6 +200,7 @@ public class AstrumCore
         }
     }
     public static bool MultiThreading => WindowConfig.UseMultiThreadUpdate;
+    public static bool GameLock = false;
 
     #region メインスレッド破棄キュー
     // 他スレッドからメインスレッドに依存するリソースの破棄を依頼するためのキュー

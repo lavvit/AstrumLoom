@@ -123,8 +123,15 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             KeyInput.Update(platform.UTime.DeltaTime);
             Mouse.Update();
             Pad.Update();
-            lock (_gameLock)
+            if (AstrumCore.GameLock)
+            {
+                lock (_gameLock)
+                    game.Update(platform.UTime.DeltaTime);
+            }
+            else
+            {
                 game.Update(platform.UTime.DeltaTime);
+            }
         }
         catch (Exception ex)
         {
@@ -152,8 +159,15 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             frameBegan = true;
             platform.Graphics.Clear(BackgroundColor);
 
-            lock (_gameLock)
+            if (AstrumCore.GameLock)
+            {
+                lock (_gameLock)
+                    game.Draw();
+            }
+            else
+            {
                 game.Draw();
+            }
             // ★ ここでオーバーレイ
             if (showOverlay)
                 Overlay.Current.Draw();
