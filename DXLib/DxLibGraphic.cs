@@ -174,7 +174,7 @@ internal sealed class DxLibGraphics : IGraphics
         BlendMode.None => DX_BLENDMODE_ALPHA,
         BlendMode.Add => DX_BLENDMODE_ADD,
         BlendMode.Subtract => DX_BLENDMODE_SUB,
-        BlendMode.Multiply => DX_BLENDMODE_MUL,
+        BlendMode.Multiply => DX_BLENDMODE_MULA,
         _ => DX_BLENDMODE_NOBLEND,
     };
 

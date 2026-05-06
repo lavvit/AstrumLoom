@@ -66,6 +66,9 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         bool file = FileCheck(Path);
         if (!file) return false;
 
+        SetUseTransColor(FALSE);                 // 色キー透過は使わない
+        SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
+
         int handle = LoadGraph(Path);
         if (handle < 0)
         {
@@ -73,8 +76,6 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
             Handle = -1;
             return false;
         }
-        SetUseTransColor(FALSE);                 // 色キー透過は使わない
-        SetUsePremulAlphaConvertLoad(TRUE);      // 重要！アルファ縁のにじみ対策（プリマルチ化）
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);   // 念のため標準ブレンドに戻す
         SetDrawBright(255, 255, 255);
         SetDrawAddColor(0, 0, 0);
