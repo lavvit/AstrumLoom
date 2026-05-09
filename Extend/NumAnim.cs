@@ -104,7 +104,7 @@ public class NumAnimation : IDisposable
     /// <summary>
     /// タイマー間隔（マイクロ秒）。
     /// </summary>
-    public long Interval
+    public double Interval
     {
         get => _counter.Interval; set => _counter.ChangeInterval(value);
     }

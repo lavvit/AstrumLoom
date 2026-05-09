@@ -27,7 +27,7 @@ public class Counter
     }
     public long Now => _now();
 
-    private static long NormalizeInterval(long interval) =>
+    private static double NormalizeInterval(double interval) =>
         // 0 は無限ループの原因になるため、最小値として 1 を採用する。
         interval == 0 ? 1 : interval;
 
@@ -38,7 +38,7 @@ public class Counter
     /// <param name="end">終了値。</param>
     /// <param name="interval">Tickする間隔(マイクロ秒)。</param>
     /// <param name="isLoop">ループするか否か。</param>
-    public Counter(long begin, long end, long interval, bool isLoop = false,
+    public Counter(long begin, long end, double interval, bool isLoop = false,
         Func<long>? nowProvider = null)
     {
         _now = nowProvider ?? DefaultNow;
@@ -76,7 +76,7 @@ public class Counter
         }
 
         // 現在時間から以前Tick()したまでの時間の差
-        long diffTime = nowTime - NowTime;
+        double diffTime = nowTime - NowTime;
 
         if (diffTime < 0)
         {
@@ -149,7 +149,7 @@ public class Counter
             }
         }
         // 余ったdiffTimeを引いて、次Tick()したときにちゃんとなるように
-        NowTime = nowTime - diffTime;
+        NowTime = nowTime - (long)diffTime;
         return tickCount;
     }
 
@@ -198,7 +198,7 @@ public class Counter
     /// タイマーのTick間隔を変更します。
     /// </summary>
     /// <param name="interval">Tickする間隔(マイクロ秒)。</param>
-    public void ChangeInterval(long interval)
+    public void ChangeInterval(double interval)
     {
         // 今までのカウンター値を更新する。
         Tick();
@@ -262,7 +262,7 @@ public class Counter
     /// <summary>
     /// タイマー間隔。
     /// </summary>
-    public long Interval { get; private set; }
+    public double Interval { get; private set; }
 
     /// <summary>
     /// カウンターの現在の値。
