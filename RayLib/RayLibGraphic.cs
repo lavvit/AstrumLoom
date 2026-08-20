@@ -203,7 +203,7 @@ internal sealed class RayLibGraphics : IGraphics
     {
         BlendMode.None => RayBlend.Alpha,
         BlendMode.Add => RayBlend.Additive,
-        BlendMode.Subtract => RayBlend.SubtractColors,
+        BlendMode.Subtract => RayBlend.Custom,
         BlendMode.Multiply => RayBlend.Multiplied,
         BlendMode.Screen => RayBlend.Custom,
         BlendMode.Reverse => RayBlend.Custom,
@@ -212,9 +212,11 @@ internal sealed class RayLibGraphics : IGraphics
 
     // OpenGLの合成係数/式の定数（raylibにプリセットの無いBlendModeをrlSetBlendFactorsで組むために使う）
     private const int GL_ONE = 1;
+    private const int GL_SRC_ALPHA = 0x0302;
     private const int GL_ONE_MINUS_SRC_COLOR = 0x0301;
+    private const int GL_ONE_MINUS_DST_COLOR = 0x0307;
     private const int GL_FUNC_ADD = 0x8006;
-    private const int GL_FUNC_SUBTRACT = 0x800A;
+    private const int GL_FUNC_REVERSE_SUBTRACT = 0x800B;
 
     // Color helper
     /// <summary>Core側のColorをraylibのColorへ変換します。opacityはアルファ値に乗算されます。</summary>
@@ -229,15 +231,22 @@ internal sealed class RayLibGraphics : IGraphics
     {
         if (blend > BlendMode.None || opacity < 1.0)
         {
-            // Screen: src + dst*(1-src) = src+dst-src*dst
-            // Reverse: src - dst（Subtractの逆方向）
+            // Screen:   src + dst*(1-src) = src+dst-src*dst
+            // Subtract: dst - src*alpha （raylib既定のSubtractColorsはアルファを無視するため、
+            //           グローのように縁がフワッと薄いテクスチャだと矩形ごとハードに黒く潰れる。
+            //           srcAlphaを効かせて縁の低アルファ部分ほど影響を弱めることで、実際のペイント
+            //           ソフトのような柔らかい暗がりになる）
+            // Reverse:  src*(1-dst) + dst*(1-src) = src+dst-2*src*dst （ペイントソフトの「反転/Exclusion」相当）
             switch (blend)
             {
                 case BlendMode.Screen:
                     Raylib_cs.Rlgl.SetBlendFactors(GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_FUNC_ADD);
                     break;
+                case BlendMode.Subtract:
+                    Raylib_cs.Rlgl.SetBlendFactors(GL_SRC_ALPHA, GL_ONE, GL_FUNC_REVERSE_SUBTRACT);
+                    break;
                 case BlendMode.Reverse:
-                    Raylib_cs.Rlgl.SetBlendFactors(GL_ONE, GL_ONE, GL_FUNC_SUBTRACT);
+                    Raylib_cs.Rlgl.SetBlendFactors(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_FUNC_ADD);
                     break;
             }
             BeginBlendMode(GetBlendMode(blend));

@@ -210,6 +210,9 @@ internal sealed class DxLibGraphics : IGraphics
     /// Screen(src+dst-src*dst)はSPINE_SCREENがそのままの式を持つのでそれを使う（RayLib側と同じ結果になる）。
     /// Reverse(src-dst想定)はDxLibにOpenGLのような合成係数のカスタム指定がないため、
     /// SUB(dst-src)の逆方向として一番近いSUB2を割り当てる（厳密な一致はRayLib側と保証されない）。
+    /// Multiplyは MUL(アルファ無視で矩形ごと黒潰れ) / SRCCOLOR(同様に黒潰れ) を実機で試した結果、
+    /// アルファを正しく考慮して安全なのはMULAだけだった。ただしRayLibのMultiplied（GL_DST_COLOR基準）
+    /// より効果が弱く出る（DxLibに合成係数を自由指定するAPIが無く、これ以上は追い込めない）。
     /// </summary>
     internal static int GetBlendMode(BlendMode mode) => mode switch
     {

@@ -350,8 +350,10 @@ internal sealed class TextureDemoScene : Scene
             "Add と Screen は下地を明るくし、Multiply と Subtract は暗くする。",
             "None は素材のアルファだけで重ねる、いちばん素直な合成。");
         DemoUi.Notes(x + Pad, ny + 4, TextW, new Color(212, 172, 112),
-            "注: Screen は両バックエンドで同じ式（src+dst-src*dst）。Reverse は DxLib だけ "
-            + "固定モードの近似（SUB2）なので、RayLib(src-dst) とわずかに違うことがある。--backend で見比べること。");
+            "注: Screen は両バックエンドで同じ式（src+dst-src*dst）。Reverse は RayLib が "
+            + "Exclusion式（src+dst-2*src*dst）、DxLib は固定モードの近似（SUB2）なので、色味はわずかに違う。"
+            + "Multiply も DxLib(MULA)は RayLib より弱めに出る（合成係数を自由指定できないため）。"
+            + "--backend で見比べること。");
     }
 
     #endregion
