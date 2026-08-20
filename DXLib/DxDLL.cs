@@ -1,4 +1,4 @@
-#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
+﻿#pragma warning disable CS8605 // null の可能性がある値をボックス化解除しています。
 #pragma warning disable SYSLIB1054 // コンパイル時に P / Invoke マーシャリング コードを生成するには
 #pragma warning disable CA2101 // P / Invoke 呼び出しで、文字列のリテラルを使用しないでください。
 #pragma warning disable IDE1006 // 命名スタイルのルールに従うため、PascalCase を使用してください。

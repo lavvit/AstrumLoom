@@ -22,60 +22,55 @@ public class Exo
 
     public bool Enable => imageObjects.Count > 0;
 
+    private static string Key(string line) => line.Split('=', 2)[0];
+    private static string Parse(string line) => line.Split('=', 2)[1];
+    private static int ParseInt(string line) => int.TryParse(Parse(line), out int r) ? r : 0;
+
     /// <summary>
-    /// exoファイルを読み込む
+    /// exo/aup2ファイルを読み込む
     /// </summary>
-    /// <param name="exoPath">exoのファイルパス</param>
+    /// <param name="filePath">ファイルパス</param>
     /// <param name="isLoop">ループするかどうか</param>
     /// <param name="isUseAntialiasing">アンチエイリアスをかけるかどうか</param>
-    public Exo(string exoPath, bool isLoop = false, bool isUseAntialiasing = false)
+    public Exo(string filePath, bool isLoop = false, bool isUseAntialiasing = false)
     {
-        FilePath = exoPath;
+        FilePath = filePath;
         IsLoop = isLoop;
         Object? currentObject = null;
         var currentFilter = FilterType.None;
-        IEnumerable<string> lines = Text.Read(exoPath);
-
+        IEnumerable<string> lines = Text.Read(filePath);
         foreach (string line in lines)
         {
+            string key = Key(line);
             #region [exeditのパース] 
             if (currentObject == null)
             {
-                if (line.StartsWith("width="))
-                {
-                    Width = int.Parse(line.Split('=')[1]);
-                }
-                else if (line.StartsWith("height="))
-                {
-                    Height = int.Parse(line.Split('=')[1]);
-                }
-                else if (line.StartsWith("rate="))
-                {
-                    Rate = int.Parse(line.Split('=')[1]);
-                }
-                else if (line.StartsWith("scale="))
-                {
-                    Scale = int.Parse(line.Split('=')[1]);
-                }
-                else if (line.StartsWith("length="))
-                {
-                    Length = int.Parse(line.Split('=')[1]);
-                }
+                if (key is "width" or "video.width")
+                    Width = ParseInt(line);
+                else if (key is "height" or "video.height")
+                    Height = ParseInt(line);
+                else if (key is "rate" or "video.rate")
+                    Rate = ParseInt(line);
+                else if (key is "scale" or "video.scale")
+                    Scale = ParseInt(line);
+                else if (key is "length")
+                    Length = ParseInt(line);
             }
             #endregion
 
             #region [ オブジェクトのパース]
 
             // [0]のような小数点なしの行
-            if (line.StartsWith("[") && line.Contains("]") && !line.StartsWith("[exedit]") && !line.Contains("."))
+            if (line.StartsWith('[') && line.Contains(']') && !line.StartsWith("[exedit]") && !line.Contains("."))
             {
                 string indexString = line.Trim('[', ']');
-                if (int.TryParse(indexString, out int index))
-                {
-                    // オブジェクトの作成
-                    Object exoObject = new();
-                    currentObject = exoObject;
-                }
+                if (!indexString.Contains('.') && indexString != "exedit" && indexString != "project" && !indexString.StartsWith("scene"))
+                    if (int.TryParse(indexString, out int index))
+                    {
+                        // オブジェクトの作成
+                        Object exoObject = new();
+                        currentObject = exoObject;
+                    }
             }
 
             if (currentObject != null)
@@ -83,20 +78,20 @@ public class Exo
                 // [0]のような小数点なしの行
                 if (line.StartsWith("start="))
                 {
-                    currentObject.StartFrame = int.Parse(line.Split('=')[1]);
+                    currentObject.StartFrame = ParseInt(line);
                 }
                 else if (line.StartsWith("end="))
                 {
-                    currentObject.EndFrame = int.Parse(line.Split('=')[1]);
+                    currentObject.EndFrame = ParseInt(line);
                 }
                 else if (line.StartsWith("layer="))
                 {
-                    currentObject.Layer = int.Parse(line.Split('=')[1]);
+                    currentObject.Layer = ParseInt(line);
                 }
 
                 if (line.StartsWith("_name="))
                 {
-                    if (line.Split('=')[1] == "グループ制御")
+                    if (Parse(line) == "グループ制御")
                     {
                         currentFilter = FilterType.None;
                         GroupObject groupObject = new(currentObject);
@@ -104,7 +99,7 @@ public class Exo
 
                         groupObjects.Add(groupObject);
                     }
-                    else if (line.Split('=')[1] == "画像ファイル")
+                    else if (Parse(line) == "画像ファイル")
                     {
                         currentFilter = FilterType.None;
                         ImageObject imageObject = new(currentObject);
@@ -112,20 +107,20 @@ public class Exo
 
                         imageObjects.Add(imageObject);
                     }
-                    else if (line.Split('=')[1] is "リサイズ" or "拡大率")
+                    else if (Parse(line) is "リサイズ" or "拡大率")
                     {
                         currentFilter = FilterType.Scale;
                     }
-                    else if (line.Split('=')[1] == "回転")
+                    else if (Parse(line) == "回転")
                     {
                         currentFilter = FilterType.Rotation;
 
                     }
-                    else if (line.Split('=')[1] == "透明度")
+                    else if (Parse(line) == "透明度")
                     {
                         currentFilter = FilterType.Opacity;
                     }
-                    else if (line.Split('=')[1] == "反転")
+                    else if (Parse(line) == "反転")
                     {
                         currentFilter = FilterType.Reverse;
                     }
@@ -332,7 +327,7 @@ public class Exo
 
                             // 画像の読み込み
                             imageObject.Texture = !textureFileNames.Contains(fileName)
-                                ? new Texture(Path.GetDirectoryName(exoPath) + @"\" + fileName)
+                                ? new Texture(Path.GetDirectoryName(FilePath) + @"\" + fileName)
                                 : imageObjects[textureFileNames.IndexOf(fileName)].Texture;
                             /*
                             // アンチエイリアスをかける
@@ -554,13 +549,13 @@ public class Exo
 
                         var FilterObject = (ReverseFilter)currentObject.Filters.Last();
 
-                        FilterObject.ReverseY = Convert.ToBoolean(int.Parse(line.Split('=')[1]));
+                        FilterObject.ReverseY = Convert.ToBoolean(ParseInt(line));
                     }
                     else if (line.StartsWith("左右反転="))
                     {
                         var FilterObject = (ReverseFilter)currentObject.Filters.Last();
 
-                        FilterObject.ReverseX = Convert.ToBoolean(int.Parse(line.Split('=')[1]));
+                        FilterObject.ReverseX = Convert.ToBoolean(ParseInt(line));
 
                         // フィルターの終了
                         currentFilter = FilterType.None;
@@ -569,6 +564,11 @@ public class Exo
 
                 #endregion
 
+            }
+
+            if (Length == 0)
+            {
+                Length = imageObjects.Count > 0 ? imageObjects.Max(obj => obj.EndFrame) : 0;
             }
 
             #endregion

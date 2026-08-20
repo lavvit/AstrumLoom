@@ -21,7 +21,13 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         Handle = handle;
         Width = w;
         Height = h;
-        WriteState(State_Success);
+        // WriteState(State_Success) を直接呼ぶだけだと Load() 経由と違って _obj が設定されず、
+        // このコンストラクタ（DxLibPlatform.CreateTexture の描画ターゲット用テクスチャなど）も
+        // Dispose が no-op になってしまう。LoadAsync(this) は _loadfunc が未設定なら
+        // 呼び出し元がメインスレッドである限り WriteState(State_Success) を呼ぶだけなので、
+        // 結果は今までと同じまま _obj だけ正しく登録できる
+        // （DxLibPlatform.CreateTexture はメインスレッド以外からの呼び出しを事前に弾いているので安全）。
+        LoadAsync(this);
     }
     public DxLibTexture(string path)
     {
@@ -60,7 +66,10 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     }
 
     #region 読み込み
-    public void Load() => LoadAsync(LoadTx);
+    // 第1引数に this（IDisposable）を渡さないと AsyncLoadableBase._obj が null のままになり、
+    // Dispose() → DisposeAsync が Host.cs の「_obj == null なら即 return」ガードに引っかかって
+    // DisposeTx が一度も呼ばれない＝DeleteGraph に到達せずハンドルが解放されない。
+    public void Load() => LoadAsync(this, LoadTx);
     private bool LoadTx()
     {
         bool file = FileCheck(Path);

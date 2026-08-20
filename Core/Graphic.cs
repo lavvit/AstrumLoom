@@ -47,6 +47,15 @@ public interface IGraphics
 
     // おまけ：デフォルトフォント（ゲームごとに 1 個用意）
     IFont DefaultFont { get; }
+
+    /// <summary>
+    /// 現在のフレームバッファを画像として保存します。
+    /// BeginFrame と EndFrame の間（＝描画スレッド）から呼ぶ必要があります。
+    /// 未対応のバックエンドは false を返します。
+    /// </summary>
+    /// <param name="path">保存先のパス。拡張子で形式が決まります（.png 推奨）。</param>
+    /// <returns>保存に成功したら true。</returns>
+    bool SaveScreenshot(string path) => false;
 }
 
 public enum BlendMode

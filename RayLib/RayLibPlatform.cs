@@ -38,8 +38,15 @@ public sealed class RayLibPlatform : IGamePlatform
             InitAudioDevice();
         }
 
-        Time = new SimpleTime { TargetFps = _targetFps };
-        UTime = new SimpleTime { TargetFps = _targetFps };
+        _multiThreadUpdate = config.UseMultiThreadUpdate;
+
+        // TargetFps は Host.cs（GameHost コンストラクタ）が Time/UTime それぞれに
+        // 正しい値（シングルスレッドなら UTime は 0＝無制限）を設定し直すので、ここでは
+        // DxLibPlatform と同じく無設定（既定 0f）のまま渡す。以前はここで両方に _targetFps を
+        // 入れていたため、シングルスレッド時に Update と Draw が毎ループそれぞれ待ち、
+        // 実効FPSが半分になるバグがあった。
+        Time = new SimpleTime();
+        UTime = new SimpleTime();
         Graphics = new RayLibGraphics();
         Input = new RayLibInput();
         TextInput = new(new RayLibTextInput(), Time);
@@ -91,6 +98,10 @@ public sealed class RayLibPlatform : IGamePlatform
 
     private bool VSync;
     private readonly int _targetFps;
+    // シングルスレッド構成では 1 ループの中で UTime.EndFrame → Time.EndFrame が連続で呼ばれるため、
+    // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
+    // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
+    private readonly bool _multiThreadUpdate;
     public void SetVSync(bool enabled)
     {
         if (!_ready || VSync == enabled) return;
@@ -104,14 +115,14 @@ public sealed class RayLibPlatform : IGamePlatform
             int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
             SetTargetFPS(targetFps);
             Time.TargetFps = targetFps;
-            UTime.TargetFps = targetFps;
+            if (_multiThreadUpdate) UTime.TargetFps = targetFps;
         }
         else
         {
             ClearWindowState(ConfigFlags.VSyncHint);
             SetTargetFPS(_targetFps);
             Time.TargetFps = _targetFps;
-            UTime.TargetFps = _targetFps;
+            if (_multiThreadUpdate) UTime.TargetFps = _targetFps;
         }
     }
     private bool dragDrop = false;
@@ -135,7 +146,10 @@ public sealed class RayLibPlatform : IGamePlatform
         public float DeltaTime { get; private set; }
         public float TotalTime => (float)_sw.Elapsed.TotalSeconds;
         public float CurrentFps { get; private set; }
-        public float TargetFps { get; set; } = 60f;
+        // DxLibPlatform 側の SimpleTime と揃えて既定 0f（無制限）にする。以前はここが 60f で
+        // DxLib 側の 0f と食い違っており、TargetFps を明示的に設定し忘れた場合の挙動が
+        // バックエンドごとに変わる原因の一つになっていた。
+        public float TargetFps { get; set; } = 0f;
 
         public void BeginFrame()
         {

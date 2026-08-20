@@ -9,3 +9,10 @@
 /Debug
 /Release
 *.user
+
+# playtest.ps1 が集める実行時の証跡（スクショ・ログ・入力記録）
+/playtest
+# --out の既定の出力先
+debugout/
+# 実行中に書き換える調整用パラメータ。値は各自の手元のもの
+tuning.txt

@@ -39,16 +39,63 @@ public class AstrumCore
     public static int WindowHeight => (int)Platform.Graphics.Size.Height;
 
     public static void Boot(GameConfig config, IGamePlatform platform, Scene scene)
+        => Boot(config, platform, scene, null);
+
+    /// <summary>
+    /// ゲームを起動します。<paramref name="options"/> にコマンドライン由来の起動オプションを渡すと、
+    /// スクリーンショットや記録・再生などの自動化機能が有効になります。
+    /// </summary>
+    public static void Boot(GameConfig config, IGamePlatform platform, Scene scene, LaunchOptions? options)
     {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(platform);
+        ArgumentNullException.ThrowIfNull(scene);
+
         MainThreadId = Environment.CurrentManagedThreadId;
         Platform = platform;
         WindowConfig = config;
+        if (config.Seed.HasValue) Randomize.Seed(config.Seed.Value);
         var game = new BaseProgram();
 
         using var host = new GameHost(config, platform, game);
         Scene.Set(scene);
-        host.Run();
+        try
+        {
+            DebugSession.Initialize(config, options);
+            host.Run();
+        }
+        finally
+        {
+            DebugSession.Shutdown();
+        }
     }
+
+    #region フレーム計測
+
+    private static long _frameCount;
+    private static long _drawFrameCount;
+
+    /// <summary>これまでに実行した論理フレーム（ゲーム更新）の回数。</summary>
+    public static long FrameCount => Interlocked.Read(ref _frameCount);
+
+    /// <summary>これまでに実行した描画フレームの回数。</summary>
+    public static long DrawFrameCount => Interlocked.Read(ref _drawFrameCount);
+
+    /// <summary>直近の論理フレームの経過時間（秒）。固定ステップ時は常に 1/FixedUpdateHz。</summary>
+    public static float DeltaTime { get; private set; }
+
+    /// <summary>固定ステップ更新で走っているか。</summary>
+    public static bool IsFixedStep => WindowConfig?.FixedUpdate ?? false;
+
+    internal static void BeginLogicFrame(float deltaTime)
+    {
+        DeltaTime = deltaTime;
+        Interlocked.Increment(ref _frameCount);
+    }
+
+    internal static void CountDrawFrame() => Interlocked.Increment(ref _drawFrameCount);
+
+    #endregion
     public static void End() => Platform.Close();
     public static FpsCounter DrawFPS = new();
     public static FpsCounter UpdateFPS = new();
@@ -195,8 +242,11 @@ public class AstrumCore
         set
         {
             WindowConfig.VSync = value;
-            // DXLib など、プラットフォーム側で VSync を制御する場合は反映させる
-            Platform.SetVSync(value);
+            // DXLib など、プラットフォーム側で VSync を制御する場合は反映させる。
+            // SetVSync はウィンドウ API（GLFW / DxLib）を叩くのでメインスレッド専用。
+            // ゲームがこのプロパティを Update から書くと更新スレッドから叩くことになるので、
+            // Sleep.Update と同じくメインスレッドへ回す。
+            RequestToMainThread(() => Platform.SetVSync(value));
         }
     }
     public static bool MultiThreading => WindowConfig.UseMultiThreadUpdate;
@@ -246,6 +296,15 @@ public class Sleep
     private static bool _vsync => AstrumCore.VSync;
     private static long _lastWakeTime = 0;
     public static bool Sleeping { get; private set; } = false;
+
+    // Platform.SetVSync に最後に要求した値。まだ一度も要求していないときは null。
+    // マルチスレッド更新では Update() は更新スレッドから毎フレーム呼ばれるが、
+    // SetVSync はウィンドウ API（GLFW / DxLib）を叩くのでメインスレッド専用。
+    // 値が変わっていないフレームまで RequestToMainThread に積むと、
+    // メインループ側は 1 フレームに 1 件しか処理しないキューが際限なく伸びるだけなので、
+    // 実際に希望値が変化したときだけ積む。
+    private static bool? _requestedVSync = null;
+
     public static void Update()
     {
         long ms = SleepDuration;
@@ -260,7 +319,7 @@ public class Sleep
                 {
                     Sleeping = true;
                 }
-                AstrumCore.Platform.SetVSync(true);
+                RequestSetVSync(true);
                 return;
             }
         }
@@ -269,8 +328,21 @@ public class Sleep
             if (!_vsync && Sleeping)
                 Sleeping = false;
         }
-        AstrumCore.Platform.SetVSync(_vsync);
+        RequestSetVSync(_vsync);
     }
+
+    /// <summary>
+    /// 希望する VSync 状態が前回要求時から変わっているときだけ、メインスレッドで
+    /// Platform.SetVSync を実行させる。シングルスレッド構成では呼び出し元が既にメイン
+    /// スレッドなので RequestToMainThread は即時実行になり、挙動は変わらない。
+    /// </summary>
+    private static void RequestSetVSync(bool enabled)
+    {
+        if (_requestedVSync == enabled) return;
+        _requestedVSync = enabled;
+        AstrumCore.RequestToMainThread(() => AstrumCore.Platform.SetVSync(enabled));
+    }
+
     public static void WakeUp()
     {
         if (!AstrumCore.Active) return;

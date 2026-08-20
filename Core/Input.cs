@@ -8,6 +8,9 @@ public interface IInput
     bool GetKeyDown(Key key);
     bool GetKeyUp(Key key);
 }
+/// <summary>
+/// キーボード入力を管理する静的クラス。
+/// </summary>
 public static class KeyInput
 {
     private static IInput _input { get; set; } = null!;
@@ -18,14 +21,58 @@ public static class KeyInput
         _textEnter = textEnter;
     }
 
+    /// <summary>
+    /// 指定したキーが押された瞬間かどうかを取得します。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <returns>押された瞬間であれば true、それ以外は false</returns>
     public static bool Push(this Key key) => !Typing && _input.GetKeyDown(key);
+    /// <summary>
+    /// 指定したキーが押され続けているかどうかを取得します。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <returns>押され続けていれば true、それ以外は false</returns>
     public static bool Hold(this Key key) => !Typing && _input.GetKey(key);
+    /// <summary>
+    /// 指定したキーが離された瞬間かどうかを取得します。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <returns>離された瞬間であれば true、それ以外は false</returns>
     public static bool Left(this Key key) => !Typing && _input.GetKeyUp(key);
+    /// <summary>
+    /// 指定したキーの状態を取得します。
+    /// 0x01: 押され続けている、0x02: 押された瞬間、0x04: 離された瞬間
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <returns>キーの状態を表すビットフラグ</returns>
+    public static int State(this Key key)
+    {
+        int state = 0;
+        if (Hold(key)) state |= 0x01;
+        if (Push(key)) state |= 0x02;
+        if (Left(key)) state |= 0x04;
+        return state;
+    }
 
+    /// <summary>
+    /// shiftキーが押されているかどうかを取得します。
+    /// </summary>
     public static bool Shift => Key.LShift.Hold() || Key.RShift.Hold();
+    /// <summary>
+    /// ctrlキーが押されているかどうかを取得します。
+    /// </summary>
     public static bool Ctrl => Key.LCtrl.Hold() || Key.RCtrl.Hold();
+    /// <summary>
+    /// altキーが押されているかどうかを取得します。
+    /// </summary>
     public static bool Alt => Key.LAlt.Hold() || Key.RAlt.Hold();
 
+    /// <summary>
+    /// 指定した文字列をキーに変換できるかどうかを試みます。
+    /// </summary>
+    /// <param name="keyString">キーの文字列</param>
+    /// <param name="key">変換結果のキー</param>
+    /// <returns>変換に成功した場合は true、それ以外は false</returns>
     public static bool TryParse(string keyString, out Key key)
     {
         try
@@ -39,9 +86,17 @@ public static class KeyInput
             return false;
         }
     }
-
+    /// <summary>
+    /// 指定した文字列をキーに変換します。
+    /// </summary>
+    /// <param name="keyString">キーの文字列</param>
+    /// <returns>変換結果のキー</returns>
     public static Key Parse(string keyString) => TryParse(keyString, out var key) ? key : Key.None;
-
+    
+    /// <summary>
+    /// 全てのキーを列挙します（Key.None を除く）。
+    /// </summary>
+    /// <returns>全てのキーの列挙</returns>
     public static IEnumerable<Key> GetAllKeys()
     {
         foreach (var key in Enum.GetValues<Key>())
@@ -50,6 +105,10 @@ public static class KeyInput
                 yield return key;
         }
     }
+    /// <summary>
+    /// 押されている全てのキーを列挙します。
+    /// </summary>
+    /// <returns>押されているキーの列挙</returns>
     public static IEnumerable<Key> GetPressedKeys()
     {
         foreach (var key in GetAllKeys())
@@ -85,10 +144,29 @@ public static class KeyInput
             }
         }
     }
+
+    /// <summary>
+    /// 指定したキーが押され続けている時間を取得します。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <returns>押され続けている時間（ミリ秒）</returns>
     public static double PressedFrameCount(Key key)
         => _pressedFrameCounts.TryGetValue(key, out double time) ? time : 0;
 
+    /// <summary>
+    /// 指定したキーがリピートされるかどうかを判定します（初回リピート間隔と通常リピート間隔を同じにする場合）。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <param name="intervalMs">リピート間隔（ミリ秒）</param>
+    /// <returns>リピートされる場合は true、それ以外は false</returns>
     public static bool Repeat(this Key key, int intervalMs) => Repeat(key, intervalMs, intervalMs);
+    /// <summary>
+    /// 指定したキーがリピートされるかどうかを判定します。
+    /// </summary>
+    /// <param name="key">キー</param>
+    /// <param name="interval">リピート間隔（ミリ秒）</param>
+    /// <param name="delay">リピート開始までの遅延（ミリ秒）</param>
+    /// <returns>リピートされる場合は true、それ以外は false</returns>
     public static bool Repeat(this Key key, int interval, int delay)
     {
         if (!key.Hold()) return false;
@@ -113,15 +191,38 @@ public static class KeyInput
         return false;
     }
 
+    /// <summary>
+    /// テキスト入力がアクティブかどうかを取得します。
+    /// </summary>
     public static bool Typing => _textEnter.IsActive;
 
+    /// <summary>
+    /// テキスト入力をアクティブにします。
+    /// </summary>
+    /// <param name="value">入力する文字列</param>
+    /// <param name="options">テキスト入力のオプション</param>
     public static void ActivateText(ref string value, TextInputOptions? options = null)
     {
         if (Typing) return;
         _textEnter.Update(ref value, options ?? new TextInputOptions());
     }
 
+    /// <summary>
+    /// 指定した位置にテキストを描画します。
+    /// </summary>
+    /// <param name="x">描画位置のX座標</param>
+    /// <param name="y">描画位置のY座標</param>
+    /// <param name="color">テキストの色</param>
+    /// <param name="font">使用するフォント</param>
     public static void DrawText(double x, double y, Color? color = null, IFont? font = null) => _textEnter.Draw(x, y, color, font);
+    /// <summary>
+    /// 指定した位置にテキストを描画します。
+    /// </summary>
+    /// <param name="x">描画位置のX座標</param>
+    /// <param name="y">描画位置のY座標</param>
+    /// <param name="text">描画するテキスト</param>
+    /// <param name="color">テキストの色</param>
+    /// <param name="font">使用するフォント</param>
     public static void DrawText(double x, double y, object text, Color? color = null, IFont? font = null)
     {
         if (Typing)
@@ -129,14 +230,28 @@ public static class KeyInput
         else font.Draw((int)x, (int)y, text, color, point: ReferencePoint.TopLeft);
     }
 
+    /// <summary>
+    /// 指定した文字列の入力を取得します。
+    /// </summary>
+    /// <param name="value">入力する文字列</param>
+    /// <returns>入力された文字列、または null</returns>
     public static string? GetText(ref string value)
     {
-        string text = value;
-        return !Typing ? null : _textEnter.Update(ref value) ? text != value ? value : null : null;
+        // _textEnter.Update が true を返す（=KeyInputState.Finished、Enter で確定）ことと
+        // 「元の文字列から変わったかどうか」は無関係。以前はここで text != value を見ていたため、
+        // 何も編集せず Enter を押した場合や、編集して元の文字列に戻した場合に確定を取りこぼし、
+        // null（＝未確定）を返してしまっていた。確定したフレームは常に確定後の value を返す。
+        return !Typing ? null : _textEnter.Update(ref value) ? value : null;
     }
-
     public static bool Enter(ref string value)
         => Enter(ref value, out _);
+
+    /// <summary>
+    /// 入力文字が確定されたかどうかを判定します。
+    /// </summary>
+    /// <param name="value">入力する文字列</param>
+    /// <param name="result">確定された文字列</param>
+    /// <returns>入力文字が確定された場合は true、それ以外は false</returns>
     public static bool Enter(ref string value, out string result)
     {
         if (!Typing)
@@ -148,12 +263,18 @@ public static class KeyInput
         result = r ?? "";
         return r != null;
     }
+    /// <summary>
+    /// 入力をキャンセルします。
+    /// </summary>
     public static void Cancel()
     {
         if (Typing)
             _textEnter.IsCancel = true;
     }
 }
+/// <summary>
+/// キーボード上のキーの種類を表します。
+/// </summary>
 public enum Key
 {
     // 数字キー（テンキー、一般・数字）
@@ -199,7 +320,7 @@ public enum Key
     M,
 
     // その他一般キー（[];:'\',.<>?/）
-    At,
+    At = 51,
     SemiColon,
     Colon,
     LBracket,
@@ -217,7 +338,7 @@ public enum Key
     Yen,
 
     // カーソルキー
-    Up,
+    Up = 81,
     Down,
     Left,
     Right,
@@ -231,7 +352,7 @@ public enum Key
     Back,
 
     // Fキー
-    F1,
+    F1 = 101,
     F2,
     F3,
     F4,
@@ -245,7 +366,7 @@ public enum Key
     F12,
 
     // 各種特殊キー
-    Insert,
+    Insert = 121,
     Delete,
     Home,
     End,
@@ -259,7 +380,7 @@ public enum Key
     Pause,
 
     // IME
-    変換,
+    変換 = 141,
     無変換,
     漢字,
     かな,
@@ -270,7 +391,7 @@ public enum Key
     CapsLock,
 
     // 修飾キー
-    LShift,
+    LShift = 151,
     LCtrl,
     LAlt,
     LWindows,
@@ -281,7 +402,7 @@ public enum Key
     RWindows,
 
     // テンキーの各数字
-    NumPad_0,
+    NumPad_0 = 200,
     NumPad_1,
     NumPad_2,
     NumPad_3,
@@ -337,6 +458,11 @@ public sealed class TextEnter
         if (!IsActive)
         {
             IsActive = true;
+            // 前セッションで KeyInput.Cancel() が呼ばれていた場合、IsCancel は true のまま
+            // 残っている（このクラスの他の場所には false に戻す経路が無い）。ここでリセットしないと
+            // 次フレームの Update が下の「if (IsCancel)」で即 Canceled 判定してしまい、
+            // 以後すべてのセッションが開始直後に強制キャンセルされ続ける。
+            IsCancel = false;
             Option = options with { InitialText = value };
             _impl.Begin(Option);
             return false;

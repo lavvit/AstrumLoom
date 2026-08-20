@@ -67,8 +67,16 @@ public class Texture : IDisposable
         => DrawRect(x, y, rectangle);
     public void DrawSize(double x, double y, Size size)
     {
+        // 変更前の Scale を退避し、描画後に必ず戻す。DrawRect が Rectangle を
+        // 一時的に差し替えて戻しているのと同じやり方。ここを戻さないと、この呼び出し以降の
+        // 通常 Draw() まで縮尺が汚染されたままになってしまう。
+        var before = XYScale;
         XYScale = (size.Width / Width, size.Height / Height);
-        _texture?.Draw(x, y);
+        // Draw(x, y) の 2 引数オーバーロード（TextureExtensions）は既定の DrawOptions を
+        // 生成して呼ぶだけなので、ここで設定した Scale を含め Color/Opacity/Point/Angle/Flip/
+        // Rectangle 等の既存設定が全部無視されていた。Option を渡す Draw(x, y, Option) 経由にする。
+        _texture?.Draw(x, y, Option);
+        XYScale = before;
     }
     public void DrawRect(double x, double y, Rect rectangle)
     {
@@ -231,6 +239,7 @@ public class Texture : IDisposable
         Rectangle = opt.Rectangle;
         Flip = opt.Flip;
     }
+    public void ResetOption() => Import(new());
 
     public void Draw(double x, double y, Rect rectangle, Point? point = null)
     {

@@ -125,8 +125,13 @@ return;
     public static void Change(Scene scene, Scene[]? child = null)
     {
         GC.Collect();
+        // scene と NowScene が同一インスタンス（「今のシーンをリスタートする」用途）のときは
+        // 旧シーンの Disable を呼ばない。Disable は ChildScene.Clear() まで行うので、素直に
+        // 呼ぶと直前の scene.Enable() で組み立てた子シーンをその場で全部消してしまう。
+        // 別インスタンスへの遷移では今まで通り、新シーンを Enable してから旧シーンを Disable する。
+        bool sameScene = ReferenceEquals(scene, NowScene);
         scene.Enable();
-        NowScene.Disable();
+        if (!sameScene) NowScene.Disable();
         NowScene = scene;
         if (child != null)
         {

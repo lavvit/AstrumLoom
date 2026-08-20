@@ -44,7 +44,10 @@ public class DxLibSound : AsyncLoadableBase, ISound
         return false;
     }
     #region 読み込み
-    public void Load() => LoadAsync(LoadSfx);
+    // 第1引数に this（IDisposable）を渡さないと AsyncLoadableBase._obj が null のままになり、
+    // Dispose() → DisposeAsync が Host.cs の「_obj == null なら即 return」ガードに引っかかって
+    // DisposeSfx が一度も呼ばれない＝DeleteSoundMem に到達せずハンドルが解放されない（DxLibTexture と同型の不具合）。
+    public void Load() => LoadAsync(this, LoadSfx);
     private bool LoadSfx()
     {
         bool file = FileCheck(Path);

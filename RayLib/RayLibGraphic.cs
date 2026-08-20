@@ -153,6 +153,26 @@ internal sealed class RayLibGraphics : IGraphics
     public IFont CreateFont(FontSpec spec)
         => new RayLibFont(spec);
 
+    public bool SaveScreenshot(string path)
+    {
+        // Raylib は描画命令をバッチに溜めて EndDrawing で初めてフレームバッファへ流す。
+        // フレームの途中で呼ばれるここでは、先に流しておかないと
+        // ClearBackground 直後の状態（＝真っ黒）を読んでしまう。
+        Raylib_cs.Rlgl.DrawRenderBatchActive();
+
+        // Raylib.TakeScreenshot は保存先が作業ディレクトリ基準になってしまうので、
+        // 画像を取り出して自分でパスを指定して書き出す。
+        var image = LoadImageFromScreen();
+        try
+        {
+            return ExportImage(image, path);
+        }
+        finally
+        {
+            UnloadImage(image);
+        }
+    }
+
     internal static RayBlend GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => RayBlend.Alpha,

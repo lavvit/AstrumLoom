@@ -141,6 +141,12 @@ internal sealed class DxLibFont : IFont
         {
             DeleteFontToHandle(_handle);
         }
+        // 縁取り用に別途作っていた _edgehandle（35-43行目）を解放し忘れていた分。
+        // 他の判定箇所（75行目の DrawEdge 呼び出し条件など）に合わせて > 0 で統一する。
+        if (_edgehandle > 0)
+        {
+            DeleteFontToHandle(_edgehandle);
+        }
 
         lock (_screenLock)
         {

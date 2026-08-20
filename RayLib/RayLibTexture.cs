@@ -71,6 +71,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
                 {
                     Raylib.UnloadTexture(Native);
                     Native = default;
+                    return true;
                 }
                 catch { Log.Error($"Failed to unload texture: {Path}"); }
             }
@@ -78,6 +79,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
             {
                 //Log.Debug($"Texture dispose skipped: not main thread : {Path}");
                 AstrumCore.RequestDispose(this);
+                return true;
             }
         }
         else

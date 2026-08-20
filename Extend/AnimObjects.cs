@@ -230,6 +230,110 @@ internal class ImageObject : Object
 
     public ImageObject Clone() => (ImageObject)this.MemberwiseClone();
 }
+
+/// <summary>
+/// サウンド再生オブジェクト
+/// </summary>
+internal class SoundObject : Object
+{
+    public SoundObject(Object Object)
+    {
+        StartFrame = Object.StartFrame;
+        EndFrame = Object.EndFrame;
+        Layer = Object.Layer;
+        // SoundObject はトランスフォームを使わないが、基底に合わせてインスタンス化しておく
+        Transfrom = new Transfrom();
+    }
+
+    /// <summary>
+    /// 実際のサウンドリソース（プロジェクト内のサウンド型を利用）
+    /// </summary>
+    public Sound? Sound { get; set; }
+
+    /// <summary>
+    /// 開始ボリューム（0.0 - 1.0）
+    /// </summary>
+    public float StartVolume { get; set; } = 1.0f;
+
+    /// <summary>
+    /// 終了ボリューム（0.0 - 1.0）
+    /// </summary>
+    public float EndVolume { get; set; } = 1.0f;
+
+    /// <summary>
+    /// ループ再生するか
+    /// </summary>
+    public bool Loop { get; set; } = false;
+
+    /// <summary>
+    /// 再生中フラグ（簡易状態管理）
+    /// </summary>
+    public bool IsPlaying { get; private set; } = false;
+
+    /// <summary>
+    /// 再生を開始する
+    /// </summary>
+    public void Play()
+    {
+        if (Sound == null) return;
+        Sound.Volume = StartVolume;
+        Sound.Loop = Loop;
+        Sound.Play();
+        IsPlaying = true;
+    }
+
+    /// <summary>
+    /// 再生を停止する
+    /// </summary>
+    public void Stop()
+    {
+        if (Sound == null) return;
+        Sound.Stop();
+        IsPlaying = false;
+    }
+
+    /// <summary>
+    /// 指定フレームにおけるボリュームを計算して適用する
+    /// - フレームが範囲外の場合は自動的に停止（または範囲外であれば開始/停止の振る舞いを変更可能）
+    /// </summary>
+    public void UpdateVolume(int frame)
+    {
+        if (Sound == null) return;
+
+        if (frame < StartFrame || frame > EndFrame)
+        {
+            // 範囲外なら停止して終了
+            if (IsPlaying)
+            {
+                Stop();
+            }
+            return;
+        }
+
+        // フレーム比率を計算
+        int duration = EndFrame - StartFrame;
+        float t = duration <= 0 ? 0f : (frame - StartFrame) / (float)duration;
+        t = Math.Clamp(t, 0f, 1f);
+
+        // イージングに従った補間
+        float eased = AnimationEasing.Get(UfEasing.Linear, t);
+        float vol = StartVolume + (EndVolume - StartVolume) * eased;
+
+        // 適用
+        Sound.Volume = Math.Clamp(vol, 0f, 1f);
+
+        // 必要なら再生開始
+        if (!IsPlaying)
+        {
+            Sound.Loop = Loop;
+            Sound.Play();
+            IsPlaying = true;
+        }
+    }
+
+    public SoundObject Clone() => (SoundObject)this.MemberwiseClone();
+}
+
 #endregion
 #region Filter
 
@@ -292,6 +396,27 @@ internal class ScaleFilter : Filter
 
     public SizeVector StartScale { get; set; } = new(1.0f, 1.0f);
     public SizeVector EndScale { get; set; } = new(1.0f, 1.0f);
+}
+
+/// <summary>
+/// 音量フィルター（Filtersリストでボリューム変化を表現する場合に使用）
+/// </summary>
+internal class SoundFilter : Filter
+{
+    /// <summary>
+    /// 開始ボリューム
+    /// </summary>
+    public float StartVolume { get; set; } = 1.0f;
+
+    /// <summary>
+    /// 終了ボリューム
+    /// </summary>
+    public float EndVolume { get; set; } = 1.0f;
+
+    /// <summary>
+    /// イージング
+    /// </summary>
+    public UfEasing Easing { get; set; } = UfEasing.Linear;
 }
 #endregion
 #region Easing

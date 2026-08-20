@@ -9,7 +9,11 @@ public readonly record struct FontSpec(
     int Edge = 0,
     int Spacing = 0,
     bool Bold = false,
-    bool Italic = false
+    bool Italic = false,
+    // 既定で焼くグリフ集合（ASCII＋日本語の常用範囲）に加えて、追加で焼いておきたい文字。
+    // 例えば "①②③" のように実際に使う文字をそのまま渡す。既存の呼び出し箇所を壊さないよう
+    // 末尾に省略可能引数として追加してあるので、位置引数で呼んでいる既存コードはそのまま動く。
+    string? ExtraGlyphs = null
 );
 public interface IFont : IDisposable
 {

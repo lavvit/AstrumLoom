@@ -10,16 +10,18 @@ internal sealed class SandboxOverlay : Overlay
     public override void Draw()
     {
         FPS.Draw();
-        if (Scene.NowScene is SimpleTestGame s)
-            if (s.Name == "LoadCheckScene") // 簡易描画のみ
-                return;
-
-        // FPS / 時刻 を描く
-        string time = $"{AstrumCore.Platform.BackendKind}\n{DateTime.Now:G}";
-        Drawing.DefaultText(10, 40, time, new Color(180, 200, 220));
+        // 子シーンが軽量表示を求めているときは、右上のパネルだけにする。
+        if (Scene.NowScene is SimpleTestGame { Child.Name: "LoadCheckScene" })
+        {
+            base.Draw();
+            return;
+        }
 
         var c = gradation.GetColor((float)(Math.Sin(DateTime.Now.TimeOfDay.TotalSeconds) + 1) / 2);
         Drawing.DefaultText(10, 80, "AstrumLoom Sandbox", c);
+
+        // 共通のデバッグパネル（バックエンド・FPS・フレーム数・REC/REPLAY など）
+        base.Draw();
     }
     private readonly Gradation gradation = new(
     [

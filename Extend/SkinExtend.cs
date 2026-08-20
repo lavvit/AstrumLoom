@@ -91,7 +91,15 @@ public class SkinExtend
         }
         return result != null && result.Enable ? result : null;
     }
+    /// <summary>
+    /// 名前から音を引きます。見つからなければ空のインスタンスを返すので、戻り値は null になりません。
+    /// </summary>
+    /// <remarks>
+    /// 呼ぶ先は 1 つ上の <see cref="SoundExtend(string, string?)"/>。
+    /// ここを GetSound と書くと自分自身を呼んで無限再帰になり、
+    /// StackOverflowException（.NET では捕捉できない）でプロセスごと落ちる。
+    /// </remarks>
     public static SoundExtend GetSound(string key)
-        => GetSound(key.ToLowerInvariant()) ?? new("");
+        => SoundExtend(key.ToLowerInvariant()) ?? new("");
     #endregion
 }

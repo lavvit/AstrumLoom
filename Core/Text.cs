@@ -242,7 +242,12 @@ public class Text
             }
             else
             {
-                int len = bytes.Length <= rebytes.Length ? rebytes.Length : bytes.Length;
+                // 再変換で長さが変わることがある（不完全なマルチバイト列が
+                // 置換文字 U+FFFD の3バイトに化けるなど）。長い方の長さで両方の配列に
+                // 添字アクセスすると短い方を読み越して IndexOutOfRangeException になり、
+                // catch に握り潰されて「一致バイト数0＝完全不一致」の誤判定になっていた。
+                // 比較できるのは両方に存在する範囲＝短い方の長さまで。
+                int len = Math.Min(bytes.Length, rebytes.Length);
                 for (int i = 0; i < len; i++)
                 {
                     if (bytes[i] != rebytes[i])
@@ -250,6 +255,10 @@ public class Text
                         return i == 0 ? 0 : i - 1;//一致バイト数
                     }
                 }
+                // 共通範囲は全て一致、長さだけが違う（＝末尾が置換文字などに化けたケース）。
+                // 呼び出し元は「末尾以外が同一なら同一とみなす」救済をするので、
+                // 不一致が見つかった場合と同じ基準で一致バイト数を返す。
+                return len == 0 ? 0 : len - 1;//一致バイト数
             }
         }
         catch

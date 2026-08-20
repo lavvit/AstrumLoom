@@ -32,8 +32,14 @@ public sealed class DxLibPlatform : IGamePlatform
         SetWindowSizeExtendRate(config.Scale); // ウィンドウ拡大率
         SetAlwaysRunFlag(1); // 非アクティブでも動かす
         SetWaitVSyncFlag(0); // VSync 無効
-        VSync = config.VSync;
+        // VSync フィールドはここでは触らず、ネイティブ側の実状態（SetWaitVSyncFlag(0)=無効）と
+        // 同じ既定値 false のままにしておく。以前は config.VSync を直接代入していたが、
+        // config.VSync=true のとき SetVSync(true) が「VSync==enabled で値が同じ」の早期 return
+        // 枝に落ちてしまい、SetWaitVSyncFlag(1) にもモニタ Hz の反映（下の SetVSync 内）にも
+        // 一切到達しなくなる。config.VSync の反映はコンストラクタ末尾の SetVSync(config.VSync)
+        // に任せる。
         _targetFps = config.TargetFps;
+        _multiThreadUpdate = config.UseMultiThreadUpdate;
 
         SetDragFileValidFlag(1);
         SetMultiThreadFlag(1); // マルチスレッド
@@ -55,6 +61,12 @@ public sealed class DxLibPlatform : IGamePlatform
         TextInput = new(new DxLibTextInput(), Time);
         Mouse = new DxLibMouse();
         Controller = new DxLibController();
+
+        // ここで初めて config.VSync をネイティブ側へ反映する。VSync フィールドは false の
+        // ままなので、config.VSync=false ならそのまま早期 return（WaitVSync(0) の空振りのみ）、
+        // config.VSync=true なら SetWaitVSyncFlag(1) とモニタ Hz に基づく TargetFps 設定まで
+        // ちゃんと通る。
+        SetVSync(config.VSync);
     }
 
     public void PollEvents()
@@ -110,6 +122,10 @@ public sealed class DxLibPlatform : IGamePlatform
     }
 
     private readonly int _targetFps;
+    // シングルスレッド構成では 1 ループの中で UTime.EndFrame → Time.EndFrame が連続で呼ばれるため、
+    // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
+    // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
+    private readonly bool _multiThreadUpdate;
     public void SetVSync(bool enabled)
     {
         if (VSync == enabled)
@@ -125,14 +141,18 @@ public sealed class DxLibPlatform : IGamePlatform
             int display = 0;
             GetDisplayInfo(display, out _, out _, out _, out _, out _,
                 out int monitorFps);
-            int targetFps = _targetFps == 0 ? monitorFps : Math.Max(0, monitorFps);
+            // 両分岐とも monitorFps になっていた書き間違い（Math.Max(0, monitorFps) は
+            // monitorFps を 0 でクランプするだけで _targetFps を全く見ていない）。
+            // RayLibPlatform.SetVSync と同じ Math.Min に合わせ、config.TargetFps がモニタの
+            // リフレッシュレートより低いときはその値を優先する。
+            int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
             Time.TargetFps = targetFps;
-            UTime.TargetFps = targetFps;
+            if (_multiThreadUpdate) UTime.TargetFps = targetFps;
         }
         else
         {
             Time.TargetFps = _targetFps;
-            UTime.TargetFps = _targetFps;
+            if (_multiThreadUpdate) UTime.TargetFps = _targetFps;
         }
     }
     private bool dragDrop = false;

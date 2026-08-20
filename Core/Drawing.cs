@@ -4,7 +4,12 @@ namespace AstrumLoom;
 
 public class Drawing
 {
-    internal static IGraphics Graphics => AstrumCore.Graphic;
+    // AstrumCore.Graphic は Platform?.Graphics で nullable（Boot() 前は Platform が未設定）。
+    // ここを素通しすると NullReferenceException が呼び出し側の深いところで static に発生し、
+    // 原因が「Boot をまだ呼んでいない」ことだと分かりにくい。戻り値は既存呼び出しを壊さないよう
+    // 非 null の IGraphics のまま維持し、未初期化時だけ意味の分かる例外にする。
+    internal static IGraphics Graphics => AstrumCore.Graphic
+        ?? throw new InvalidOperationException("AstrumCore.Boot がまだ呼ばれていません。Drawing は Boot 完了後（Scene.Enable 以降）でのみ使用できます。");
 
     public static void Point(double x, double y,
         Color? color = null,
@@ -321,8 +326,17 @@ public class Drawing
     }
 
     public static Texture MakeTexture(Action drawAction, int width = 0, int height = 0)
-    //    => G.MakeTexture(drawAction, width, height);
-          => new("");
+    {
+        // width/height が 0 のときは画面サイズいっぱいのレンダーターゲットにする、という
+        // 引数の既定値(0)が示す意図を尊重する。
+        int w = width > 0 ? width : AstrumCore.Width;
+        int h = height > 0 ? height : AstrumCore.Height;
+        // Texture(Size, Action) は IGamePlatform.CreateTexture を経由して drawAction を
+        // レンダーターゲットへ実際に焼き込む（TextureCathe.Get と同じ経路）。
+        // 以前はここが new("") のスタブで、drawAction も width/height も無視して
+        // 空のテクスチャを返していた。
+        return new Texture(new LayoutUtil.Size(w, h), drawAction);
+    }
 
     public static double DefaultScale { get; set; } = 1.0;
 }

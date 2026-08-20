@@ -9,7 +9,7 @@ public interface IGame
     void Draw();
 }
 
-public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOverlay = true, bool showMouse = true)
+public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig config)
 {
     private static readonly Color BackgroundColor = new(10, 10, 11);
     private static readonly Color FatalBackgroundColor = new(12, 4, 6);
@@ -21,13 +21,21 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
     private readonly object _gameLock = new();
     private volatile bool _fatalTriggered;
 
+    /// <summary>固定ステップ更新の未消化時間（秒）。</summary>
+    private float _accumulator;
+    private InputBridge? _inputBridge;
+
     public void Run()
     {
         AstrumCore.Platform = platform;
         AstrumCore.MainThreadId = Environment.CurrentManagedThreadId;
 
-        KeyInput.Initialize(platform.Input, platform.TextInput);
-        Mouse.Init(platform.Mouse, showMouse);
+        // 記録・再生・合成入力を差し込めるように、プラットフォーム入力を常に包む。
+        var (input, mouse) = InputCapture.Install(platform, config, DebugSession.Options);
+        _inputBridge = input as InputBridge;
+
+        KeyInput.Initialize(input, platform.TextInput);
+        Mouse.Init(mouse, config.ShowMouse);
         game.Initialize();
         AstrumCore.InitCompleted = true;
         Scene.Start();
@@ -120,18 +128,30 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
         try
         {
             Sleep.Update();
+
+            // 生入力を先に進めておく。こうするとデバッグホットキーは
+            // 一時停止中でも、入力再生中でも効く。
+            _inputBridge?.PreUpdate();
+            DebugControl.PollHotkeys();
+
+            // 一時停止・スローの判定はループ 1 回につき 1 度。
+            bool run = DebugControl.ShouldRunUpdate();
+
+            // 入力の確定はループ 1 回につき 1 度だけ。
+            // キャッチアップで複数ステップ走る場合、それらは同じ入力を共有する。
+            // 再生はフレーム番号で引くので、この反復で進む「最初の」論理フレームに合わせる。
+            long frame = AstrumCore.FrameCount + 1;
+            if (run) InputCapture.BeginFrame(frame);
+
             KeyInput.Update(platform.UTime.DeltaTime);
             Mouse.Update();
             Pad.Update();
-            if (AstrumCore.GameLock)
-            {
-                lock (_gameLock)
-                    game.Update(platform.UTime.DeltaTime);
-            }
-            else
-            {
-                game.Update(platform.UTime.DeltaTime);
-            }
+
+            // 記録は入力を確定させた「後」。ここを BeginFrame と同じ場所でやると
+            // 1 フレーム前の状態を書いてしまい、再生が 1 フレームずれる。
+            if (run) InputCapture.EndFrame(frame);
+
+            if (run) RunLogicSteps(game, platform.UTime.DeltaTime);
         }
         catch (Exception ex)
         {
@@ -146,6 +166,60 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
 
         if (_fatalTriggered)
             return;
+    }
+
+    /// <summary>
+    /// この反復で進めるべき論理フレームを実行します。
+    /// 可変 dt / 固定ステップ / ロックステップの 3 モードをここで吸収します。
+    /// </summary>
+    private void RunLogicSteps(IGame game, float wallDelta)
+    {
+        if (!config.FixedUpdate)
+        {
+            LogicStep(game, wallDelta);
+            return;
+        }
+
+        float fixedDt = (float)(1.0 / Math.Max(1e-6, config.FixedUpdateHz));
+
+        // ロックステップは実時間を見ない。1 ループ 1 ステップ。
+        if (config.LockStep)
+        {
+            LogicStep(game, fixedDt);
+            return;
+        }
+
+        _accumulator += wallDelta;
+
+        // ブレークポイントや初回フレームで巨大な dt が来ても、一気に走らせない。
+        float maxAccum = fixedDt * Math.Max(1, config.MaxCatchUpSteps);
+        if (_accumulator > maxAccum) _accumulator = maxAccum;
+
+        int steps = 0;
+        while (_accumulator >= fixedDt && steps < Math.Max(1, config.MaxCatchUpSteps))
+        {
+            _accumulator -= fixedDt;
+            steps++;
+            LogicStep(game, fixedDt);
+        }
+    }
+
+    /// <summary>論理フレームを 1 回進めます。入力は呼び出し側で確定済みです。</summary>
+    private void LogicStep(IGame game, float deltaTime)
+    {
+        AstrumCore.BeginLogicFrame(deltaTime);
+
+        if (AstrumCore.GameLock)
+        {
+            lock (_gameLock)
+                game.Update(deltaTime);
+        }
+        else
+        {
+            game.Update(deltaTime);
+        }
+
+        DebugSession.OnLogicFrame(deltaTime);
     }
     public void Draw(IGame game)
     {
@@ -168,12 +242,15 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             {
                 game.Draw();
             }
-            // ★ ここでオーバーレイ
-            if (showOverlay)
+            // ★ ここでオーバーレイ（F1 で切り替わる）
+            if (DebugControl.ShowOverlay)
                 Overlay.Current.Draw();
             Log.Draw();
 
             ExtendAction(end: true);
+
+            // スクリーンショットはオーバーレイとログまで含めた「見えている絵」を撮る。
+            DebugSession.OnDrawFrame();
         }
         catch (Exception ex)
         {
@@ -188,6 +265,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, bool showOver
             }
             platform.Time.EndFrame();
             AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
+            AstrumCore.CountDrawFrame();
         }
 
         if (_fatalTriggered)

@@ -3,6 +3,12 @@
 // MultiBeat.FPS の AstrumLoom 版
 public sealed class FpsCounter
 {
+    // Tick は更新スレッド、GetFPS/GetMaxFPS/GetMinFPS/ToString は描画スレッドから呼ばれうる
+    // （UseMultiThreadUpdate=true のとき）。_times や _prevTimeMs をロック無しで共有すると
+    // List.ToArray() が内部状態の不整合を踏んで ArgumentException を投げうる。
+    // Profiler / Tune / Randomize と同じ lock(_sync) 方式で全体を一つの臨界区間にする。
+    private readonly object _sync = new();
+
     public double NowValue { get; private set; }
 
     private double _prevTimeMs;
@@ -15,25 +21,28 @@ public sealed class FpsCounter
     {
         double timeMs = totalSeconds * 1000.0;
 
-        if (_prevTimeMs == 0)
+        lock (_sync)
         {
+            if (_prevTimeMs == 0)
+            {
+                _prevTimeMs = timeMs;
+                return;
+            }
+
+            double etime = timeMs - _prevTimeMs;
+            if (etime < 0) return;
+            double fps = 1000.0 / Math.Max(0.001, etime);
+
+            NowValue = Math.Round(fps, 3, MidpointRounding.AwayFromZero);
             _prevTimeMs = timeMs;
-            return;
-        }
 
-        double etime = timeMs - _prevTimeMs;
-        if (etime < 0) return;
-        double fps = 1000.0 / Math.Max(0.001, etime);
+            _times.Add((timeMs, NowValue));
 
-        NowValue = Math.Round(fps, 3, MidpointRounding.AwayFromZero);
-        _prevTimeMs = timeMs;
-
-        _times.Add((timeMs, NowValue));
-
-        // 直近 1 秒分だけ残す（or 件数1000までは許容）
-        if (_times.Count > 1000 || _times[^1].timeMs - _times[0].timeMs > 1000.0)
-        {
-            _times.RemoveAt(0);
+            // 直近 1 秒分だけ残す（or 件数1000までは許容）
+            if (_times.Count > 1000 || _times[^1].timeMs - _times[0].timeMs > 1000.0)
+            {
+                _times.RemoveAt(0);
+            }
         }
     }
 
@@ -44,45 +53,44 @@ public sealed class FpsCounter
 
     public double GetFPS(double rangeSeconds = 1.0)
     {
-        try
+        lock (_sync)
         {
-            var all = _times.ToArray();
-            if (all.Length < 2) return 0;
+            if (_times.Count < 2) return 0;
 
             double border = _prevTimeMs - rangeSeconds * 1000.0;
-            var target = all.Where(t => t.timeMs >= border).ToList();
+            var target = _times.Where(t => t.timeMs >= border).ToList();
             return target.Count < 2
                 ? 0
                 : Math.Round(target.Select(t => t.value).Average(), 3, MidpointRounding.AwayFromZero);
-        }
-        catch (ArgumentException)
-        {
-            return 0;
         }
     }
 
     public double GetMaxFPS(double rangeSeconds = 1.0)
     {
-        var all = _times.ToArray();
-        if (all.Length < 2) return 0;
+        lock (_sync)
+        {
+            if (_times.Count < 2) return 0;
 
-        double border = _prevTimeMs - rangeSeconds * 1000.0;
-        var target = all.Where(t => t.timeMs >= border).ToList();
-        return target.Count < 2
-            ? 0
-            : Math.Round(target.Select(t => t.value).Max(), 3, MidpointRounding.AwayFromZero);
+            double border = _prevTimeMs - rangeSeconds * 1000.0;
+            var target = _times.Where(t => t.timeMs >= border).ToList();
+            return target.Count < 2
+                ? 0
+                : Math.Round(target.Select(t => t.value).Max(), 3, MidpointRounding.AwayFromZero);
+        }
     }
 
     public double GetMinFPS(double rangeSeconds = 1.0)
     {
-        var all = _times.ToArray();
-        if (all.Length < 2) return 0;
+        lock (_sync)
+        {
+            if (_times.Count < 2) return 0;
 
-        double border = _prevTimeMs - rangeSeconds * 1000.0;
-        var target = all.Where(t => t.timeMs >= border).ToList();
-        return target.Count < 2
-            ? 0
-            : Math.Round(target.Select(t => t.value).Min(), 3, MidpointRounding.AwayFromZero);
+            double border = _prevTimeMs - rangeSeconds * 1000.0;
+            var target = _times.Where(t => t.timeMs >= border).ToList();
+            return target.Count < 2
+                ? 0
+                : Math.Round(target.Select(t => t.value).Min(), 3, MidpointRounding.AwayFromZero);
+        }
     }
 }
 

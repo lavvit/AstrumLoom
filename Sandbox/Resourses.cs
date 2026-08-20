@@ -5,28 +5,24 @@ namespace Sandbox;
 /// <summary>
 /// Texture / Sound の各種プロパティと描画・再生挙動を視覚的にテストするシーン。
 /// </summary>
-internal sealed class TextureSoundDemoScene : Scene
+internal sealed class TextureDemoScene : Scene
 {
+    private Texture? _bgtex;
     private Texture? _tex;
-    private Sound? _bgm;
-    private Sound? _sfx;
+    private Texture? _flash;
     private double _angle;          // 回転角度
     private double _time;           // 経過時間
     private readonly List<Texture> _clones = [];
     private bool _showGrid = true;
     private bool _paused;
+    private ETexDrawState _drawState = ETexDrawState.BaseDraw;
 
     public override void Enable()
     {
         // アセット読み込み（Program と同じ配置想定）
         _tex = new Texture("Assets/test.png");
-        _bgm = new Sound("Assets/バナナのナナチ.ogg", stream: true);
-        _sfx = new Sound("Assets/Cancel.ogg");
-        if (_bgm != null)
-        {
-            _bgm.Loop = true;
-            _bgm.Volume = 0.6;
-        }
+        _bgtex = new Texture("Assets/colorbg.jpg");
+        _flash = new Texture("Assets/flash.png");
         // クローン作成（描画オプションの差異確認用）
         _clones.Clear();
         if (_tex != null)
@@ -43,37 +39,36 @@ internal sealed class TextureSoundDemoScene : Scene
     {
         base.Disable();
         _tex?.Dispose();
-        _bgm?.Dispose();
-        _sfx?.Dispose();
+        _bgtex?.Dispose();
+        _flash?.Dispose();
         foreach (var c in _clones) c.Dispose();
         _clones.Clear();
     }
 
     public override void Update()
     {
+        if (Key.Esc.Push()) AstrumCore.End();
+        if (Key.F1.Push()) _drawState = (ETexDrawState)(((int)_drawState + 1) % (int)ETexDrawState.Max);
+
         double dt = AstrumCore.Platform.UTime.DeltaTime;
         if (!_paused) _time += dt;
 
-        if (Key.Esc.Push()) AstrumCore.End();
-        if (Key.Space.Push()) _sfx?.Play();
+        switch (_drawState)
+        {
+            case ETexDrawState.BaseDraw:
+                break;
+            case ETexDrawState.BlendDraw:
+                _flash?.Point = ReferencePoint.Center;
+                _flash?.Scale = 3.0;
+                _flash?.Opacity = 0.5 + 0.5 * Math.Sin(_time * 4.0);
+                _flash?.BlendMode = BlendMode.Add;
+                break;
+        }
+
+        /*
+
         if (Key.G.Push()) _showGrid = !_showGrid;
         if (Key.P.Push()) _paused = !_paused;
-
-        // BGM の簡易コントロール
-        _bgm?.PlayStream(); // 一度だけ呼ぶ
-        if (Key.Up.Repeat(4, 12)) _bgm!.Volume = Math.Min(4.0, _bgm!.Volume + 0.02);
-        if (Key.Down.Repeat(4, 12)) _bgm!.Volume = Math.Max(0.0, _bgm!.Volume - 0.02);
-        if (Key.Left.Repeat(6, 12)) _bgm!.Pan = Math.Max(-1.0, _bgm!.Pan - 0.05);
-        if (Key.Right.Repeat(6, 12)) _bgm!.Pan = Math.Min(1.0, _bgm!.Pan + 0.05);
-        if (Key.F1.Push()) _bgm!.Pitch = Math.Max(0.05, _bgm!.Pitch - 0.05);
-        if (Key.F2.Push()) _bgm!.Pitch = Math.Min(8.0, _bgm!.Pitch + 0.05);
-        if (Key.R.Push()) _bgm!.Time = 0.0;
-        if (Key.E.Push())
-        {
-            _bgm!.Volume = 1;
-            _bgm!.Pan = 0;
-            _bgm!.Pitch = 1;
-        }
 
         // 回転角度更新
         _angle += dt * 90.0; // 90度/秒
@@ -99,6 +94,7 @@ internal sealed class TextureSoundDemoScene : Scene
             int ry = (_tex.Height - rh) / 2;
             _tex.Rectangle = new LayoutUtil.Rect(rx, ry, rw, rh);
         }
+        */
     }
 
     public override void Draw()
@@ -108,6 +104,9 @@ internal sealed class TextureSoundDemoScene : Scene
         DrawBackdrop();
 
         if (_tex == null) return;
+
+        /*
+
 
         double cx = AstrumCore.Width / 2.0;
         double cy = AstrumCore.Height / 2.0 - 40;
@@ -135,11 +134,41 @@ internal sealed class TextureSoundDemoScene : Scene
             t.Draw(ox, oy);
             Drawing.Cross(ox, oy, 24, Color.Yellow, 2);
             Drawing.Text(ox, oy + 80, t.Point.ToString(), Color.White, point: ReferencePoint.Center);
+        }*/
+
+        switch (_drawState)
+        {
+            case ETexDrawState.BaseDraw:
+                Draw_BaseDraw();
+                break;
+            case ETexDrawState.BlendDraw:
+                Draw_BlendDraw();
+                break;
         }
 
         // 情報パネル
         DrawInfoPanel();
     }
+
+    private void Draw_BaseDraw()
+    {
+        // 基本描画（ブレンドなし）
+        if (_tex != null)
+        {
+            _tex.BlendMode = BlendMode.None;
+            _tex.Draw(100, 100);
+        }
+    }
+
+    private void Draw_BlendDraw()
+    {
+
+        _bgtex?.Draw(0, 0, new LayoutUtil.Rect(0, 0, AstrumCore.Width, AstrumCore.Height));
+
+        // ブレンド描画（通常のアルファブレンド）
+        _flash?.Draw(600, 400);
+    }
+
 
     private void DrawReferencePointGrid(double cx, double cy)
     {
@@ -172,14 +201,7 @@ internal sealed class TextureSoundDemoScene : Scene
         double y = AstrumCore.Height - 140;
         Drawing.Box(x - 12, y - 12, 420, 130, new Color(0, 0, 0, 120));
 
-        if (_bgm != null)
-        {
-            Drawing.Box(x, y - 4, 400 * _bgm.Progress, 8, Color.LimeGreen);
-            Drawing.Text(x, y, $"BGM Vol: {_bgm.Volume:0.00} Pan: {_bgm.Pan:0.00} Pitch: {_bgm.Pitch:0.00}", Color.White);
-            Drawing.Text(x, y + 22, $"Time: {_bgm.Time / 1000.0:0.0}s / {_bgm.Length / 1000.0:0.0}s", Color.White);
-        }
         Drawing.Text(x, y + 44, $"Texture Opacity: {_tex?.Opacity:0.00} Scale: {_tex?.Scale:0.00} Angle: {_angle:0.0}", Color.White);
-        Drawing.Text(x, y + 66, "SPACE: SFX  Up/Down: Vol  Left/Right: Pan  F1/F2: Pitch", Color.Gray);
         Drawing.Text(x, y + 88, "G: Grid  P: Pause  ESC: Exit", Color.Gray);
     }
 
@@ -199,4 +221,12 @@ internal sealed class TextureSoundDemoScene : Scene
             Drawing.Circle(px, py, 50 * pulse, col);
         }
     }
+}
+
+internal enum ETexDrawState
+{
+    BaseDraw,   // 基本描画
+    BlendDraw,  // ブレンド描画
+
+    Max,
 }

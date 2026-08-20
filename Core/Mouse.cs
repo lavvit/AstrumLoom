@@ -108,7 +108,8 @@ public class Mouse
     /// <param name="size">基本サイズ</param>
     /// <param name="color">メインカラー（nullなら白）</param>
     /// <param name="accent">アクセントカラー（nullならグレー）</param>
-    public static void Draw(int size = 18, Color? color = null, Color? accent = null)
+    /// <param name="showgrid">現在位置を表示するかどうか</param>
+    public static void Draw(int size = 18, Color? color = null, Color? accent = null, bool showgrid = false)
     {
         if (AstrumCore.WindowConfig.ShowMouse)
             return;
@@ -235,6 +236,13 @@ public class Mouse
                 Drawing.LineZ(0, y, AstrumCore.Width, y, Color.White);
                 Drawing.LineZ(x, 0, x, AstrumCore.Height, Color.White);
             }
+        }
+
+        if (showgrid)
+        {
+            Drawing.LineZ(0, y, AstrumCore.Width, y, Color.White);
+            Drawing.LineZ(x, 0, x, AstrumCore.Height, Color.White);
+            Drawing.Text(x, y, $"({(int)x}, {(int)y})", Color.White, point: ReferencePoint.BottomLeft);
         }
     }
 

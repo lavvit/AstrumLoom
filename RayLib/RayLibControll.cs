@@ -36,10 +36,15 @@ public class RayLibMouse : IMouse
         bool rRaw = IsMouseButtonDown(Raylib_cs.MouseButton.Right);
         bool mRaw = IsMouseButtonDown(Raylib_cs.MouseButton.Middle);
 
-        // 押下開始を記録（安定化用）
-        if (lRaw) RecordDown(MouseButton.Left, now);
-        if (rRaw) RecordDown(MouseButton.Right, now);
-        if (mRaw) RecordDown(MouseButton.Middle, now);
+        // 押下開始を記録（安定化用）。
+        // RecordDown は _downTickX==0 のときしか基準位置を取り直さない（押しっぱなしの間、
+        // ドラッグ判定の基準点を固定するため）。離した瞬間に _downTickX を 0 に戻さないと、
+        // 次に別の場所を押しても「起動後最初に押した位置」が基準のままになり、
+        // WithinTolerance が TapMoveTolerance(既定3px) を超えたと判定してクリックが一切
+        // 取れなくなる。
+        if (lRaw) RecordDown(MouseButton.Left, now); else _downTickLeft = 0;
+        if (rRaw) RecordDown(MouseButton.Right, now); else _downTickRight = 0;
+        if (mRaw) RecordDown(MouseButton.Middle, now); else _downTickMiddle = 0;
 
         // 安定化判定（必要なら）
         bool l = IsStableDown(MouseButton.Left, lRaw, now) && WithinTolerance(MouseButton.Left);

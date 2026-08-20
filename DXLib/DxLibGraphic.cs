@@ -169,6 +169,32 @@ internal sealed class DxLibGraphics : IGraphics
     public IFont CreateFont(FontSpec spec)
         => new DxLibFont(spec);
 
+    public bool SaveScreenshot(string path)
+    {
+        // SaveDrawScreen は「現在の描画対象」を保存するので、裏画面に戻してから撮る。
+        // BeginFrame と EndFrame の間から呼ばれる前提。
+        GetWindowSize(out int w, out int h);
+        if (w <= 0 || h <= 0) return false;
+
+        int previous = GetDrawScreen();
+        SetDrawScreen(DX_SCREEN_BACK);
+        try
+        {
+            int type = Path.GetExtension(path).ToLowerInvariant() switch
+            {
+                ".bmp" => DX_IMAGESAVETYPE_BMP,
+                ".jpg" or ".jpeg" => DX_IMAGESAVETYPE_JPEG,
+                ".dds" => DX_IMAGESAVETYPE_DDS,
+                _ => DX_IMAGESAVETYPE_PNG,
+            };
+            return SaveDrawScreen(0, 0, w, h, path, type) == 0;
+        }
+        finally
+        {
+            if (previous != DX_SCREEN_BACK) SetDrawScreen(previous);
+        }
+    }
+
     internal static int GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => DX_BLENDMODE_ALPHA,
