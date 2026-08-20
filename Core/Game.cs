@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace AstrumLoom;
 
@@ -20,7 +22,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 {
     private static readonly Color BackgroundColor = new(10, 10, 11);
     private static readonly Color FatalBackgroundColor = new(12, 4, 6);
-    private static readonly TimeSpan FatalDisplayDuration = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan FatalDisplayDuration = TimeSpan.FromMinutes(5);
     private static DateTime? ThrowErrorTime = null;
 
     private volatile bool _running;
@@ -342,7 +344,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         AstrumCore.ReportFatalError(phase, ex);
     }
 
-    /// <summary>致命的エラー発生後、一定時間だけエラー画面を表示してからウィンドウを閉じる。</summary>
+    /// <summary>致命的エラー発生後、一定時間エラー画面を表示する。Enterキーで即座に閉じられ、Cキーで診断情報をクリップボードにコピーできる。</summary>
     private void RenderFatalAndClose()
     {
         var info = AstrumCore.FatalError;
@@ -351,9 +353,25 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
         var endAt = DateTime.UtcNow + FatalDisplayDuration;
         ThrowErrorTime ??= DateTime.UtcNow;
+        string? copyStatus = null;
+        DateTime copyStatusUntil = DateTime.MinValue;
+
         while (DateTime.UtcNow < endAt && !platform.ShouldClose)
         {
             platform.PollEvents();
+            platform.Input.Buffer();
+            platform.Input.Update();
+
+            if (platform.Input.GetKeyDown(Key.Enter))
+                break;
+
+            if (platform.Input.GetKeyDown(Key.C))
+            {
+                bool ok = ClipboardUtil.TrySetText(BuildFatalReport(info));
+                copyStatus = ok ? "診断コードをクリップボードにコピーしました。" : "コピーに失敗しました。";
+                copyStatusUntil = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+            }
+
             platform.Time.BeginFrame();
             bool frameBegan = false;
             try
@@ -361,7 +379,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
                 platform.Graphics.BeginFrame();
                 frameBegan = true;
                 platform.Graphics.Clear(FatalBackgroundColor);
-                DrawFatalMessage(info);
+                DrawFatalMessage(info, DateTime.UtcNow < copyStatusUntil ? copyStatus : null);
             }
             finally
             {
@@ -377,21 +395,47 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         platform.Close();
     }
 
-    private void DrawFatalMessage(FatalErrorInfo info)
+    /// <summary>クリップボードに載せる診断情報。内部のコードやパスがそのまま読めないよう、通し番号だけ平文で、詳細はBase64で難読化する。</summary>
+    private static string BuildFatalReport(FatalErrorInfo info)
     {
-        Drawing.Box(0, 0, AstrumCore.Width, AstrumCore.Height, Color.Black, opacity: 0.7);
+        var raw = new StringBuilder();
+        raw.AppendLine($"Phase: {info.Phase}");
+        raw.AppendLine($"Type: {info.ExceptionType}");
+        raw.AppendLine($"Message: {info.Message}");
+        raw.AppendLine($"Timestamp: {info.Timestamp:yyyy-MM-dd HH:mm:ss}");
+        raw.AppendLine("--- StackTrace ---");
+        raw.AppendLine(info.StackTrace);
+
+        string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw.ToString()));
+
+        var report = new StringBuilder();
+        report.AppendLine("=== AstrumLoom Error Report ===");
+        report.AppendLine($"Time: {info.Timestamp:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine("(サポート窓口にそのまま貼り付けてください / Paste this as-is when reporting the issue)");
+        report.AppendLine();
+        report.Append(encoded);
+        return report.ToString();
+    }
+
+    private void DrawFatalMessage(FatalErrorInfo info, string? copyStatus)
+    {
+        Drawing.Box(0, 0, AstrumCore.Width, AstrumCore.Height, Color.Black, opacity: 0.75);
         Drawing.Box(20, 20, AstrumCore.Width - 40, AstrumCore.Height - 40, Color.Red, thickness: 4);
-        Drawing.Box(40, 40, AstrumCore.Width - 80, AstrumCore.Height - 80, Color.DarkRed, opacity: 0.4);
+        Drawing.Box(40, 40, AstrumCore.Width - 80, AstrumCore.Height - 80, Color.DarkRed, opacity: 0.35);
         double x = 60;
         double y = 60;
         int fontSize = Drawing.FontSize();
+
         Drawing.Text(x, y, "アプリケーション内でエラーが発生しました。 Fatal Error has occurred.", Color.Red);
         y += fontSize * 2 + 10;
-        Drawing.Text(x, y, $"スレッド Phase: {info.Phase}", Color.Yellow);
+        Drawing.Text(x, y, $"発生時刻 Time: {info.Timestamp:yyyy-MM-dd HH:mm:ss}", Color.Gray);
+        y += fontSize + 6;
+        Drawing.Text(x, y, $"フェーズ Phase: {info.Phase}", Color.Yellow);
         y += fontSize + 10;
         Drawing.Text(x, y, $"{info.ExceptionType}: {info.Message}", Color.Gold);
-        y += fontSize * 2 + 10;
+        y += fontSize * 2 + 6;
 
+#if DEBUG
         if (info?.Details.Length > 1)
         {
             Drawing.Text(x, y, "詳細情報 / Details:", Color.Orange);
@@ -399,17 +443,113 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             foreach (string? line in info.Details[1..].Take(10))
             {
                 Drawing.Text(x, y, line, Color.White);
-                y += fontSize + 10;
+                y += fontSize + 6;
             }
         }
+#else
+        Drawing.Text(x, y, "詳細はサポート窓口へ「エラー情報をコピー」した内容をお送りください。", Color.Orange);
+        y += fontSize + 10;
+#endif
 
-        y = AstrumCore.Height - 80;
+        // 操作案内バー
+        double barY = AstrumCore.Height - 130;
+        Drawing.Box(x, barY, AstrumCore.Width - 120, fontSize + 20, Color.Black, opacity: 0.4);
+        Drawing.Text(x + 16, barY + 10, "[Enter] 閉じる / Close    [C] エラー情報をコピー / Copy diagnostic code", Color.Cyan);
+
+        if (!string.IsNullOrEmpty(copyStatus))
+            Drawing.Text(x + 16, barY - fontSize - 8, copyStatus, Color.LightGreen);
+
+        // 自動クローズまでの残り時間バー
+        y = AstrumCore.Height - 70;
         double w = AstrumCore.Width * 0.25;
         var endAt = ThrowErrorTime ?? DateTime.UtcNow + FatalDisplayDuration;
-        Drawing.Box(x, y, w, 20, Color.Gray, opacity: 0.3);
+        Drawing.Box(x, y, w, 16, Color.Gray, opacity: 0.3);
         double ms = (endAt - DateTime.UtcNow).TotalMilliseconds;
         double progress = Easing.Ease(-ms / FatalDisplayDuration.TotalMilliseconds, EEasing.Sine, EInOut.InOut);
-        Drawing.Box(x, y, w * progress, 20, Color.DeepPink);
-        Drawing.Text(x, y - fontSize - 10, "自動的に閉じます...", Color.DeepPink);
+        Drawing.Box(x, y, w * progress, 16, Color.DeepPink);
+        Drawing.Text(x, y - fontSize - 6, "自動的に閉じます... (Enterで今すぐ閉じる)", Color.DeepPink);
+    }
+}
+
+/// <summary>Win32クリップボードへの最小限のテキスト書き込み。バックエンド(DxLib/RayLib)に依存しない。</summary>
+internal static class ClipboardUtil
+{
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll")]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
+
+    private const uint CF_UNICODETEXT = 13;
+    private const uint GMEM_MOVEABLE = 0x0002;
+
+    /// <summary>クリップボードへの書き込みを試みる。失敗しても例外は投げず false を返す。</summary>
+    public static bool TrySetText(string text)
+    {
+        IntPtr hGlobal = IntPtr.Zero;
+        bool opened = false;
+        try
+        {
+            opened = OpenClipboard(IntPtr.Zero);
+            if (!opened)
+                return false;
+
+            EmptyClipboard();
+
+            int byteCount = (text.Length + 1) * sizeof(char);
+            hGlobal = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)byteCount);
+            if (hGlobal == IntPtr.Zero)
+                return false;
+
+            IntPtr target = GlobalLock(hGlobal);
+            if (target == IntPtr.Zero)
+                return false;
+
+            try
+            {
+                Marshal.Copy(text.ToCharArray(), 0, target, text.Length);
+                Marshal.WriteInt16(target, text.Length * sizeof(char), 0);
+            }
+            finally
+            {
+                GlobalUnlock(hGlobal);
+            }
+
+            if (SetClipboardData(CF_UNICODETEXT, hGlobal) == IntPtr.Zero)
+                return false;
+
+            // 所有権はクリップボードに移ったので、ここでは解放しない
+            hGlobal = IntPtr.Zero;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (hGlobal != IntPtr.Zero)
+                GlobalFree(hGlobal);
+            if (opened)
+                CloseClipboard();
+        }
     }
 }
