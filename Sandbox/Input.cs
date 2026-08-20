@@ -129,6 +129,13 @@ internal sealed class InputDemoScene : Scene
             if (!string.IsNullOrEmpty(committed)) AddLog($"Entered \"{committed}\"");
             _textActive = false;
         }
+        // Esc キャンセルは Enter() 経由では捕まらない（Finished ではなく Canceled で終わるため）。
+        // KeyInput.Typing がセッション終了で false に落ちたら、確定/キャンセルどちらでも待機状態へ戻す。
+        else if (_textActive && !KeyInput.Typing)
+        {
+            AddLog("Text input canceled");
+            _textActive = false;
+        }
     }
 
     public override void Draw()
@@ -251,10 +258,8 @@ internal sealed class InputDemoScene : Scene
         ny = DemoUi.Notes(x + Pad_, ny, TextW, new Color(152, 170, 202),
             $"最大 {_textOptions.MaxLength} 文字。Enter で確定してイベントログへ流れる。");
 
-        DemoUi.Notes(x + Pad_, ny + 6, TextW, new Color(212, 172, 112),
-            "注: 入力中の Esc キャンセル判定は Key.Esc.Push() を使っているが、"
-            + "Push は Typing 中は常に false を返すゲートがあるため絶対に成立しない。"
-            + "Esc でこの入力欄を閉じられないのはバグで、正しい退避手段は無い（未修正）。");
+        DemoUi.Notes(x + Pad_, ny + 6, TextW, new Color(152, 200, 152),
+            "Esc でもキャンセルできる（Typing ゲートを通さない RawGetKeyDown 経由）。");
     }
 
     #endregion
