@@ -157,9 +157,10 @@ public class Skin
             }
             QueMax = SkinQue.Count;
             string fontpath = Path.Combine(skinPath, "default.ttf");
-            string defaultFont = DefaultFont ??
-                (File.Exists(fontpath) ? fontpath : FHandle.SystemFont);
-            SetFont(Path.Combine(skinPath, "default.ttf"));
+            // DefaultFont は非nullableな string で既定値が "" のため ?? では判定できない。空文字判定に直す
+            string defaultFont = !string.IsNullOrEmpty(DefaultFont) ? DefaultFont
+                : (File.Exists(fontpath) ? fontpath : FHandle.SystemFont);
+            SetFont(defaultFont);
             if (inque)
                 Log.Write($"Skin: 読み込みキューに追加しました。({SkinQue.Count} items)", true);
             else FinishLoad();
@@ -301,7 +302,8 @@ public class Skin
 
         if (count < total && QueMax > 0)
         {
-            int l = count / (int)(QueMax / 10.0);
+            int step = Math.Max(1, (int)(QueMax / 10.0));
+            int l = count / step;
             if (l != _logcount)
             {
                 _logcount = l;
@@ -782,7 +784,9 @@ public class Skin
         string targetdir = FilePath("System");
 
         // フォルダが増えている可能性があるのでキャッシュ件数と実際のディレクトリ数を比較して無効化判定する
-        if (_skinList.Count < Directory.GetDirectories(targetdir).Length)
+        // targetdir がまだ存在しない場合は GetDirectories が例外を投げるため先にガードする
+        int dircount = Directory.Exists(targetdir) ? Directory.GetDirectories(targetdir).Length : 0;
+        if (_skinList.Count < dircount)
             _skinList = [];
         if (_skinList.Count > 0) return _skinList;
 

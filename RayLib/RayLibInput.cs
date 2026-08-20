@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Concurrent;
+using System.Text;
 
 using Raylib_cs;
 
@@ -29,6 +30,12 @@ internal sealed class RayLibInput : IInput
         _state = new int[len];
     }
 
+    // raylibのネイティブなキー入力ポンプ（PollInputEvents、EndDrawing経由）はメインスレッドでしか
+    // 起きないため、文字キューはBuffer()（メインスレッドから呼ばれる）でここに退避しておく。
+    // RayLibTextInput.Update()は更新スレッドから呼ばれうるが、GetCharPressed()を直接叩かず
+    // このスレッドセーフなキューを読むだけにする。
+    private readonly ConcurrentQueue<char> _charQueue = new();
+
     // 毎フレーム一度呼び出して内部バッファを更新する
     public void Buffer()
     {
@@ -43,7 +50,18 @@ internal sealed class RayLibInput : IInput
             bool isDown = rk != KeyboardKey.Null && IsKeyDown(rk);
             _now[i] = isDown;
         }
+
+        // 文字入力キューをポンプ（メインスレッドでのみ安全に呼べるGetCharPressed）
+        int key = GetCharPressed();
+        while (key != 0)
+        {
+            _charQueue.Enqueue((char)key);
+            key = GetCharPressed();
+        }
     }
+
+    /// <summary>Buffer()でポンプ済みの文字入力を1件取り出す。RayLibTextInputが更新スレッドから呼ぶ想定。</summary>
+    public bool PopChar(out char c) => _charQueue.TryDequeue(out c);
     /// <summary>Buffer()で取り込んだ現在/前フレームの押下状態から、各キーの遷移状態(1/2/-1/0)を確定します。</summary>
     public void Update()
     {
@@ -233,8 +251,18 @@ internal sealed class RayLibTextInput : ITextInput
     // Raylib には組み込みのテキスト入力管理機能がないため、
     // 独自実装が必要になる。
     // ここでは簡易的な実装例を示す。
+    //
+    // Enter/Esc/Backspace/文字入力は、raylibのIsKeyPressed/GetCharPressedを直接叩くのではなく
+    // RayLibInputが Buffer()（メインスレッド）で確定させたバッファ済み状態経由で読む。
+    // UseMultiThreadUpdate=true構成では、このクラスのUpdate()/KeyStateは更新スレッドから呼ばれる一方、
+    // raylibのネイティブなキー状態配列・文字キューの実ポンプはメインスレッドのEndDrawing内でしか
+    // 起きないため、直読みだとスレッド間の排他が無いまま同じネイティブ状態を触ることになる
+    // （VirtualInputによる合成入力もInputBridge層＝バッファ済み状態経由でしか効かないため、
+    // 直読みのままだとselftestから文字入力を通す手段も無い）。
+    private readonly RayLibInput _input;
     private StringBuilder _textBuilder = new();
     private TextInputOptions _options = new();
+    public RayLibTextInput(RayLibInput input) => _input = input;
     public bool IsActive { get; private set; }
     public string Text => _textBuilder.ToString();
     public int Cursor { get; private set; }
@@ -266,13 +294,13 @@ internal sealed class RayLibTextInput : ITextInput
         {
             if (!IsActive) return KeyInputState.Error;
 
-            // Enter 確定
-            if (IsKeyPressed(KeyboardKey.Enter))
+            // Enter 確定（raylibのIsKeyPressed直読みではなく、Buffer()で確定済みのバッファ状態を見る）
+            if (_input.GetBufferedState(Key.Enter) == 1)
                 return KeyInputState.Finished;
 
             // Esc キャンセル
             return _options.EscapeCancelable &&
-                IsKeyPressed(KeyboardKey.Escape)
+                _input.GetBufferedState(Key.Esc) == 1
                 ? KeyInputState.Canceled
                 : KeyInputState.Typing;
         }
@@ -282,20 +310,19 @@ internal sealed class RayLibTextInput : ITextInput
     public void Update()
     {
         if (!IsActive) return;
-        int key = GetCharPressed();
-        while (key != 0)
+        // GetCharPressed()を直接叩かず、RayLibInput.Buffer()（メインスレッド）が
+        // 事前にポンプ済みのスレッドセーフなキューから読む。
+        while (_input.PopChar(out char c))
         {
-            char c = (char)key;
             // 簡易的に文字数（UTF-16 char数）制限のみ考慮
             if ((ulong)_textBuilder.Length < _options.MaxLength)
             {
                 _textBuilder.Insert(Cursor, c);
                 Cursor++;
             }
-            key = GetCharPressed();
         }
-        // バックスペース処理
-        if (IsKeyPressed(KeyboardKey.Backspace) && Cursor > 0)
+        // バックスペース処理（Buffer()で確定済みのバッファ状態を見る）
+        if (_input.GetBufferedState(Key.Back) == 1 && Cursor > 0)
         {
             _textBuilder.Remove(Cursor - 1, 1);
             Cursor--;

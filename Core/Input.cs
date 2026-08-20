@@ -1,4 +1,6 @@
-﻿namespace AstrumLoom;
+﻿using System.Collections.Concurrent;
+
+namespace AstrumLoom;
 
 /// <summary>プラットフォームが実装するキーボード入力の最小インターフェース。KeyInputはこれをラップして使う。</summary>
 public interface IInput
@@ -119,8 +121,11 @@ public static class KeyInput
         }
     }
 
-    private static Dictionary<Key, double> _pressedFrameCounts = [];
-    private static Dictionary<Key, double> _lastRepeatTimes = [];
+    // UseMultiThreadUpdate=true では更新スレッドが書き、描画スレッド（KeyBoard.Draw経由の
+    // PressedFrameCount）が読む。素の Dictionary だとリサイズ中のバケット配列を読んで
+    // 例外・誤値・最悪 TryGetValue が戻らない事態になるため ConcurrentDictionary にする。
+    private static readonly ConcurrentDictionary<Key, double> _pressedFrameCounts = new();
+    private static readonly ConcurrentDictionary<Key, double> _lastRepeatTimes = new();
     internal static void Update(double deltaTime)
     {
         _input.Update();
@@ -140,8 +145,8 @@ public static class KeyInput
             }
             else if (_pressedFrameCounts.ContainsKey(key))
             {
-                _pressedFrameCounts.Remove(key);
-                _lastRepeatTimes.Remove(key);
+                _pressedFrameCounts.TryRemove(key, out _);
+                _lastRepeatTimes.TryRemove(key, out _);
             }
         }
     }
@@ -178,13 +183,24 @@ public static class KeyInput
         // delay フレーム以降、interval ごとに true を返す
 
         // 初回発火
-        if (!_lastRepeatTimes.ContainsKey(key))
+        if (!_lastRepeatTimes.TryGetValue(key, out double last))
         {
             _lastRepeatTimes[key] = frames;
             return true;
         }
 
-        if (frames - _lastRepeatTimes[key] >= interval)
+        // PressedFrameCount は KeyInput.Update が1フレームに1回しか進めないので、
+        // 同一フレーム内で複数箇所（メニューAとB、Update側とDraw側など）が
+        // 同じ key.Repeat() を見ると frames は毎回同じ値になる。
+        // 以前は「読んだら _lastRepeatTimes を進めて消費する」実装だったため、
+        // 先に評価された1人目だけが true を受け取り、同一フレームの2人目以降は
+        // 直後に差分が0になって必ず false を返していた。
+        // frames が前回発火時と同じ＝同一フレーム内の再評価なので、
+        // 状態を進めずに前回と同じ結果（true）を返す。
+        if (frames == last)
+            return true;
+
+        if (frames - last >= interval)
         {
             _lastRepeatTimes[key] = frames;
             return true;
@@ -272,6 +288,14 @@ public static class KeyInput
         if (Typing)
             _textEnter.IsCancel = true;
     }
+
+    /// <summary>
+    /// TextEnter からだけ使う、Typing ゲートを通さない生のキー押下判定。
+    /// Key.Esc.Push() は `!Typing &amp;&amp; ...` なので、TextEnter.Update の中
+    /// （＝常に Typing==true の状態）から呼ぶと絶対に true にならない。
+    /// ESC キャンセル判定用にゲート無しの経路を用意する。
+    /// </summary>
+    internal static bool RawGetKeyDown(Key key) => _input.GetKeyDown(key);
 }
 /// <summary>
 /// キーボード上のキーの種類を表します。
@@ -470,7 +494,10 @@ public sealed class TextEnter
             _impl.Begin(Option);
             return false;
         }
-        if (Key.Esc.Push() && Option.EscapeCancelable)
+        // Key.Esc.Push() は !Typing が条件に入っているため、Typing==true の
+        // このメソッド内から呼ぶと常に false になり、このESC分岐が到達不能だった。
+        // Typing ゲートを通さない KeyInput.RawGetKeyDown で判定する。
+        if (KeyInput.RawGetKeyDown(Key.Esc) && Option.EscapeCancelable)
         {
             // ESC キーでキャンセル
             _impl.Cancel();

@@ -20,9 +20,6 @@ internal sealed class SimpleTestGame : Scene
 
     public override void Enable()
     {
-        var ft = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 12, edge: 1);
-        if (ft != null) Drawing.DefaultFont = ft;
-
         // --scene で起動時のシーンを指定できる（1 始まり）。証跡を撮るときに便利。
         Select(StartScene);
         Overlay.Set(new SandboxOverlay());

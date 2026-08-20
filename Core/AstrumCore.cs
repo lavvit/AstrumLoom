@@ -14,13 +14,10 @@ internal class BaseProgram : IGame
     {
         _scene?.Update();
 
-        bool drop = AstrumCore.IsDroppable;
-        AstrumCore.Platform.SetDragDrop(drop);
-        if (!drop) return;
-        string[] files = AstrumCore.Platform.DropFiles;
-        if (files.Length > 0)
-            foreach (string f in files)
-                _scene?.Drag(f);
+        // 採取そのものはメインスレッドの AstrumCore.PumpDropFiles が済ませている。
+        // ここではキューから受け取って Scene に配るだけ。
+        while (AstrumCore.TryTakeDropFile(out string f))
+            _scene?.Drag(f);
     }
     public void Draw()
     {
@@ -134,6 +131,36 @@ public class AstrumCore
     public static void Droppable() => Interlocked.Increment(ref _dropCounter);
 
     internal static void InitDrop() => _dropCounter = 0;
+
+    // Platform.DropFiles / SetDragDrop はウィンドウ API（GLFW の GetDroppedFiles 等）を
+    // 叩くのでメインスレッド専用。更新スレッドから読むと描画スレッドの EndDrawing と
+    // 競合して取りこぼしや解放済み文字列の読み出しになるので、採取はメインスレッドの
+    // PumpDropFiles で行い、更新スレッドはこのキューから受け取るだけにする。
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<string> _droppedFiles = new();
+
+    /// <summary>
+    /// メインスレッドでドロップされたファイルを採取してキューに積みます。ゲームループ内から呼び出されます。
+    /// </summary>
+    internal static void PumpDropFiles()
+    {
+        if (Environment.CurrentManagedThreadId != MainThreadId) return;
+
+        bool drop = IsDroppable;
+        Platform.SetDragDrop(drop);
+        if (!drop)
+        {
+            // 受け付けていない間に溜まった分は捨てる（次に有効化したとき古いパスが流れないように）
+            while (_droppedFiles.TryDequeue(out _)) { }
+            return;
+        }
+        foreach (string f in Platform.DropFiles)
+            _droppedFiles.Enqueue(f);
+    }
+
+    /// <summary>
+    /// キューに積まれたドロップ済みファイルを 1 件取り出します。無ければ false。
+    /// </summary>
+    internal static bool TryTakeDropFile(out string file) => _droppedFiles.TryDequeue(out file!);
     #endregion
 
     #region アプリケーションパス関連
@@ -301,7 +328,11 @@ public class Sleep
 {
     private static long SleepDuration => AstrumCore.WindowConfig.SleepDurationMs;
     private static bool _vsync => AstrumCore.VSync;
-    private static long _lastWakeTime = 0;
+    // 0 のままだと Environment.TickCount64（OS 起動からの経過ミリ秒）と比べたときに
+    // 「OS 起動時刻に最後に起きた」という意味になり、PC を SleepDurationMs 以上
+    // 動かしていれば起動直後の 1 回目の Update で即スリープ判定になってしまう。
+    // クラス初期化の時刻を初期値にして、起きたばかりの状態から始める。
+    private static long _lastWakeTime = Environment.TickCount64;
     public static bool Sleeping { get; private set; } = false;
 
     // Platform.SetVSync に最後に要求した値。まだ一度も要求していないときは null。

@@ -42,6 +42,12 @@ public class Text
     /// <summary>行のリストをファイルへ保存する。末尾の空行は書き込まない。ディレクトリが無ければ作成する。</summary>
     public static void Save(List<string> list, string path, string encode = "utf-8", bool append = false)
     {
+        // GetEncoding 側と同じ「おまじない」。Text.Read/Text.GetEncoding を一度も通さずに
+        // Save だけを呼んだ場合、shift_jis 等のコードページ系エンコーディングが
+        // CodePagesEncodingProvider 未登録のまま Encoding.GetEncoding に渡され、
+        // ArgumentException（'shift_jis' is not a supported encoding name）で落ちていた。
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
         // エンコーディングの取得（例外は呼び出し元で処理）
         var encoding = Encoding.GetEncoding(encode);
 

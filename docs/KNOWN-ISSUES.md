@@ -6,6 +6,21 @@
 - ✅ … 修正済み
 - ⬜ … 未着手
 
+## 2026-08-20 の一斉修正
+
+未着手だった 65 件のうち **58 件を修正**しました。両バックエンド（RayLib / DxLib）で
+`--selftest` が全件 PASS、素の MT ループ 20 秒でも致命エラーなしを確認済みです。
+
+残る ⬜ の 7 件は、機械的に直すと別の場所が静かに壊れるので意図的に残してあります:
+
+| 残した項目 | 残した理由 |
+| --- | --- |
+| `Drawing.DefaultScale` 系 3 件（Core / DXLib / RayLib） | 「拡大率をどの層で誰が適用するか」を三者で決め直す話。片方だけ直すと既存の絵が全部ずれる |
+| `IInput` の Buffer() と Update() が別ループ回数で回る | ループ構造そのものの変更で、全バックエンドの入力実装を巻き込む |
+| `IMouse` にだけ Buffer() が無い | 同上。IMouse に Buffer() を足すインターフェース変更が要る |
+| 呼び出しごとの edgecolor が Edge>0 のフォントでしか効かない | Core 側は EdgeColor を正しく渡せている。直すのはバックエンドの縁取りハンドル生成側で、両方に一時ハンドルの仕組みが要る |
+| Sandbox のオーバーレイの分岐が成立しない | `LoadCheckScene` がどこからも生成されないデッドコード。実害ゼロで、消すか繋ぐかは Sandbox の設計判断 |
+
 ## 第一次監査で確定したもの
 
 ### 重大（13 件 / 修正済み 13 件）
@@ -88,9 +103,9 @@ GameConfig { TargetFps = 60, UseMultiThreadUpdate = false } で RayLib バック
 
 起動後 (100,100) で左クリック→離す→(400,300) へ移動して左クリック、で Mouse.Push/Hold/Left が一切 true にならない。同様に押したまま 3px 以上ドラッグすると押下中でも Released→None になりドラッグ操作が成立しない。
 
-### 中（31 件 / 修正済み 7 件）
+### 中（31 件 / 修正済み 27 件）
 
-#### ⬜ 初期化中（game.Initialize / Scene.Start）の例外だけ致命エラー画面に乗らず、素の未処理例外になる
+#### ✅ 初期化中（game.Initialize / Scene.Start）の例外だけ致命エラー画面に乗らず、素の未処理例外になる
 
 `Core/Game.cs:24`
 
@@ -108,19 +123,19 @@ GameConfig { TargetFps = 60, UseMultiThreadUpdate = false } で RayLib バック
 
 毎フレーム 1 行ログを出すゲームを 1 時間動かすと 21.6 万件になり、Log.Write 1 回が 21.6 万件走査、Log.Draw が毎フレーム 21.6 万件の LINQ になってフレームレートが実用外まで落ちる。メモリも解放されない。
 
-#### ⬜ Counter.Time が常に DateTime.MinValue を返す（AddMilliseconds の戻り値を捨てている）
+#### ✅ Counter.Time が常に DateTime.MinValue を返す（AddMilliseconds の戻り値を捨てている）
 
 `Core/Time.cs:305`
 
 どんな Value でも Counter.Time は 0001/01/01 00:00:00 を返す。経過時間表示に使うと常に同じ値が出る（TimeConvert 経由の CTime は正しく動くので、片方だけ壊れていて気づきにくい）。
 
-#### ⬜ Counter が終端に達しても while が回り続け、Ended が 1 回の Tick で何度も発火する
+#### ✅ Counter が終端に達しても while が回り続け、Ended が 1 回の Tick で何度も発火する
 
 `Core/Time.cs:118`
 
 `new Counter(0, 10, 1000)`（1ms 刻み・非ループ）を 50ms 間 Tick しなかったあとに Tick() すると、Ended が 1 回ではなく約 40 回発火する。Ended で「次のシーンへ遷移」や「音を鳴らす」を書いていると多重発火する。
 
-#### ⬜ Counter を長時間 Tick しないと次の Tick で数百万回スピンする
+#### ✅ Counter を長時間 Tick しないと次の Tick で数百万回スピンする
 
 `Core/Time.cs:101`
 
@@ -132,13 +147,13 @@ Interval=1（1µs）のループカウンタを 10 秒間 Tick しないでお�
 
 マルチスレッド更新時に FpsCounter.ToString() や GetMaxFPS/GetMinFPS を UpdateFPS に対して呼ぶと、List.ToArray() が内部 _size と _items の不整合を踏んで ArgumentException（Destination array is not long enough）を投げ、そのまま HandleFatal に流れる。GetFPS 側は例外を握り潰す代わりに 0 を返すので、FPS 表示が不定期に 0 に落ちる。
 
-#### ⬜ Sleep の初期値 0 が「OS 起動時刻」を意味してしまい、起動直後からスリープ状態になりうる
+#### ✅ Sleep の初期値 0 が「OS 起動時刻」を意味してしまい、起動直後からスリープ状態になりうる
 
 `Core/AstrumCore.cs:255`
 
 PC を 30 秒以上（Sandbox は SleepDurationMs=30000）動かしている状態で、別ウィンドウにフォーカスがあるまま、あるいはウィンドウ生成直後でまだフォーカスが来ていない状態で起動すると、初回の Sleep.Update で即スリープ判定になり VSync が強制 ON、Sleeping=true のまま最初のキー入力かマウス移動まで動く。ベンチや自動テストのように誰も入力しない実行では最後までスリープモードのまま。
 
-#### ⬜ ドラッグ＆ドロップの取得をゲーム更新スレッドで行っている
+#### ✅ ドラッグ＆ドロップの取得をゲーム更新スレッドで行っている
 
 `Core/AstrumCore.cs:16`
 
@@ -156,19 +171,19 @@ UseMultiThreadUpdate=true で RayLib バックエンドを使い、ファイル�
 
 UseMultiThreadUpdate=true で描画 144Hz・更新 60Hz にして 10ms 程度キーを叩くと、Buffer() が押下と解放の両方を _now に書いた後に Update() が走るため _state が 0 のままになり、Push も Left も一度も観測されない。入力が丸ごと消える（逆に更新が速い場合は Push が観測されるだけで実害は無いので、症状はフレームレート次第で変わる）。
 
-#### ⬜ 押下時間の Dictionary を更新スレッドで書きながら描画スレッドから読む
+#### ✅ 押下時間の Dictionary を更新スレッドで書きながら描画スレッドから読む
 
 `Core/Input.cs:121`
 
 UseMultiThreadUpdate=true にし、Sandbox/Input.cs:141 と同じように Draw() 内で KeyBoard.Draw() を呼びながらキーを連打する。Dictionary がリサイズしている最中のバケット配列を TryGetValue が読むため、InvalidOperationException、誤った値の返却、最悪 TryGetValue が戻らない（無限ループ）のいずれかが起きる。
 
-#### ⬜ Repeat() が「読むと消費される」クエリになっていて、同一フレームの2人目は必ず false
+#### ✅ Repeat() が「読むと消費される」クエリになっていて、同一フレームの2人目は必ず false
 
 `Core/Input.cs:180`
 
 2つの UI（例：メニューAとメニューB、あるいは Update 側と Draw 側）が同時に Key.Down.Repeat(150) を見ていると、先に評価された方だけがスクロールし、もう片方はキーを押し続けても永久にリピートを受け取れない。呼び出し順を変えると挙動が入れ替わるため原因も追いにくい。
 
-#### ⬜ TextEnter.Update の ESC キャンセル分岐が到達不能（Typing ゲートで常に false）
+#### ✅ TextEnter.Update の ESC キャンセル分岐が到達不能（Typing ゲートで常に false）
 
 `Core/Input.cs:462`
 
@@ -180,13 +195,13 @@ UseMultiThreadUpdate=true にし、Sandbox/Input.cs:141 と同じように Draw(
 
 UseMultiThreadUpdate=true にして描画1回の間に更新が2回走ると、raylib が EndDrawing まで保持しているホイール値を 2 回読むため、1ノッチのスクロールが WheelTotal に 2 回加算され、Mouse.Wheel != 0 の判定（Sandbox/Input.cs:63）も 2 回成立して 1 回のスクロールが 2 回分として扱われる。加えて GLFW の入力状態をメインスレッド外から読むことになる。
 
-#### ⬜ IJoyPad.Index の基準がバックエンドで違う（RayLib は 0 始まり、DxLib は 1 始まり）
+#### ✅ IJoyPad.Index の基準がバックエンドで違う（RayLib は 0 始まり、DxLib は 1 始まり）
 
 `Core/Pad.cs:15`
 
 pad.Index を設定ファイルに保存して次回 Pad.GetJoyPad(saved) で復元するコードは、RayLib では正しく動くが DxLib では 1 つずれたパッドを返すか null になる。Pad.List の一覧表示も DxLib だけ 1 始まりになり、Sandbox/Input.cs:172-176 のように配列添字と並べて出すと番号がずれる。
 
-#### ⬜ Text.Save が CodePages プロバイダ未登録のまま Encoding.GetEncoding を呼ぶ
+#### ✅ Text.Save が CodePages プロバイダ未登録のまま Encoding.GetEncoding を呼ぶ
 
 `Core/Text.cs:40`
 
@@ -198,43 +213,43 @@ pad.Index を設定ファイルに保存して次回 Pad.GetJoyPad(saved) で復
 
 `Drawing.DefaultScale = 2.0;` にして `tex.Draw(100,100); Drawing.Box(100,100,50,50);` を描くと、DxLib では テクスチャが (200,200) に 2 倍サイズ、RayLib では (200,200) に等倍サイズ、Box は両方 (100,100) に等倍。同じコードで 3 通りの結果になる。
 
-#### ⬜ Drawing.Point が既定の太さで何も描かない（int 除算で半径 0）
+#### ✅ Drawing.Point が既定の太さで何も描かない（int 除算で半径 0）
 
 `Core/Drawing.cs:13`
 
 `Drawing.Point(100, 100, Color.White);`（thickness 既定 1）が完全に不可視。thickness=3 を指定しても半径 1 の円になり、指定した太さの 1/3 程度の点しか出ない。
 
-#### ⬜ Texture.Draw(Point, DrawOption?) が option 引数を黙って捨てる
+#### ✅ Texture.Draw(Point, DrawOption?) が option 引数を黙って捨てる
 
 `Core/Texture.cs:35`
 
 `tex.Draw(new Point(10,20), new DrawOption { Opacity = 0.3, Color = Color.Red });` が不透明度も色も反映されず、インスタンスの既定 Option でそのまま描かれる。
 
-#### ⬜ HSBColor が負の色相を折り返さず、Shift(h:負) が別の色になる
+#### ✅ HSBColor が負の色相を折り返さず、Shift(h:負) が別の色になる
 
 `Core/Color.cs:176`
 
 スクラッチ実行で確認: `Color.FromHSB(-30,1,1)` は R:255 G:0 B:0（純赤）を返す。正しくは 330 度＝R:255 G:0 B:127。同じく `Color.Red.Shift(h:-30)` が赤のまま変化せず、`Color.Red.Shift(h:330)` だけが期待どおり R:255 G:0 B:127 になる。
 
-#### ⬜ 色 1 個の Gradation は GetColor が必ず例外を投げる
+#### ✅ 色 1 個の Gradation は GetColor が必ず例外を投げる
 
 `Core/ColorExtend.cs:277`
 
 スクラッチ実行で確認: `new Gradation(new[]{ Color.Red }).GetColor(0.5f)` および `GetColor(0f)` が InvalidOperationException。Drawing.Gradation（Drawing.cs:228）は 1 列ごとに GetColor を呼ぶので、単色グラデーションを渡すと描画フレームの途中で例外になり GameRunner.HandleFatal（Game.cs:180）でゲームが落ちる。
 
-#### ⬜ Drawing.Polygon に空の点列を渡すと IndexOutOfRangeException
+#### ✅ Drawing.Polygon に空の点列を渡すと IndexOutOfRangeException
 
 `Core/Drawing.cs:218`
 
 スクラッチ実行で確認: `Drawing.Polygon(Array.Empty<(double,double)>())` が IndexOutOfRangeException。動的に生成した頂点リスト（可視判定で全部落ちたなど）が空になった瞬間にゲームが落ちる。
 
-#### ⬜ Color.Parse(int) がアルファ 0x80 以上の ARGB を必ず不透明に潰す
+#### ✅ Color.Parse(int) がアルファ 0x80 以上の ARGB を必ず不透明に潰す
 
 `Core/Color.cs:156`
 
 スクラッチ実行で確認: `Color.Parse(unchecked((int)0x80112233))` が R:17 G:34 B:51 A:255 を返す。期待は A:128。半透明の色定数を ARGB の整数リテラルで持たせている箇所が全部不透明になる。
 
-#### ⬜ Drawing.Gradation の汎用パスがピクセル数ぶんのドローコールと色空間変換を発行する
+#### ✅ Drawing.Gradation の汎用パスがピクセル数ぶんのドローコールと色空間変換を発行する
 
 `Core/Drawing.cs:307`
 
@@ -252,7 +267,7 @@ config.VSync = true で起動すると、Sleep.Update() が毎フレーム Platf
 
 config.TargetFps = 30、144Hz モニタの環境で VSync を on にする（または SleepDurationMs 経過で Sleep.Update が自動的に SetVSync(true) を呼ぶ）と、Time/UTime.TargetFps が 30 ではなく 144 に書き換わり、放置から復帰するまでゲームが 4.8 倍速で進む。
 
-#### ⬜ 毎秒 6 回ほどコントローラの再列挙（ReSetupJoypad）が走る
+#### ✅ 毎秒 6 回ほどコントローラの再列挙（ReSetupJoypad）が走る
 
 `DXLib/DxLibPad.cs:20`
 
@@ -264,7 +279,7 @@ config.TargetFps = 30、144Hz モニタの環境で VSync を on にする（ま
 
 `Drawing.DefaultScale = 2.0` にすると、スプライトだけが 2 倍の大きさ・2 倍の座標に飛び、同じ座標に描いている Drawing.Box の枠や Drawing.Text のラベルは元の位置・大きさのまま残る。UI とスプライトが完全にずれる。
 
-#### ⬜ Loop = true でも Play() ではループしない／シーク位置から再生できない
+#### ✅ Loop = true でも Play() ではループしない／シーク位置から再生できない
 
 `DXLib/DxLibSound.cs:190`
 
@@ -276,15 +291,15 @@ config.TargetFps = 30、144Hz モニタの環境で VSync を on にする（ま
 
 ファイルから読んだテクスチャを Dispose するたびに「RayLibTexture Dispose returned false.」の警告が出て、状態が Disposed ではなく Failed になり IsFailed が true に化ける。
 
-### 軽微（13 件 / 修正済み 1 件）
+### 軽微（13 件 / 修正済み 11 件）
 
-#### ⬜ 非アクティブ中は移動差分を更新しないので Speed が固まり、復帰時に跳ねる
+#### ✅ 非アクティブ中は移動差分を更新しないので Speed が固まり、復帰時に跳ねる
 
 `Core/Mouse.cs:41`
 
 マウスを速く動かしている最中に Alt+Tab で他ウィンドウへ移ると Speed > 200 のまま固定され、Mouse.Draw の高速移動エフェクト（Mouse.cs:229-239 の白い全画面十字）が復帰まで描かれ続ける。復帰した瞬間も、非アクティブ中に画面端から端まで動かした分の差分が 1 フレームに乗って同じエフェクトが暴発する。
 
-#### ⬜ IsTouchPad を累積値 WheelTotal の小数部で判定していて、貼り付いたり取りこぼしたりする
+#### ✅ IsTouchPad を累積値 WheelTotal の小数部で判定していて、貼り付いたり取りこぼしたりする
 
 `Core/Mouse.cs:75`
 
@@ -296,25 +311,25 @@ config.TargetFps = 30、144Hz モニタの環境で VSync を on にする（ま
 
 フォントを差し替えていない状態で `Drawing.Text(10, 10, "HP", Color.White, Color.Black);` と書いても縁取りが一切出ない。エラーもログも出ず、背景に同化した文字が読めないまま気付けない。
 
-#### ⬜ Circle の 2 つのオーバーロードで塗り／枠線の既定が逆
+#### ✅ Circle の 2 つのオーバーロードで塗り／枠線の既定が逆
 
 `Core/Drawing.cs:88`
 
 `Drawing.Circle(100, 100, 8, Color.Red)` は塗り円、`Drawing.Circle(new LayoutUtil.Point(100,100), 8, Color.Red)` は輪郭だけの円になる。座標を Point に置き換えるリファクタをしただけで見た目が変わる。
 
-#### ⬜ LCM が int で静かにオーバーフローし、GCD は int.MinValue で例外
+#### ✅ LCM が int で静かにオーバーフローし、GCD は int.MinValue で例外
 
 `Core/Math.cs:19`
 
 スクラッチ実行で確認: `MathExtend.LCM(65536, 65535)` が 65536 を返す（正解は 4294901760）。互いに素なのに最小公倍数が片方より小さいという矛盾した値が、例外なしで下流に流れる。`MathExtend.GCD(int.MinValue, 0)` は OverflowException。
 
-#### ⬜ BigNum が負の値で指数表現を失い、桁が展開されてしまう
+#### ✅ BigNum が負の値で指数表現を失い、桁が展開されてしまう
 
 `Core/Math.cs:502`
 
 スクラッチ実行で確認: `new BigNum(-2, 5).ToString()` が "-2000000000000000.00"（期待は "-2.00Q"）、`new BigNum(-2500000.0).ToString()` が "-2500000.00"（期待は "-2.50M"）。正の値は "2.00Q" / "2.50M" と正しいので、負債やマイナス収支を表示した瞬間だけ桁区切り表記が壊れる。
 
-#### ⬜ SystemFontResolver.Resolve が bold=false のときに Bold 実体を選びうる
+#### ✅ SystemFontResolver.Resolve が bold=false のときに Bold 実体を選びうる
 
 `Core/Font.cs:209`
 
@@ -326,31 +341,31 @@ config.TargetFps = 30、144Hz モニタの環境で VSync を on にする（ま
 
 `FontHandle.Create(name, 24, edge: 2)`（Sandbox/Program.cs:13 と同じ形）で作ったフォントを Dispose しても DxLib のフォントハンドルが 1 個残る。サイズ違いの縁取りフォントを動的に作り直すコード（テキストサイズをアニメーションさせる用途など）ではハンドルが上限まで増える。
 
-#### ⬜ 回転中心(Position)に Math.Abs をかけていて負の基準点が指定できない
+#### ✅ 回転中心(Position)に Math.Abs をかけていて負の基準点が指定できない
 
 `DXLib/DxLibTexture.cs:137`
 
 画像の外側を軸に回したくて `texture.Position = new Point(-16, 0)` を指定すると、DxLib では +16 の位置（画像内側）を軸に回転し、RayLib では -16 で回転する。同じコードでバックエンドごとに違う絵になる。
 
-#### ⬜ GetFrequency のフォールバックがコピペミスで常に 1 を返す
+#### ✅ GetFrequency のフォールバックがコピペミスで常に 1 を返す
 
 `DXLib/DxLibSound.cs:178`
 
 GetFrequencySoundMem が 0 以下を返すサウンド（読み込み直後や取得できない形式）で Frequency が 1 または int.MinValue になり、Update() の `_speed = (float)GetFrequency() / Frequency;`（121行目）が 44100 倍などの無意味な値になる。Sound.Speed / Pitch の表示・利用が壊れる。
 
-#### ⬜ LoadSound の streaming 引数が完全に無視される
+#### ✅ LoadSound の streaming 引数が完全に無視される
 
 `DXLib/DxLibSound.cs:11`
 
 `platform.LoadSound("bgm.ogg", streaming: true)` としても全曲が非圧縮で常駐メモリに展開される。5 分の 44.1kHz ステレオで約 50MB。曲数が増えるとメモリを食い切る。
 
-#### ⬜ フォント名が空文字のとき既定フォントへフォールバックしない
+#### ✅ フォント名が空文字のとき既定フォントへフォールバックしない
 
 `DXLib/DxLibFont.cs:170`
 
 Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.cs:156）が GDI のフェイス名なしマッチで選ばれた任意のフォントになる。日本語グリフを持たないフォントに当たると、フォント未指定の Drawing.Text が日本語で豆腐になる。
 
-#### ⬜ Vibrate の pan（左右振り分け）が計算だけして捨てられている
+#### ✅ Vibrate の pan（左右振り分け）が計算だけして捨てられている
 
 `DXLib/DxLibPad.cs:140`
 
@@ -394,11 +409,12 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
 
 第一次監査では検証が最後まで走らず真偽不明だった 34 件を、現在のコードに対して判定し直したものです。
 
-### いま実際に壊れるもの（26 件）
+### いま実際に壊れるもの（26 件 / 修正済み 24 件）
 
-未着手です。触る前にここを読んでください。
+2026-08-20 の一斉修正で 24 件を修正済みにしました。残る ⬜ の 2 件は
+`Drawing.DefaultScale` の配線と Sandbox のデッドコードで、いずれも設計判断が要ります。
 
-#### ⬜ [medium] マルチスレッド構成で RequestToMainThread が 1 フレームに 1 件しか処理されない
+#### ✅ [medium] マルチスレッド構成で RequestToMainThread が 1 フレームに 1 件しか処理されない
 
 `Core/Game.cs:89`
 
@@ -419,7 +435,7 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
 **直し方の方針**: メインスレッドループの `if` を `while` にして、そのフレームに積まれた分は
 1 フレームで掃き切る（無限ループを避けるため、ループ開始時点のキュー件数だけ処理する形にするとよい）。
 
-#### ⬜ [high] Animation のコンストラクタが必ず NotImplementedException を投げる
+#### ✅ [high] Animation のコンストラクタが必ず NotImplementedException を投げる
 
 `Extend/Animation.cs:9`
 
@@ -429,7 +445,7 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
 
 **直し方の方針**: Loopを自動実装プロパティ(バッキングフィールド付き)にしてisLoopを保持するだけにする。他のIMovieメンバーも実装が追いつくまでは、少なくともコンストラクタから間接的に呼ばれるLoopのようなメンバーだけは動く状態にしておく。
 
-#### ⬜ [high] SkinList が Directory.Exists のガードより前に GetDirectories を呼ぶ
+#### ✅ [high] SkinList が Directory.Exists のガードより前に GetDirectories を呼ぶ
 
 `Extend/Skin.cs:732`
 
@@ -449,7 +465,7 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
 
 **直し方の方針**: 1回目のディレクトリ数取得も Directory.Exists でガードする。例: int count = Directory.Exists(targetdir) ? Directory.GetDirectories(targetdir).Length : 0; if (_skinList.Count < count) _skinList = [];
 
-#### ⬜ [high] 進捗ログ計算がゼロ除算する
+#### ✅ [high] 進捗ログ計算がゼロ除算する
 
 `Extend/Skin.cs:282`
 
@@ -463,7 +479,7 @@ QueMax > 0 のガードはあるが、QueMax が1〜9のとき QueMax/10.0 は1.
 
 **直し方の方針**: 0除算を避けるため、例えば int step = Math.Max(1, (int)(QueMax / 10.0)); としてから count / step を計算する、あるいは Math.Ceiling を使う。
 
-#### ⬜ [high] Speed が Opus 専用の OpusOriginalFrequency 属性に依存し、非Opusファイルではget側がゼロ除算、set側は指定値が無視される
+#### ✅ [high] Speed が Opus 専用の OpusOriginalFrequency 属性に依存し、非Opusファイルではget側がゼロ除算、set側は指定値が無視される
 
 `Extend/SoundExtend.cs:385`
 
@@ -499,7 +515,7 @@ ManagedBass.xml: `<member name="F:ManagedBass.ChannelAttribute.OpusOriginalFrequ
 
 **直し方の方針**: Load()成功直後に Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out var baseFreq) で元の周波数を一度だけ取得してフィールドにキャッシュし、Opus専用のOpusOriginalFrequencyの代わりにそのキャッシュ値を分母・基準として使うようにする。
 
-#### ⬜ [high] Pitch セッターが BASS_FX 専用属性 ChannelAttribute.Pitch を素の BASS ストリームに設定しようとして必ず例外を投げる
+#### ✅ [high] Pitch セッターが BASS_FX 専用属性 ChannelAttribute.Pitch を素の BASS ストリームに設定しようとして必ず例外を投げる
 
 `Extend/SoundExtend.cs:371`
 
@@ -527,7 +543,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: ManagedBass.Fx を追加しbass_fx.dllを同梱した上で、ロード時に BassFx.TempoCreate で元のストリームをラップしたテンポチャンネルを作ってから Pitch/Speed 属性を使うように変更する。もしくはテンポ非依存のピッチ変更が不要なら、Frequency属性ベースの疑似ピッチ実装に統一する。
 
-#### ⬜ [high] 重複キーのある設定ファイルで ItemDictionary が例外を投げる
+#### ✅ [high] 重複キーのある設定ファイルで ItemDictionary が例外を投げる
 
 `Extend/TextConf.cs:8`
 
@@ -537,7 +553,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: ToDictionaryの代わりに手動ループで構築し、重複時は「後勝ち」または「先勝ち」を明示して上書き/無視する。あるいはLoad()側で同名キー追加時に既存エントリを更新するようにする。
 
-#### ⬜ [high] DecorateOptionの参照ハッシュ(既定GetHashCode)をキャッシュキーに使っており装飾テキストのキャッシュが機能しない
+#### ✅ [high] DecorateOptionの参照ハッシュ(既定GetHashCode)をキャッシュキーに使っており装飾テキストのキャッシュが機能しない
 
 `Extend/TextSprite.cs:231`
 
@@ -547,7 +563,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: DecorateOptionにGradation/Textureの中身に基づくEquals/GetHashCodeを実装する(またはrecord/record structにする)、もしくはGetCacheKeyでGradation/Texture自体のオブジェクトIDや内容から個別にキーを組み立てる。
 
-#### ⬜ [high] 非同期ロード時に LoadTx と Pump(_pendingBytes) が二重にテクスチャを生成しリークする
+#### ✅ [high] 非同期ロード時に LoadTx と Pump(_pendingBytes) が二重にテクスチャを生成しリークする
 
 `RayLib/RayLibTexture.cs:163`
 
@@ -557,7 +573,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: AsyncLoadableBase側で `_bgloadfuncs` が設定されている場合は `PumpAsync()` の deferred フォールバックで `_loadfunc`（LoadTx）を再実行しないようにする。あるいは RayLibTexture.Pump() の `_pendingBytes` 分岐に入る直前に `if (Native.Id != 0) Raylib.UnloadTexture(Native);` を入れて既存ハンドルを解放してから上書きする。
 
-#### ⬜ [medium] Rate=0のときStart()のInterval計算が(int)キャストのオーバーフローで巨大な負値になり、アニメーションが実質フリーズする
+#### ✅ [medium] Rate=0のときStart()のInterval計算が(int)キャストのオーバーフローで巨大な負値になり、アニメーションが実質フリーズする
 
 `Extend/ExoAnimation.cs:605`
 
@@ -567,7 +583,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: Start()でRateを使う前に `int rate = Rate > 0 ? Rate : 30;` のようにフォールバックする。あわせてCounter.NormalizeInterval側も `interval <= 0`(0だけでなく負値・非有限値も含む)を弾くようにしておくと、同種の計算ミスに対しても防御になる。
 
-#### ⬜ [medium] file= 再利用時に textureFileNames と imageObjects のインデックスがずれ、誤ったテクスチャを参照する
+#### ✅ [medium] file= 再利用時に textureFileNames と imageObjects のインデックスがずれ、誤ったテクスチャを参照する
 
 `Extend/ExoAnimation.cs:331`
 
@@ -577,7 +593,7 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 **直し方の方針**: インデックスの暗黙対応に頼らず、file= 行を処理する際に Dictionary<string, Texture>(またはDictionary<string, ImageObject>)でファイル名からテクスチャを直接引けるようにし、imageObjects と textureFileNames が常に並行して伸びるという前提そのものを外す。
 
-#### ⬜ [medium] Skin.DefaultFont の指定が計算だけされて捨てられている
+#### ✅ [medium] Skin.DefaultFont の指定が計算だけされて捨てられている
 
 `Extend/Skin.cs:153`
 
@@ -592,7 +608,7 @@ defaultFont はファイル内で他に一切参照されない(grep 'defaultFon
 
 **直し方の方針**: SetFont(Path.Combine(skinPath, "default.ttf")) を SetFont(defaultFont) に置き換える。ただし DefaultFont プロパティは既定値が null ではなく "" (非nullable string) なので `DefaultFont ?? (...)` の ?? は実質死んでおり常に左辺を返す。あわせて `string.IsNullOrEmpty(DefaultFont) ? (File.Exists(fontpath) ? fontpath : FHandle.SystemFont) : DefaultFont` のように空文字判定に直す必要がある。
 
-#### ⬜ [medium] Update() を Play()/PlayStream() なしで毎フレーム直接呼ぶと再生が始まらず Time が0に固定される
+#### ✅ [medium] Update() を Play()/PlayStream() なしで毎フレーム直接呼ぶと再生が始まらず Time が0に固定される
 
 `Extend/SoundExtend.cs:293`
 
@@ -619,7 +635,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: Update() が _played=false の場合に Play() 相当の処理へフォールバックするか、PlayStream() のロジックへ統合してUpdate()単独呼び出しでも初回再生が始まるようにする。あるいはUpdate()をinternalにして直接呼び出しをコンパイル時に禁止し、XMLドキュメントでPlayStream()経由を必須と明記する。
 
-#### ⬜ [medium] キャッシュ済みTextSpriteのEdgeColor変更が描画テクスチャに反映されない
+#### ✅ [medium] キャッシュ済みTextSpriteのEdgeColor変更が描画テクスチャに反映されない
 
 `Extend/TextSprite.cs:195`
 
@@ -629,7 +645,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: EdgeColor変更時にも_dirtyを立てる仕組みが必要。TextSprite側でEdgeColorのsetterに変更検知を入れて_dirty=trueにする、またはTextSprites.Draw側で旧EdgeColorと比較してsprite側に反映後dirty化する、もしくはキャッシュキーにedgeColorも含める。
 
-#### ⬜ [medium] IGraphics.Text の基準点オフセットの符号が IFont 実装と逆
+#### ✅ [medium] IGraphics.Text の基準点オフセットの符号が IFont 実装と逆
 
 `RayLib/RayLibGraphic.cs:136`
 
@@ -639,7 +655,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: 136行目を `var pnt = new LayoutUtil.Point(x, y) + anchorOffset;`（減算ではなく加算）に直し、RayLibFont.Draw / DxLibFont.Draw と符号を揃える。DXLib側 DxLibGraphic.cs の同型コード（133-134行目）も同じ修正が必要（別ファイルなので今回のスコープ外だが一貫性のため要検討）。
 
-#### ⬜ [medium] 枠線の Circle / Oval が thickness を無視する
+#### ✅ [medium] 枠線の Circle / Oval が thickness を無視する
 
 `RayLib/RayLibGraphic.cs:79`
 
@@ -649,7 +665,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: Circle は raylib の DrawRing(center, radius - thickness/2f, radius + thickness/2f, 0, 360, segments, col) を使えば太さを再現できる。Oval には直接対応する太さ付きAPIが無いため、DrawEllipseLines を thickness 分だけ半径をずらして複数回描く（または DrawEllipseLines の代わりに外周・内周2つの楕円点列からストリップポリゴンを自前で作る）といった実装が必要。
 
-#### ⬜ [medium] RayLibTextInput が Enter/Esc/Backspace/文字入力を buffered state 経由でなく raylib の IsKeyPressed/GetCharPressed 直呼びで処理している
+#### ✅ [medium] RayLibTextInput が Enter/Esc/Backspace/文字入力を buffered state 経由でなく raylib の IsKeyPressed/GetCharPressed 直呼びで処理している
 
 `RayLib/RayLibInput.cs:280`
 
@@ -659,7 +675,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: Enter/Esc/Backspaceの判定は既にTextEnter.cs:470が使っている buffered state (Key.Esc.Push() 相当)に統一し、文字入力もメインスレッドのBuffer()内でGetCharPressed()をポンプしてスレッドセーフなキューに積み、RayLibTextInput.Update()はそのキューを読むだけにする。
 
-#### ⬜ [medium] GetButton(int)がraylibのGamepadButton列挙をそのままcastしており、DxLib版のビット順と一致しない
+#### ✅ [medium] GetButton(int)がraylibのGamepadButton列挙をそのままcastしており、DxLib版のビット順と一致しない
 
 `RayLib/RayLibPad.cs:131`
 
@@ -669,7 +685,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: RayLibPad側にもDxLibPad同様の共通ボタン順マッピングテーブルを用意してGetButton(int)をそこ経由にする、あるいはIJoyPadに共通の論理ボタンenumを設けて両バックエンドがそこへ変換するようにする。
 
-#### ⬜ [medium] RayLibController.Count / List / GetJoyPad が _lock を取らずに _joyPads を読む一方、Buffer()/Update() はロックしている
+#### ✅ [medium] RayLibController.Count / List / GetJoyPad が _lock を取らずに _joyPads を読む一方、Buffer()/Update() はロックしている
 
 `RayLib/RayLibPad.cs:11`
 
@@ -679,7 +695,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: Count/List/GetJoyPad の実装を Buffer()/Update() と同じ _lock で包み、読み取りも書き込みと同じ排他ドメインに揃える。
 
-#### ⬜ [medium] Resizable=false のとき ConfigFlags.UndecoratedWindow をセットし、タイトルバー等の装飾が消える
+#### ✅ [medium] Resizable=false のとき ConfigFlags.UndecoratedWindow をセットし、タイトルバー等の装飾が消える
 
 `RayLib/RayLibPlatform.cs:27`
 
@@ -689,7 +705,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: Resizableの真偽はそのままConfigFlags.WindowResizableの設定/非設定に対応させる。装飾(タイトルバー)の有無を制御したいなら別のプロパティ(例: Undecorated)として分離する。
 
-#### ⬜ [medium] SE のループ再開処理が到達しない位置にある
+#### ✅ [medium] SE のループ再開処理が到達しない位置にある
 
 `RayLib/RayLibSound.cs:209`
 
@@ -699,7 +715,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: SE分岐(194-205行目)で `IsSoundPlaying(Sfx)` が false になった（再生が終わった）タイミングで `_played = false;` を立てる。さらに、その場で Loop なら PlaySound を呼び直す（もしくは次フレームの else 節に処理を委ねるだけでなく、そこで実際に Play() を呼ぶよう分岐を追加する）ことで、_played のフラグリセットだけでなく実際の再生再開まで確実につなげる。
 
-#### ⬜ [medium] 非同期ロード経路が streaming 指定を無視して常に Music を読み直す
+#### ✅ [medium] 非同期ロード経路が streaming 指定を無視して常に Music を読み直す
 
 `RayLib/RayLibSound.cs:129`
 
@@ -719,7 +735,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: DxLibTexture.cs同様、`(double w, double h) = use.Scale; w *= defscale; h *= defscale;` を追加し、origin/destW/destHの計算をその後の w,h から求めるようにする（位置と拡大率の両方に defscale を反映）。
 
-#### ⬜ [medium] RenderTexture の上下反転補正が Flip.Y の有無を無視して無条件適用され、Flip.Y=true 時に srcRect が範囲外になる
+#### ✅ [medium] RenderTexture の上下反転補正が Flip.Y の有無を無視して無条件適用され、Flip.Y=true 時に srcRect が範囲外になる
 
 `RayLib/RayLibTexture.cs:229`
 
@@ -729,7 +745,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: RenderTexture補正とFlip.Yを独立した2回の符号反転として順に適用するのではなく、`bool netFlip = use.Flip.Y ^ (_renderTex.Id != 0);` のように実効反転の要否をXORで一度だけ求め、その結果に応じて `srcRect.Y`/`srcRect.Height` を1回だけ決定する形に書き換える。
 
-#### ⬜ [medium] テクスチャ再生成で旧テクスチャを破棄していない
+#### ✅ [medium] テクスチャ再生成で旧テクスチャを破棄していない
 
 `Sandbox/Load.cs:132`
 
@@ -739,7 +755,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: 代入前に `_tex?.Dispose();` を追加する（Resourses.cs と同じパターン）。
 
-#### ⬜ [low] _streaming が代入のみで一度も読まれない（CS0414 相当）
+#### ✅ [low] _streaming が代入のみで一度も読まれない（CS0414 相当）
 
 `RayLib/RayLibSound.cs:155`
 
@@ -759,11 +775,11 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: LoadCheckScene を実際に SimpleTestGame の子シーンとして切り替えられるようにする（シーン切替の仕組みを追加）か、比較先を実際に使われているシーン名に修正する。
 
-### 一部だけ正しいもの（2 件）
+### 一部だけ正しいもの（2 件 / 修正済み 2 件）
 
 主張の一部は成立しますが、結論や深刻度が違います。
 
-#### ⬜ [medium] リサイズ/拡大率フィルターのX=・Y=処理が「拡大率=が最初に来る」前提でFilters.Last()を無防備に呼ぶ
+#### ✅ [medium] リサイズ/拡大率フィルターのX=・Y=処理が「拡大率=が最初に来る」前提でFilters.Last()を無防備に呼ぶ
 
 `Extend/ExoAnimation.cs:445`
 
@@ -773,7 +789,7 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 **直し方の方針**: 行の出現順に依存しない実装にする。`currentObject.Filters.OfType<ScaleFilter>().LastOrDefault()` を使い、nullなら新規生成してAddする形にすれば、3つのキーのどれが最初に来ても安全に動く。
 
-#### ⬜ [medium] ファイナライザからのDispose呼び出しが非スレッドセーフな static Dictionary(Skin.Textures)を直接書き換える
+#### ✅ [medium] ファイナライザからのDispose呼び出しが非スレッドセーフな static Dictionary(Skin.Textures)を直接書き換える
 
 `Extend/NumAnim.cs:183`
 

@@ -85,7 +85,15 @@ internal sealed class RayLibGraphics : IGraphics
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawCircleV(new Vector2((float)x, (float)y), (float)radius, col);
-        else DrawCircleLines((int)Math.Round(x), (int)Math.Round(y), (float)radius, col);
+        else
+        {
+            // DrawCircleLines には太さ引数が無いため、内径/外径を thickness 分だけ
+            // ずらした DrawRing で枠線を再現する。
+            float half = thickness / 2f;
+            DrawRing(new Vector2((float)x, (float)y),
+                (float)Math.Max(0, radius - half), (float)(radius + half),
+                0f, 360f, segments, col);
+        }
     }
 
     /// <summary>楕円を描画します（rx, ryはそれぞれ横半径・縦半径）。</summary>
@@ -96,7 +104,17 @@ internal sealed class RayLibGraphics : IGraphics
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
         if (options.Fill) DrawEllipse((int)x, (int)y, (int)rx, (int)ry, col);
-        else DrawEllipseLines((int)x, (int)y, (int)rx, (int)ry, col);
+        else
+        {
+            // 楕円用の太さ付きAPIはraylibに無いため、外周と内周のDrawEllipseLinesを
+            // thickness 分だけ半径違いで重ねて描き、太さを再現する。
+            float half = thickness / 2f;
+            for (int i = 0; i < thickness; i++)
+            {
+                float t = thickness <= 1 ? 0f : -half + i;
+                DrawEllipseLines((int)x, (int)y, (int)Math.Max(0, rx + t), (int)Math.Max(0, ry + t), col);
+            }
+        }
     }
 
     /// <summary>
@@ -151,7 +169,7 @@ internal sealed class RayLibGraphics : IGraphics
 
         var size = MeasureTextInternal(text, fontSize);
         var anchorOffset = LayoutUtil.GetAnchorOffset(options.Point, size.X, size.Y);
-        var pnt = new LayoutUtil.Point(x, y) - anchorOffset;
+        var pnt = new LayoutUtil.Point(x, y) + anchorOffset;
         var pos = new Vector2((float)pnt.X, (float)pnt.Y);
 
         // Raylib の DrawTextEx を使う

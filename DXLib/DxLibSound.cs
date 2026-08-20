@@ -12,6 +12,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
     public DxLibSound(string path, bool streaming = true)
     {
         Path = path;
+        _streaming = streaming;
         Load();
     }
     ~DxLibSound()
@@ -55,6 +56,10 @@ public class DxLibSound : AsyncLoadableBase, ISound
     {
         bool file = FileCheck(Path);
         if (!file) return false;
+
+        // streaming引数が今まで完全に無視されていた分。SetCreateSoundDataTypeは次のLoadSoundMemにのみ効くため、
+        // ロード直前に毎回明示的に切り替える（DX_SOUNDDATATYPE_FILE=ストリーム再生、MEMNOPRESS_PLUS=DxLib既定の非圧縮メモリ展開）。
+        SetCreateSoundDataType(_streaming ? DX_SOUNDDATATYPE_FILE : DX_SOUNDDATATYPE_MEMNOPRESS_PLUS);
 
         int handle = LoadSoundMem(Path);
         if (handle < 0)
@@ -109,7 +114,8 @@ public class DxLibSound : AsyncLoadableBase, ISound
     #endregion
     #region プロパティ
     private bool _played = false;
-    private bool _streaming = false;
+    // コンストラクタのstreaming引数を保持する。LoadSfxでSetCreateSoundDataTypeへ渡すのに使う。
+    private readonly bool _streaming;
     private long _time;
     private float _volume = 1.0f;
     private float _pan = 0.0f;
@@ -124,7 +130,6 @@ public class DxLibSound : AsyncLoadableBase, ISound
             bool playing = CheckSoundMem(Handle) != 0;
             if (playing)
             {
-                _streaming = true;
                 _time = GetSoundCurrentTime(Handle);
                 _speed = (float)GetFrequency() / Frequency;
                 return;
@@ -134,7 +139,6 @@ public class DxLibSound : AsyncLoadableBase, ISound
         }
         else
         {
-            _streaming = false;
             _time = 0;
         }
     }
@@ -198,11 +202,16 @@ public class DxLibSound : AsyncLoadableBase, ISound
     public bool Loop { get; set; } = false;
     #endregion
 
+    /// <summary>Loop==trueならDX_PLAYTYPE_LOOPで再生し、DxLib自身にループさせる（従来はDX_PLAYTYPE_BACK固定で1回鳴って止まっていた）。
+    /// Time経由で設定済みのシーク位置があれば、先頭からTopPositionFlag=TRUEで開始した直後にそこへ再度シークし直す
+    /// （TopPositionFlag=FALSEは「停止した位置から再開」であって任意のシーク位置からの開始ではないため）。</summary>
     public void Play()
     {
         if (!Enable) return;
-        _time = 0;
-        PlaySoundMem(Handle, DX_PLAYTYPE_BACK, TRUE);
+        int playType = Loop ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK;
+        PlaySoundMem(Handle, playType, TRUE);
+        if (_time > 0)
+            SetSoundCurrentTime(_time, Handle);
         _played = true;
     }
     public void Stop()

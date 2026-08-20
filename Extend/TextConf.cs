@@ -9,7 +9,16 @@ public class TextConf : IDisposable
     public string FilePath { get; private set; } = "";
     private List<ConfItem> Items { get; set; } = [];
     public Dictionary<string, string> ItemDictionary
-        => Items.ToDictionary(i => i.Name, i => i.Value, StringComparer.OrdinalIgnoreCase);
+    {
+        get
+        {
+            // ToDictionary は重複キーで例外を投げるため、手動ループで構築し重複時は後勝ちにする
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in Items)
+                dict[item.Name] = item.Value;
+            return dict;
+        }
+    }
     public int Count => Items.Count;
 
     public override string ToString() => $"{Path.GetFileName(FilePath)} : {Count} items" +

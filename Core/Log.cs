@@ -141,8 +141,8 @@ public class Log
         int size = Drawing.FontSize();
         string[] prefixes = [.. loglist.Select(l => l.Level switch
         {
-            LogLevel.Warning => "⚠ ",
-            LogLevel.Error => "✕ ",
+            LogLevel.Warning => " ! ",
+            LogLevel.Error =>   "!! ",
             _ => ""
         })];
         int width = Drawing.TextSize(string.Join("\n", loglist.Select((l, i) => prefixes[i] + l)).Trim()).width;

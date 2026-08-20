@@ -189,7 +189,9 @@ internal sealed class DxLibFont : IFont
     private static string GetFont(string? font)
     {
         string name = GetFontName() ?? "";
-        if (font == null) return name;
+        // 空文字も未指定と同様に既定フォントへフォールバックする（空文字のままCreateFontToHandleへ渡すとGDIが
+        // フェイス名なしマッチで任意のフォントを選び、日本語グリフを持たないものに当たると豆腐になる）。
+        if (string.IsNullOrEmpty(font)) return name;
 
         // フォントがファイルパスかどうかを判定
         if (File.Exists(font))

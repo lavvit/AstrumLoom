@@ -19,7 +19,9 @@ public class Drawing
         Color? color = null,
         int thickness = 1,
         BlendMode blend = BlendMode.None, double opacity = 1)
-        => Circle(x, y, thickness / 2, color, 0, blend, opacity);
+        // thickness/2 は int 除算のため、既定値 1 のとき半径が 0 になり何も描かれなかった。
+        // double 除算にして、太さ1でも半径0.5の点が出るようにする。
+        => Circle(x, y, thickness / 2.0, color, 0, blend, opacity);
     public static void Line(double x1, double y1, double dx, double dy,
         Color? color = null,
         int thickness = 1,
@@ -94,7 +96,10 @@ public class Drawing
             });
     public static void Circle(LayoutUtil.Point center, double radius,
         Color? color = null,
-        int thickness = 1,
+        // (x, y, radius, ...) 版（既定 thickness=0＝塗り）と既定が食い違っていて、
+        // Point に置き換えるだけで塗り円が輪郭円に変わってしまっていた。既存の呼び出し元は
+        // リポジトリ内に無く、(x, y, radius, ...) 版に揃えても見た目を壊さないためこちらに合わせる。
+        int thickness = 0,
         BlendMode blend = BlendMode.None, double opacity = 1)
     {
         var (x, y) = center.ToTuple();
@@ -214,6 +219,9 @@ public class Drawing
         BlendMode blend = BlendMode.None, double opacity = 1)
     {
         var pts = points.ToArray();
+        // 頂点0個（可視判定で全部落ちた等）を渡されると pts[0] や pts[(i+1)%pts.Length] が
+        // 例外になる。描くものが無いだけなので何もせず戻る。
+        if (pts.Length == 0) return;
         for (int i = 0; i < pts.Length; i++)
         {
             var (x1, y1) = pts[i].ToTuple();
@@ -302,7 +310,20 @@ public class Drawing
             return;
         }
 
-        // 汎用パス：各ピクセルを射影して正規化する（既存実装）
+        // 汎用パス（回転あり）：以前はピクセル毎に GetColor（色空間変換）と Box（ドローコール）を
+        // 呼んでいたため、640x360 で毎フレーム 23 万回ずつ発生し 60fps を維持できなかった。
+        // t は連続量だが、同じ行の中で t が変わらない/わずかしか変わらない区間は見た目上ほぼ同じ色になる。
+        // そこで t を有限個（256）のバケットに量子化し、
+        //  1) GetColor はバケット数ぶんだけ事前に呼んでパレット化する（色空間変換の回数を定数に固定）、
+        //  2) 行の中でバケットが変わらない連続区間は 1 回の Box にまとめる（回転軸＝斜めの帯を横方向の
+        //     ランレングスとして塗る）
+        // ことでドローコール数・変換回数を大きく減らす。回転 0 のときは元々列単位の高速パスに入るので、
+        // ここはあくまで斜め回転の場合の話。
+        const int Buckets = 256;
+        var palette = new Color[Buckets + 1];
+        for (int b = 0; b <= Buckets; b++)
+            palette[b] = grad.GetColor((float)b / Buckets, cs);
+
         double rad = rotate * Math.PI / 180.0;
         double dx = Math.Cos(rad);
         double dy = Math.Sin(rad);
@@ -319,17 +340,27 @@ public class Drawing
 
         for (int j = 0; j < height; j++)
         {
+            double py = j + 0.5;
+            int runStart = 0;
+            int runBucket = -1;
             for (int i = 0; i < width; i++)
             {
                 double px = i + 0.5;
-                double py = j + 0.5;
                 double proj = px * dx + py * dy;
                 double t = (proj - minProj) / range;
                 if (t < 0) t = 0;
                 else if (t > 1) t = 1;
-                var color = grad.GetColor((float)t, cs);
-                Box(x + i, y + j, 1, 1, color);
+                int bucket = (int)(t * Buckets);
+                if (bucket != runBucket)
+                {
+                    if (runBucket >= 0)
+                        Box(x + runStart, y + j, i - runStart, 1, palette[runBucket]);
+                    runStart = i;
+                    runBucket = bucket;
+                }
             }
+            if (runBucket >= 0)
+                Box(x + runStart, y + j, width - runStart, 1, palette[runBucket]);
         }
     }
 

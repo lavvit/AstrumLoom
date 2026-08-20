@@ -9,9 +9,12 @@ namespace AstrumLoom.RayLib;
 /// </summary>
 public class RayLibController : IController
 {
-    public int Count => _joyPads.Count;
-    public string[] List => [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")];
-    public IJoyPad? GetJoyPad(int index) => _joyPads.FirstOrDefault(p => p.Index == index);
+    // Count/List/GetJoyPad は Buffer()/Update() と同じ _lock 経由で読む。
+    // ここを素通しにすると、接続/切断で _joyPads が書き換わる瞬間に
+    // 別スレッドから列挙して InvalidOperationException を踏みうる。
+    public int Count { get { lock (_lock) return _joyPads.Count; } }
+    public string[] List { get { lock (_lock) return [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")]; } }
+    public IJoyPad? GetJoyPad(int index) { lock (_lock) return _joyPads.FirstOrDefault(p => p.Index == index); }
 
     private List<IJoyPad> _joyPads = [];
     private readonly object _lock = new();
@@ -146,7 +149,31 @@ public class RayLibPad : IJoyPad
         SetGamepadVibration(Index, leftMotor, rightMotor, length / 1000.0f);
     }
 
-    private static GamepadButton GetButton(int index) => (GamepadButton)index;
+    // DxLib/DxLibPad.cs の GetJoypadInputState ビット順（DOWN,LEFT,RIGHT,UP,A,B,C,X,Y,Z,L,R,START,M,...）に
+    // 合わせるためのテーブル。raylib の GamepadButton 列挙値をそのまま index として cast すると
+    // 全く別の物理ボタンを指してしまうため、DxLib 側と同じ index が同じ物理ボタンを指すよう変換する。
+    // A/B/X/Y は XInput パッドでの一般的な対応（A=下, B=右, X=左, Y=上）に、L/R はショルダー(1段目)に、
+    // START/M はメニュー系ボタンに寄せてある。C/Z や左右スティック押し込みなど raylib 側に
+    // 対応する列挙値が無いものは Unknown のままにする。
+    private static readonly GamepadButton[] DxOrderMap =
+    [
+        GamepadButton.LeftFaceDown,   // 0: DOWN
+        GamepadButton.LeftFaceLeft,   // 1: LEFT
+        GamepadButton.LeftFaceRight,  // 2: RIGHT
+        GamepadButton.LeftFaceUp,     // 3: UP
+        GamepadButton.RightFaceDown,  // 4: A
+        GamepadButton.RightFaceRight, // 5: B
+        GamepadButton.Unknown,        // 6: C（対応ボタン無し）
+        GamepadButton.RightFaceLeft,  // 7: X
+        GamepadButton.RightFaceUp,    // 8: Y
+        GamepadButton.Unknown,        // 9: Z（対応ボタン無し）
+        GamepadButton.LeftTrigger1,   // 10: L
+        GamepadButton.RightTrigger1,  // 11: R
+        GamepadButton.Middle,         // 12: START
+        GamepadButton.MiddleLeft,     // 13: M
+    ];
+    private static GamepadButton GetButton(int index) =>
+        index >= 0 && index < DxOrderMap.Length ? DxOrderMap[index] : GamepadButton.Unknown;
     /// <summary>パッド名の文字列に含まれるキーワードから、対応するコントローラー種別を推定します。</summary>
     private ControllerType GetControllerType()
     {

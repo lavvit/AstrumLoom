@@ -9,33 +9,42 @@ internal class DxLibController : IController
 {
     public int Count => _joyPads.Count;
     public string[] List => [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")];
-    // DxLibのパッド番号は1始まりだが、IController.GetJoyPad の index は0始まりで受け取る前提のため+1する。
-    public IJoyPad? GetJoyPad(int index) => _joyPads.FirstOrDefault(p => p.Index == index + 1);
+    // IJoyPad.Index はRayLibバックエンドに合わせて0始まりに統一済み（DxLibPad側で変換している）ため、そのまま比較する。
+    public IJoyPad? GetJoyPad(int index) => _joyPads.FirstOrDefault(p => p.Index == index);
 
     private List<IJoyPad> _joyPads = [];
     private readonly object _lock = new();
+    // ReSetupJoypad（デバイス再列挙）の間隔を制御するための最終実行時刻。
+    private DateTime _lastResetup = DateTime.MinValue;
+    // デバイス再列挙は数百ms置きで十分なため、この間隔を空けて呼ぶ（毎秒6回前後走っていたのを1回未満に抑える）。
+    private static readonly TimeSpan _resetupInterval = TimeSpan.FromSeconds(2);
 
-    /// <summary>接続中のパッドを検出し、_joyPadsを実際の接続状況に同期させる。DateTime.Now.Millisecond&lt;100の判定で毎フレームではなく間欠的にReSetupJoypad（デバイス再列挙）を行う。</summary>
+    /// <summary>接続中のパッドを検出し、_joyPadsを実際の接続状況に同期させる。ReSetupJoypad（デバイス再列挙）は_resetupInterval間隔でのみ呼ぶ。</summary>
     public void SetController()
     {
         // 接続されているコントローラーを取得
         int maxPads = 10; // 最大コントローラー数
-        if (DateTime.Now.Millisecond < 100)
+        var now = DateTime.Now;
+        if (now - _lastResetup >= _resetupInterval)
+        {
             ReSetupJoypad();
+            _lastResetup = now;
+        }
         int connectedPads = GetJoypadNum();
         for (int i = 1; i <= maxPads; i++)
         {
             int j = GetJoypadInputState(i);
+            // DxLibの実デバイス番号iは1始まりだが、IJoyPad.Indexは0始まりに変換して保持している。
             if (i <= connectedPads || j > 0)
             {
                 // コントローラーが接続されている場合、JoyPad オブジェクトを作成
-                if (!_joyPads.Any(p => p.Index == i))
+                if (!_joyPads.Any(p => p.Index == i - 1))
                     _joyPads.Add(new DxLibPad(i));
             }
             else
             {
                 // コントローラーが切断されている場合、JoyPad オブジェクトを削除
-                _joyPads.RemoveAll(p => p.Index == i);
+                _joyPads.RemoveAll(p => p.Index == i - 1);
             }
         }
     }
@@ -65,7 +74,10 @@ internal class DxLibController : IController
 /// <summary>DxLibバックエンドでの1台分のゲームパッド実装。ButtonはPush/Hold/Left相当の状態遷移(1押下開始/2保持/-1離鍵/0非押下)を持つ。</summary>
 internal class DxLibPad : IJoyPad
 {
+    // RayLibバックエンドは0始まり、DxLibの実デバイス番号は1始まりで食い違っていたため、
+    // 公開する Index はRayLib側に合わせて0始まりに変換する。DxLib APIへ渡す実番号は_dxIndexに保持する。
     public int Index { get; }
+    private readonly int _dxIndex;
     public string Name { get; }
     public string Product { get; }
     public ControllerType Type { get; }
@@ -76,10 +88,11 @@ internal class DxLibPad : IJoyPad
     private bool[] _pressed = [];
     private float[] _axis = new float[6];
 
-    public DxLibPad(int index)
+    public DxLibPad(int dxIndex)
     {
-        Index = index;
-        (Name, Product) = GetName(index);
+        _dxIndex = dxIndex;
+        Index = dxIndex - 1;
+        (Name, Product) = GetName(dxIndex);
         Type = GetControllerType();
     }
 
@@ -88,19 +101,19 @@ internal class DxLibPad : IJoyPad
     {
         if (_pressed.Length != Button.Length)
             Array.Resize(ref _pressed, Button.Length);
-        int input = GetJoypadInputState(Index);
+        int input = GetJoypadInputState(_dxIndex);
         for (int i = 0; i < Button.Length; i++)
         {
             _pressed[i] = (input & (1 << i)) > 0;
         }
         // トリガーとスティックの状態を更新
-        GetJoypadAnalogInput(out int lx, out int ly, Index);
-        GetJoypadAnalogInputRight(out int rx, out int ry, Index);
+        GetJoypadAnalogInput(out int lx, out int ly, _dxIndex);
+        GetJoypadAnalogInputRight(out int rx, out int ry, _dxIndex);
         _axis[0] = lx / 1000.0f;
         _axis[1] = ly / 1000.0f;
         _axis[2] = rx / 1000.0f;
         _axis[3] = ry / 1000.0f;
-        GetJoypadXInputState(Index, out var xinput);
+        GetJoypadXInputState(_dxIndex, out var xinput);
         _axis[4] = xinput.LeftTrigger / 255.0f;
         _axis[5] = xinput.RightTrigger / 255.0f;
         // トリガーもボタンの1つとして扱えるよう、一定量踏み込んだらButtonビットにも反映する
@@ -139,13 +152,14 @@ internal class DxLibPad : IJoyPad
     public bool IsReleased(int buttonIndex) => Button[buttonIndex] < 0;
     public int? NowPushedButton() => Button.ToList().FindIndex(b => b > 0) is int idx and >= 0 ? idx : null;
 
-    /// <summary>左右モーターの強さを計算するが、DxLibのStartJoypadVibrationは左右独立制御を持たないため、結局strengthのみを使い左右差(pan)は反映されていない。</summary>
+    /// <summary>左右モーターの強さを計算するが、DxLibのStartJoypadVibrationは左右独立制御を持たないため、
+    /// 左右の平均を実際の強さとして使うことでpanを近似的に反映する（中央から振るほど片側の寄与が0に近づき、全体の強さが弱まる）。</summary>
     public void Vibrate(float pan, float strength, float length)
     {
         float leftMotor = strength * (pan <= 0 ? 1.0f : 1.0f - pan);
         float rightMotor = strength * (pan >= 0 ? 1.0f : 1.0f + pan);
-        float str = strength * 1000;
-        StartJoypadVibration(Index, (int)str, (int)length);
+        float str = ((leftMotor + rightMotor) / 2.0f) * 1000;
+        StartJoypadVibration(_dxIndex, (int)str, (int)length);
     }
 
     private static (string, string) GetName(int index)

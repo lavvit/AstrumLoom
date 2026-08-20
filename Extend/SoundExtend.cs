@@ -16,6 +16,8 @@ public sealed class SoundExtend : ISound, IDisposable
 
     private int _stream;
     private bool _disposed;
+    /// <summary>Load() 成功直後にキャッシュした元の再生周波数。Speed/Pitchの基準値として使う。</summary>
+    private float _baseFreq;
 
     // IResourse 状態管理 (-1=Failed/Disposed, 0=Loading, 1=Ready)
     private int _asyncState = -1;
@@ -90,6 +92,10 @@ public sealed class SoundExtend : ISound, IDisposable
             _stream = stream;
             Volatile.Write(ref _asyncState, 1); // Ready
             _startTicks = Environment.TickCount64;
+            // OpusOriginalFrequency はBassOpus専用属性で非Opusストリームでは0のまま返ってくるため、
+            // Speed/Pitchの基準周波数として使えない。ロード直後の実周波数を自前でキャッシュしておく。
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out float baseFreq);
+            _baseFreq = baseFreq;
         }
         catch
         {
@@ -236,6 +242,7 @@ public sealed class SoundExtend : ISound, IDisposable
             throw new InvalidOperationException($"再生に失敗しました: {Bass.LastError}");
         }
         _played = true;
+        _everStarted = true;
     }
 
     public void Pause()
@@ -279,6 +286,8 @@ public sealed class SoundExtend : ISound, IDisposable
         _played = true;
     }
     private bool _played = false;
+    /// <summary>Play()/PlayStream() を一度も経由せずに済んだかどうか。Update()単独呼び出しの救済に使う。</summary>
+    private bool _everStarted = false;
     /// <summary>
     /// PlayStream の継続処理。ループしない曲が終端に近づいたら止め、ループ曲や巻き戻り時は再生フラグをリセットする。
     /// </summary>
@@ -286,6 +295,13 @@ public sealed class SoundExtend : ISound, IDisposable
     {
         Pump();
         if (!Enable) return;
+        if (!_everStarted)
+        {
+            // Play()/PlayStream() を挟まずUpdate()だけを毎フレーム直接呼んだ場合の救済。
+            // このままだと_playedが永遠にfalseのままTime=0が続き、再生が一切始まらない。
+            Play();
+            return;
+        }
         if (_played)
         {
             bool isPlaying = IsPlaying;
@@ -372,21 +388,29 @@ public sealed class SoundExtend : ISound, IDisposable
             }
         }
     }
+    /// <summary>
+    /// ピッチ（半音単位）。ChannelAttribute.Pitch は BassFx のテンポチャンネル専用属性で、
+    /// このクラスが生成する素の BASS ストリームには存在しないため使えない（設定すると必ず失敗する）。
+    /// BassFx を追加参照しない方針としたため、ここでは Frequency 属性を使った疑似ピッチ実装にしている。
+    /// 再生速度(Speed)と基準周波数を共有しているため、Pitch を設定すると Speed による速度変化は上書きされる
+    /// （テンポ非依存の本格的なピッチシフトが必要になった場合は ManagedBass.Fx の導入を検討すること）。
+    /// </summary>
     public double Pitch
     {
         get
         {
             EnsureReadyForChannel();
-            if (!Enable) return 0;
-            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Pitch, out float pitch);
-            return pitch;
+            if (!Enable || _baseFreq <= 0) return 0;
+            Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out float freq);
+            return 12.0 * Math.Log2(freq / _baseFreq);
         }
         set
         {
             EnsureReadyForChannel();
-            if (!Enable) return;
-            float p = Math.Clamp((float)value, -12f, 12f); // BASS のピッチ範囲に合わせる
-            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Pitch, p))
+            if (!Enable || _baseFreq <= 0) return;
+            float p = Math.Clamp((float)value, -12f, 12f);
+            float newFreq = _baseFreq * (float)Math.Pow(2.0, p / 12.0);
+            if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Frequency, newFreq))
             {
                 throw new InvalidOperationException($"ピッチの設定に失敗しました: {Bass.LastError}");
             }
@@ -397,10 +421,9 @@ public sealed class SoundExtend : ISound, IDisposable
         get
         {
             EnsureReadyForChannel();
-            if (!Enable) return 1;
+            if (!Enable || _baseFreq <= 0) return 1;
             Bass.ChannelGetAttribute(_stream, ChannelAttribute.Frequency, out float freq);
-            Bass.ChannelGetAttribute(_stream, ChannelAttribute.OpusOriginalFrequency, out float origFreq);
-            return freq / origFreq;
+            return freq / _baseFreq;
         }
         set
         {
@@ -410,8 +433,8 @@ public sealed class SoundExtend : ISound, IDisposable
             {
                 throw new ArgumentOutOfRangeException(nameof(value), "速度は正の値でなければなりません。");
             }
-            Bass.ChannelGetAttribute(_stream, ChannelAttribute.OpusOriginalFrequency, out float origFreq);
-            float newFreq = origFreq * (float)value;
+            if (_baseFreq <= 0) return;
+            float newFreq = _baseFreq * (float)value;
             if (!Bass.ChannelSetAttribute(_stream, ChannelAttribute.Frequency, newFreq))
             {
                 throw new InvalidOperationException($"速度の設定に失敗しました: {Bass.LastError}");

@@ -63,6 +63,19 @@ public class Mouse
                 Sleep.WakeUp();
             }
         }
+        else
+        {
+            // 非アクティブ中も _prevX/_prevY を現在座標に追従させておく。
+            // ここを素通りさせていると、非アクティブ中に動いた座標差分が
+            // 復帰した最初のフレームに一気に乗って Speed が跳ね上がり、
+            // Mouse.Draw の高速移動エフェクトが復帰直後に暴発する。
+            // 差分自体も 0 にしておかないと、非アクティブ直前の Speed に
+            // 固まったまま復帰までエフェクトが描かれ続ける。
+            _prevX = X;
+            _prevY = Y;
+            _xdiff = 0;
+            _ydiff = 0;
+        }
     }
     public static double X => MouseInstance.X;
     public static double Y => MouseInstance.Y;
@@ -73,13 +86,17 @@ public class Mouse
     {
         get
         {
-            // WheelTotal が小数を含むかどうかを判定する
-            // NaN/Infinity は false とみなす
-            double wt = WheelTotal;
-            if (double.IsNaN(wt) || double.IsInfinity(wt))
+            // 累積値 WheelTotal の小数部で判定していると、一度でも半端な値が
+            // 乗った後は巻き戻す経路が無く貼り付いたまま true を返し続ける。
+            // 逆に +0.5 を2回のように、合計がちょうど整数に戻る細かい入力は
+            // 取りこぼして false になる。float に無限に足し込むので、長時間
+            // セッションでは小数部そのものが量子化で消えてしまう問題もある。
+            // 累積せず、このフレームのホイール差分（Wheel）だけを見て判定する。
+            double w = Wheel;
+            if (w == 0 || double.IsNaN(w) || double.IsInfinity(w))
                 return false;
             // 整数部分との差の絶対値（小数部分）
-            double frac = Math.Abs(wt - Math.Truncate(wt));
+            double frac = Math.Abs(w - Math.Truncate(w));
             const double eps = 1e-9;
             return frac > eps;
         }

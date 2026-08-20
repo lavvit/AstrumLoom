@@ -154,9 +154,9 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
             ? (use.Rectangle.Value.Width, use.Rectangle.Value.Height)
             : (Width, Height);
 
+        // 回転中心(Position)にMath.Absをかけていたため、負の基準点（画像外側を軸にしたい場合）を指定できなかった。
+        // DxLibのDrawRotaGraph3F/DrawRectRotaGraph3Fは符号付きの相対座標をそのまま回転中心として受け取れるため、絶対値化は不要。
         var point = use.Position ?? Point(use.Point, use.Rectangle);// (GetAnchorOffset(use.Point, width, height) * -1);
-        point = new(Math.Abs(point.X),
-                 Math.Abs(point.Y));
         float defscale = (float)Drawing.DefaultScale;
         float fx = (float)(x * defscale);
         float fy = (float)(y * defscale);

@@ -62,6 +62,10 @@ public class Animation : AsyncLoadableBase, IMovie
 
     public bool IsPlaying => throw new NotImplementedException();
 
+    /// <summary>
+    /// ループ再生の可否。単なるバッキングフィールド付きプロパティ。
+    /// コンストラクタの Loop = isLoop; がここで例外を投げないよう自動実装にしている。
+    /// </summary>
     public bool Loop { get; set; }
     public DrawOptions? Option { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 

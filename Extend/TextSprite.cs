@@ -136,7 +136,22 @@ public class TextSprite : IDisposable
         _dirty = false;
     }
     public Color Color { get; set; } = Color.White;
-    public Color? EdgeColor { get; set; } = null;
+    private Color? _edgeColor = null;
+    /// <summary>
+    /// 縁取り色。変更時にキャッシュ済みテクスチャへ反映されるよう _dirty を立てる
+    /// （EdgeColorはGetCacheKeyのキーに含まれないため、同一キャッシュキーのまま値だけ変わっても
+    /// このsetterで検知しないと古い縁色テクスチャが描画され続けてしまう）。
+    /// </summary>
+    public Color? EdgeColor
+    {
+        get => _edgeColor;
+        set
+        {
+            if (_edgeColor == value) return;
+            _edgeColor = value;
+            _dirty = true;
+        }
+    }
     public DecorateText.DecorateOption? DecoOption { get; set; } = null;
     public ReferencePoint Point { get; set; } = ReferencePoint.TopLeft;
     public BlendMode Blend { get; set; } = BlendMode.None;
@@ -251,7 +266,12 @@ public static class TextSprites
     private static string GetCacheKey(string text, IFont font, DecorateText.DecorateOption decorate)
     {
         string fontKey = font.GetHashCode().ToString();
-        string decoKey = decorate.GetHashCode().ToString();
-        return $"{text}__{fontKey}__{decoKey}";
+        // decorate(DecorateOptionラッパー)自体は呼び出しのたびにnewされるため、
+        // その参照ハッシュをキーにすると絶対に一致しない。中身のGradation/Textureの参照ハッシュを使う。
+        string gradKey = decorate.Gradation != null
+            ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(decorate.Gradation).ToString() : "none";
+        string texKey = decorate.Texture != null
+            ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(decorate.Texture).ToString() : "none";
+        return $"{text}__{fontKey}__{gradKey}_{texKey}";
     }
 }

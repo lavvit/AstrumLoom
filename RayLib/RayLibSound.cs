@@ -65,9 +65,13 @@ public class RayLibSound : AsyncLoadableBase, ISound
     private bool _streamloaded => Music.FrameCount > 0;
 
     #region 読み込み
-    /// <summary>非同期ロードを開始する。メインスレッドならLoadSfxを即実行、そうでなければLoadBackGroundでバイト列だけ先に読んでおく。</summary>
+    /// <summary>非同期ロードを開始する。メインスレッドならLoadSfxを即実行、そうでなければLoadBackGroundでバイト列だけ先に読んでおく。
+    /// streaming は Pump() の非同期完了処理でも参照するため、ここでフィールドに控えておく。</summary>
     public void Load(bool streaming = true)
-        => LoadAsync(this, () => LoadSfx(streaming), () => LoadBackGround(streaming));
+    {
+        _streaming = streaming;
+        LoadAsync(this, () => LoadSfx(streaming), () => LoadBackGround(streaming));
+    }
     /// <summary>メインスレッドから直接パスを読み込む経路。Sfx/Musicの両方をraylib APIで生成し、streaming=falseならMusicは即解放する。</summary>
     private bool LoadSfx(bool streaming)
     {
@@ -137,6 +141,12 @@ public class RayLibSound : AsyncLoadableBase, ISound
 
                 // BGM用に Music も（ファイルパスからでOK）※必要なら別APIに分けても良い
                 Music = LoadMusicStream(Path);
+                if (!_streaming)
+                {
+                    // LoadSfx（同期経路）と同じく、streaming=false 指定時は Music を常駐させない
+                    UnloadMusicStream(Music);
+                    Music = default;
+                }
 
                 WriteState(State_Success);
             }
@@ -162,6 +172,8 @@ public class RayLibSound : AsyncLoadableBase, ISound
     #endregion
     #region プロパティ
     private bool _played = false;
+    // Load() 時の streaming 指定を Pump() の非同期完了処理からも参照するために保持する
+    // （以前は書き込むだけで一度も読まれておらず、CS0414相当の死んだフィールドだった）。
     private bool _streaming = false;
     private double _time;
     private float _volume = 1.0f;
@@ -184,7 +196,6 @@ public class RayLibSound : AsyncLoadableBase, ISound
                 bool playing = IsMusicStreamPlaying(Music);
                 if (playing && _streamloaded)
                 {
-                    _streaming = true;
                     _time = Math.Clamp(GetMusicTimePlayed(Music) * 1000.0 - 0.5, 0, Length);
                     // 任意: ループポイント処理（TimeがEndを越えたらStartにSeek）
                     if (Loop)
@@ -203,7 +214,6 @@ public class RayLibSound : AsyncLoadableBase, ISound
                     }
                     return;
                 }
-                _streaming = false;
             }
             else
             {
@@ -211,13 +221,22 @@ public class RayLibSound : AsyncLoadableBase, ISound
                 bool playing = IsSoundPlaying(Sfx);
                 if (playing)
                 {
-                    _streaming = true;
                     _time += GetFrameTime() * 1000.0;
                     if (Length > 0 && _time > Length) _time = Length;
                 }
                 else
                 {
-                    _streaming = false;
+                    // SEの自然な再生終了。_played を落とし、Loopなら即座に鳴らし直す
+                    // （ここでリセットするだけだと else 節（本メソッド末尾）へは次フレームまで
+                    // 到達しないため、ループ再開が1フレーム遅れるだけでなく、そもそもここで
+                    // _played を戻さない限り一生else節に到達できなかった）。
+                    _played = false;
+                    _time = 0;
+                    if (Loop)
+                    {
+                        PlaySound(Sfx);
+                        _played = true;
+                    }
                 }
             }
         }
@@ -225,7 +244,6 @@ public class RayLibSound : AsyncLoadableBase, ISound
         {
             if (Loop) // ループ時にフラグをリセットして再生
                 _played = false;
-            _streaming = false;
             _time = 0;
         }
     }
@@ -316,7 +334,6 @@ public class RayLibSound : AsyncLoadableBase, ISound
             StopSound(Sfx);
         }
         _played = false;
-        _streaming = false;
         _time = 0;
     }
     /// <summary>再生済みならストリーム更新のみ行い、未再生ならPlay()から開始します（BGMループ等の毎フレーム呼び出し向け）。</summary>

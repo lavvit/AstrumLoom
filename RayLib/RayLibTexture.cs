@@ -175,6 +175,13 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         {
             try
             {
+                // PumpAsync() 内の _deferred フォールバックで LoadTx が先に走り、
+                // 既に Native が生成されている場合がある。ここで二重にテクスチャを
+                // 作ってしまうと古いハンドルが二度と Unload されずリークするので、
+                // 上書きする前に解放しておく。
+                if (Native.Id != 0)
+                    Raylib.UnloadTexture(Native);
+
                 // すべてメインで：バイト列 → Image → Texture2D
                 var img = Raylib.LoadImageFromMemory(_pendingExt ?? ".png", _pendingBytes);
                 Native = Raylib.LoadTextureFromImage(img);
@@ -224,7 +231,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         float fy = (float)(y * defscale);
         (double w, double h) = use.Scale;
         double angle = use.Angle;
-        (int tx, int ty) = (use.Flip.X ? -1 : 1, use.Flip.Y ? -1 : 1);
+        int tx = use.Flip.X ? -1 : 1;
 
         // ★ 宛先座標系での origin（拡大後の量に変換）
         var origin = new System.Numerics.Vector2(
@@ -233,19 +240,16 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         );
 
         var rect = use.Rectangle ?? new(0, 0, Width, Height);
+        // RenderTexture経由はUV原点が上下逆なので、その分の反転とFlip.Yの反転は
+        // 独立に2回適用せず、実効的に反転させるかどうかをXORでまとめて1回だけ決める。
+        bool netFlipY = use.Flip.Y ^ (_renderTex.Id != 0);
+        int netTy = netFlipY ? -1 : 1;
         // src は TurnX/TurnY で反転（幅/高さを負にする）
         var srcRect = new Rectangle(
             (float)rect.X, (float)rect.Y,
             (float)rect.Width * tx,
-            (float)rect.Height * ty
+            (float)rect.Height * netTy
         );
-
-        // Render経由の場合上下反転するので補正
-        if (_renderTex.Id != 0)
-        {
-            srcRect.Y += srcRect.Height;
-            srcRect.Height *= -1;
-        }
 
         // 宛先サイズ（常に正）※拡大後の大きさ
         float destW = (float)(rect.Width * Math.Abs(w));

@@ -20,7 +20,10 @@ public class Exo
 
     private List<ImageObject> imageObjects = []; // 画像オブジェクトのリスト
     private List<GroupObject> groupObjects = []; // グループ制御オブジェクトのリスト
-    private List<string> textureFileNames = []; // テクスチャ名のリスト
+    private List<string> textureFileNames = []; // テクスチャ名のリスト（互換のため残置。参照はしていない）
+    // file名からTextureを直接引くための辞書。imageObjects/textureFileNamesはfile=行が無い中間点でも
+    // imageObjects側だけ増えるため添字が対応しなくなる。ここではその暗黙対応に頼らない。
+    private Dictionary<string, Texture> textureByFileName = [];
 
     public Counter counter = new();
 
@@ -330,10 +333,14 @@ public class Exo
                         {
                             imageObject = imageObjects.Last();
 
-                            // 画像の読み込み
-                            imageObject.Texture = !textureFileNames.Contains(fileName)
-                                ? new Texture(Path.GetDirectoryName(FilePath) + @"\" + fileName)
-                                : imageObjects[textureFileNames.IndexOf(fileName)].Texture;
+                            // 画像の読み込み（file名→Textureの辞書引きにする。imageObjects/textureFileNamesの
+                            // インデックス対応は中間点オブジェクトの分だけずれるため使わない）
+                            if (!textureByFileName.TryGetValue(fileName, out var texture))
+                            {
+                                texture = new Texture(Path.GetDirectoryName(FilePath) + @"\" + fileName);
+                                textureByFileName[fileName] = texture;
+                            }
+                            imageObject.Texture = texture;
                             /*
                             // アンチエイリアスをかける
                             if (isUseAntialiasing)
@@ -447,7 +454,14 @@ public class Exo
                         // 数値に変換
                         float[] numbers = parts.Select(float.Parse).ToArray();
 
-                        var FilterObject = (ScaleFilter)currentObject.Filters.Last();
+                        // 「拡大率=が必ず先に来る」前提でFilters.Last()を無防備にキャストすると、
+                        // 順序が違う.exoやリストが空の場合に例外になる。無ければここで生成して追加する。
+                        var FilterObject = currentObject.Filters.OfType<ScaleFilter>().LastOrDefault();
+                        if (FilterObject == null)
+                        {
+                            FilterObject = new ScaleFilter();
+                            currentObject.Filters.Add(FilterObject);
+                        }
 
                         FilterObject.StartScale = new(numbers[0] / 100.0f, FilterObject.StartScale.Height);
 
@@ -465,7 +479,13 @@ public class Exo
                         // 数値に変換
                         float[] numbers = parts.Select(float.Parse).ToArray();
 
-                        var FilterObject = (ScaleFilter)currentObject.Filters.Last();
+                        // X=と同様、Filters.Last()を無防備にキャストしない
+                        var FilterObject = currentObject.Filters.OfType<ScaleFilter>().LastOrDefault();
+                        if (FilterObject == null)
+                        {
+                            FilterObject = new ScaleFilter();
+                            currentObject.Filters.Add(FilterObject);
+                        }
 
                         FilterObject.StartScale = new(FilterObject.StartScale.Width, numbers[0] / 100.0f);
 
@@ -607,7 +627,10 @@ public class Exo
     /// </summary>
     public void Start()
     {
-        counter = new Counter(1, Length, (int)(1000.0 * (1000.0 / Rate)), IsLoop);
+        // Rate=0のとき 1000.0/Rate が Infinity になり、(int)キャストで int.MinValue に化けて
+        // Counterの間隔計算が壊れる（アニメーションが実質フリーズする）。未設定時は既定30fps相当にフォールバックする。
+        int rate = Rate > 0 ? Rate : 30;
+        counter = new Counter(1, Length, (int)(1000.0 * (1000.0 / rate)), IsLoop);
         counter.Start();
         _isPlaying = true;
     }

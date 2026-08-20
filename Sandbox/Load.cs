@@ -129,6 +129,9 @@ internal class LoadCheckScene : Scene
         if (_regenerate)
         {
             _regenerate = false;
+            // 旧テクスチャを明示的に破棄してから差し替える（Resourses.cs と同じパターン）。
+            // 破棄しないとGC/ファイナライザ任せになり、ネイティブハンドルの解放が遅延する。
+            _tex?.Dispose();
             _tex = new Texture(new LayoutUtil.Size(90, 30), () =>
             {
                 Drawing.Fill(Color.Blue);

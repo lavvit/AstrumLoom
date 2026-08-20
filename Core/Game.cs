@@ -46,9 +46,22 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
         KeyInput.Initialize(input, platform.TextInput);
         Mouse.Init(mouse, config.ShowMouse);
-        game.Initialize();
-        AstrumCore.InitCompleted = true;
-        Scene.Start();
+
+        // 初期化中（Initialize/Scene.Start）の例外は Loop() の try に乗らないため、
+        // ここで捕まえて HandleFatal に回さないと Boot を突き抜けて素の未処理例外になる。
+        try
+        {
+            game.Initialize();
+            AstrumCore.InitCompleted = true;
+            Scene.Start();
+        }
+        catch (Exception ex)
+        {
+            HandleFatal(ex, "Initialize");
+            RenderFatalAndClose();
+            return;
+        }
+
         Sleep.WakeUp();
         Loop();
     }
@@ -64,6 +77,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             while (!platform.ShouldClose && !_fatalTriggered)
             {
                 AstrumCore.ProcessPendingDisposals();
+                AstrumCore.PumpDropFiles();
                 AstrumCore.InitDrop();
                 MainUpdate(game);
                 Update(game);
@@ -87,13 +101,23 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             {
                 // 処理開始時にメインスレッドでの破棄要求を処理
                 AstrumCore.ProcessPendingDisposals();
+                // ドロップの採取はウィンドウ API なのでメインスレッドで行い、
+                // 更新スレッドはキューから受け取るだけにする（BaseProgram.Update）。
+                AstrumCore.PumpDropFiles();
                 MainUpdate(game);
-                if (_mainThreadActions.TryDequeue(out var action))
+                // 1件だけ掃く if だと、更新スレッドが1フレームに複数積んだ分が
+                // 次フレーム以降にずれ込み続けてキューが際限なく伸びる。
+                // このフレームに積まれた分は while で掃き切る。
+                // ただし action() の中から新たに積まれた分まで同じフレームで
+                // 掃き続けると無限ループになりうるので、ループ開始時点の件数だけ処理する。
+                int pending = _mainThreadActions.Count;
+                for (int i = 0; i < pending && _mainThreadActions.TryDequeue(out var action); i++)
                 {
                     try { action(); }
                     catch (Exception ex)
                     {
                         HandleFatal(ex, "MainThreadAction");
+                        break;
                     }
                 }
 

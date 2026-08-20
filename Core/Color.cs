@@ -164,9 +164,16 @@ public readonly struct Color : IEquatable<Color>
     }
     /// <summary>TryParseに失敗した場合はWhiteを返す簡易版。</summary>
     public static Color Parse(string? input) => TryParse(input, out var color) ? color : White;
-    /// <summary>アルファ成分が立っていない（0x01000000未満の）値はアルファ255を補って解釈する。</summary>
-    public static Color Parse(int hex) => FromDrawing(DrawingColor.FromArgb(hex |
-        (hex < 0x01000000 ? unchecked((int)0xFF000000) : 0)));
+    /// <summary>アルファ成分(最上位バイト)が0の値はアルファ255を補って解釈する。0x80のような半透明のアルファ値はそのまま尊重する。</summary>
+    public static Color Parse(int hex)
+    {
+        // hex < 0x01000000 は符号付きintの比較なので、アルファに0x80以上を含む
+        // (=int表現が負になる)値まで「アルファ無し」と誤判定してしまっていた。
+        // アルファバイトそのものを見て判定する。
+        int alphaByte = (int)((uint)hex >> 24);
+        int v = alphaByte == 0 ? hex | unchecked((int)0xFF000000) : hex;
+        return FromDrawing(DrawingColor.FromArgb(v));
+    }
 
     /// <summary>RGBA各成分を線形補間する（t=0..1にクランプ）。</summary>
     public static Color Lerp(Color a, Color b, float t)
@@ -187,7 +194,11 @@ public readonly struct Color : IEquatable<Color>
         public double Hue, Saturation, Brightness;
         public HSBColor(double hue, double saturation, double brightness)
         {
-            Hue = hue % 360;
+            // C#の%は被除数が負だと負の結果を返すため、そのままだと負の色相が折り返さない。
+            // 0..360の範囲に正規化する。
+            double h = hue % 360;
+            if (h < 0) h += 360;
+            Hue = h;
             Saturation = saturation;
             Brightness = brightness;
         }

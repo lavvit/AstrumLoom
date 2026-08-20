@@ -301,6 +301,9 @@ public class Gradation
     {
         if (Points.Length == 0)
             throw new InvalidOperationException("No color points defined.");
+        // 色が1個だけの場合は区間が存在しないので、下の探索ループに入る前にその色を返す。
+        if (Points.Length == 1)
+            return Points[0].Color;
         if (position <= Points[0].Position)
             return Points[0].Color;
         if (position >= Points[^1].Position)

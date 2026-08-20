@@ -27,12 +27,14 @@ public sealed class RayLibPlatform : IGamePlatform
     /// <summary>raylibウィンドウ/オーディオデバイスを初期化し、各サブシステムを構築します。</summary>
     public RayLibPlatform(GameConfig config)
     {
-        InitWindow(config.Width, config.Height, config.Title);
-
-        if (!config.Resizable)
+        // ウィンドウのリサイズ可否は ConfigFlags.ResizableWindow に対応させる。
+        // 以前は !Resizable のときに UndecoratedWindow（装飾なし＝タイトルバー等が消える）を
+        // 誤って立てており、Resizable=false が「装飾が消える」という意図しない挙動になっていた。
+        if (config.Resizable)
         {
-            SetWindowState(ConfigFlags.UndecoratedWindow); // 例：必要なら調整
+            SetConfigFlags(ConfigFlags.ResizableWindow);
         }
+        InitWindow(config.Width, config.Height, config.Title);
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
         _targetFps = config.TargetFps;
@@ -53,8 +55,11 @@ public sealed class RayLibPlatform : IGamePlatform
         Time = new SimpleTime();
         UTime = new SimpleTime();
         Graphics = new RayLibGraphics();
-        Input = new RayLibInput();
-        TextInput = new(new RayLibTextInput(), Time);
+        var rayInput = new RayLibInput();
+        Input = rayInput;
+        // RayLibTextInput はネイティブAPIを直接叩かず、rayInput が Buffer() で確定させた
+        // バッファ済み状態（キー/文字キュー）経由で読むため、同一インスタンスを共有する。
+        TextInput = new(new RayLibTextInput(rayInput), Time);
         Mouse = new RayLibMouse();
         Controller = new RayLibController();
     }

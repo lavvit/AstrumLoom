@@ -202,21 +202,36 @@ public class NumAnimation : IDisposable
     {
         if (_disposed) return;
         // 2) Skin.Textures から _keyPrefix を含むキーを全て削除する
+        // Skin.Textures は非スレッドセーフな static Dictionary で、ファイナライザスレッドから
+        // 直接Keys列挙/Removeすると、メインスレッド側の同時読み書きと衝突しうる。
+        // AstrumCore.RequestDisposeのメインスレッド専用キューに委譲し、実際の辞書操作は
+        // 必ずメインスレッドでまとめて行われるようにする。
         if (!string.IsNullOrEmpty(_keyPrefix) && Skin.Textures != null)
         {
-            // キー一覧を安全に取得してから削除する
-            var keysToRemove = Skin.Textures.Keys
-                .Where(k => k != null && k.StartsWith($"{_keyPrefix}_"))
-                .ToList();
+            AstrumCore.RequestDispose(new TextureKeyRemover(_keyPrefix));
+        }
 
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Skin.Textures から指定プレフィックスに一致するキーを削除する処理を、
+    /// メインスレッド破棄キュー(AstrumCore.RequestDispose)経由で遅延実行するためのラッパー。
+    /// </summary>
+    private sealed class TextureKeyRemover(string keyPrefix) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (Skin.Textures == null) return;
+            var keysToRemove = Skin.Textures.Keys
+                .Where(k => k != null && k.StartsWith($"{keyPrefix}_"))
+                .ToList();
             foreach (string? k in keysToRemove)
             {
                 Skin.RemoveTexture(k);
             }
         }
-
-        _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>描画基準点。設定すると全フレームに一括反映されます。</summary>

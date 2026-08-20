@@ -28,6 +28,9 @@ public class Counter
     }
     public long Now => _now();
 
+    // 1回のTick()で処理する最大Tick数。長時間放置後の暴走(数百万回スピン)を防ぐための上限。
+    private const long MaxCatchUpTicks = 100_000;
+
     private static double NormalizeInterval(double interval) =>
         // 0 は無限ループの原因になるため、最小値として 1 を採用する。
         interval == 0 ? 1 : interval;
@@ -97,6 +100,16 @@ public class Counter
             Interval = 1;
         }
 
+        // 安全ガード: 長時間 Tick() を呼ばずにいた場合、diffTime が Interval に対して
+        // 極端に大きくなり、下のwhileが数百万回転してフレームが固まることがある。
+        // 一度のTick()で処理するTick回数の上限を決めて、それを超える分の経過時間は捨てる
+        // (＝長時間止まっていた分は「たった今再開した」ものとして扱う)。
+        double maxCatchUpTime = Math.Abs(Interval) * MaxCatchUpTicks;
+        if (diffTime > maxCatchUpTime)
+        {
+            diffTime = maxCatchUpTime;
+        }
+
         if (Interval >= 0)
         {
             while (tickCount >= 0 && diffTime >= Interval)
@@ -115,9 +128,11 @@ public class Counter
                     else
                     {
                         // 非ループ設定かつ現在の値が終了値より大きかったら、終了値を維持してタイマーを停止する。
+                        // ここで止めないと、Stopped後もwhileが回り続けてEndedが何度も発火してしまう。
                         Value = End;
                         Stop();
                         Ended?.Invoke(this, new EventArgs());
+                        break;
                     }
                 }
                 diffTime -= Interval;
@@ -141,9 +156,11 @@ public class Counter
                     else
                     {
                         // 非ループ設定かつ現在の値が終了値より大きかったら、終了値を維持してタイマーを停止する。
+                        // ここで止めないと、Stopped後もwhileが回り続けてEndedが何度も発火してしまう。
                         Value = Begin;
                         Stop();
                         Ended?.Invoke(this, new EventArgs());
+                        break;
                     }
                 }
                 diffTime += Interval;
@@ -302,9 +319,10 @@ public class Counter
     {
         get
         {
+            // DateTime.AddMilliseconds は新しいインスタンスを返すだけで自分自身は変化しない。
+            // 戻り値を受け取らないと常に DateTime.MinValue のままになる。
             DateTime time = new();
-            time.AddMilliseconds(Value);
-            return time;
+            return time.AddMilliseconds(Value);
         }
     }
     public TimeConvert CTime => new(this);

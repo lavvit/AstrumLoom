@@ -38,7 +38,9 @@ public class Texture : IDisposable
         => _texture?.Draw(x, y, Option);
     public void Draw(double x, double y, DrawOption? option)
         => _texture?.Draw(x, y, Option.Temp(option));
-    public void Draw(Point point, DrawOption? option = null) => _texture?.Draw(point.X, point.Y, Option);
+    // option が渡された場合に黙って捨てて既定の Option をそのまま使っていた。
+    // Draw(double, double, DrawOption?) と同じく Option.Temp(option) を経由させる。
+    public void Draw(Point point, DrawOption? option = null) => _texture?.Draw(point.X, point.Y, Option.Temp(option));
 
     public void Draw(double x, double y,
         txScale? s = null,

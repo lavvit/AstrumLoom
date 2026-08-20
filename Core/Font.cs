@@ -201,23 +201,40 @@ public static class SystemFontResolver
         static int StyleScore(string name, bool b, bool i)
         {
             name = name.ToLowerInvariant();
+            bool hasBold = name.Contains("bold") || name.Contains("demi") || name.Contains("medium")
+                || name.Contains("semibold") || name.Contains("black") || name.Contains("heavy");
+            bool hasItalic = name.Contains("italic") || name.Contains("oblique");
             int score = 0;
             if (b)
             {
                 if (name.Contains("bold")) score += 2;
                 if (name.Contains("demi") || name.Contains("medium")) score += 1;
             }
+            else
+            {
+                // bold=false なのに部分一致だけで拾うと、"Arial" のつもりが arialbd.ttf
+                // （表示名に Bold が含まれる実体）を掴んでしまうことがあった。
+                // 太字系の名前は明示的に減点し、通常体を優先する。
+                if (hasBold) score -= 3;
+            }
             if (i)
             {
                 if (name.Contains("italic") || name.Contains("oblique")) score += 2;
             }
-            // 標準体を好むときは minus をつけない（等価でOK）
+            else
+            {
+                if (hasItalic) score -= 3;
+            }
             return score;
         }
 
         var chosen = cand
             .OrderByDescending(t => StyleScore(t.name, bold, italic))
             .ThenByDescending(t => ExtScore(t.path))
+            // スタイル同点のときは、指定名により近い（短い＝装飾の少ない）表示名を優先する。
+            // 完全一致（例："Yu Gothic"）が "Yu Gothic UI Semilight" のような部分一致より
+            // 優先されるようにするための保険。
+            .ThenBy(t => t.name.Length)
             .First();
 
         // TTC/OTCはサブフェイス選択が必要になることがあり、Raylibだと扱いづらいので注意喚起

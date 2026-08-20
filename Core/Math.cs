@@ -3,18 +3,39 @@
 /// <summary>整数論寄りの汎用ヘルパー（最大公約数・最小公倍数・素数判定）。</summary>
 public static class MathExtend
 {
-    /// <summary>最大公約数を返します。</summary>
+    /// <summary>最大公約数を返します。int.MinValueが絡んでMath.Absがオーバーフローする場合はint.MaxValueに丸めます。</summary>
     public static int GCD(int a, int b)
     {
-        while (b != 0) { int t = a % b; a = b; b = t; }
-        return Math.Abs(a);
+        // long経由にすることで、a=int.MinValue(Math.Abs(int.MinValue)は例外)でも安全に計算できる。
+        long la = a, lb = b;
+        while (lb != 0) { long t = la % lb; la = lb; lb = t; }
+        long result = Math.Abs(la);
+        return result > int.MaxValue ? int.MaxValue : (int)result;
     }
-    /// <summary>最小公倍数を返します。</summary>
+    /// <summary>最大公約数を返します(long版)。intの結果を超える桁でも正確に計算したい場合に使う。</summary>
+    public static long GCD(long a, long b)
+    {
+        while (b != 0) { long t = a % b; a = b; b = t; }
+        return a == long.MinValue ? long.MaxValue : Math.Abs(a);
+    }
+
+    /// <summary>
+    /// 最小公倍数を返します。int同士が互いに素に近いとint範囲を静かにオーバーフローしうるため、
+    /// 内部ではlongで計算し、int範囲を超える場合はint.MaxValueに丸めます。
+    /// 正確な値がint範囲を超えて必要な場合はLCM(long,long)を使ってください。
+    /// 既存の呼び出し元を壊さないよう戻り値の型(int)は変更していません。
+    /// </summary>
     public static int LCM(int a, int b)
+    {
+        long result = LCM((long)a, (long)b);
+        return result > int.MaxValue ? int.MaxValue : (int)result;
+    }
+    /// <summary>最小公倍数を返します(long版)。int同士でもオーバーフローせずに正確な値が得られる。</summary>
+    public static long LCM(long a, long b)
     {
         // If either is zero, LCM is defined as 0 (avoid division by zero)
         if (a == 0 || b == 0) return 0;
-        int g = GCD(a, b);
+        long g = GCD(a, b);
         if (g == 0) return 0;
         // Use division first to reduce overflow risk
         return Math.Abs(a / g * b);
@@ -502,29 +523,35 @@ public enum EInOut
 /// </summary>
 public readonly struct BigNum : IDisposable
 {
-    public readonly double Mantissa; // [1,1000) に保つ
+    public readonly double Mantissa; // 絶対値を[1,1000) に保つ(符号はそのまま)
     public readonly int Digit;        // カンマの個数
 
     public BigNum(double mantissa, int digit)
     {
         int tier = digit;
-        double m = mantissa;
+        // 符号を退避してから絶対値で桁調整する。符号付きのままだと
+        // m>=1000.0/m<1.0の判定が負の値では成立せず、桁がまったく畳まれなくなる。
+        double sign = mantissa < 0 ? -1.0 : 1.0;
+        double m = Math.Abs(mantissa);
 
         while (m >= 1000.0) { m /= 1000.0; tier++; }
         while (m < 1.0 && tier > 0) { m *= 1000.0; tier--; }
 
-        Mantissa = m;
+        Mantissa = m * sign;
         Digit = tier;
     }
     public BigNum(double value)
     {
         int tier = 0;
-        double m = value;
+        // 符号を退避してから絶対値で桁調整する。符号付きのままだと
+        // m>=1000.0/m<1.0の判定が負の値では成立せず、桁がまったく畳まれなくなる。
+        double sign = value < 0 ? -1.0 : 1.0;
+        double m = Math.Abs(value);
 
         while (m >= 1000.0) { m /= 1000.0; tier++; }
         while (m < 1.0 && tier > 0) { m *= 1000.0; tier--; }
 
-        Mantissa = m;
+        Mantissa = m * sign;
         Digit = tier;
     }
 
