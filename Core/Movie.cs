@@ -5,6 +5,10 @@ public interface IMovie : ISound, ITexture
 {
 }
 
+/// <summary>
+/// 動画（音声付きテクスチャ）のラッパー。実体はプラットフォーム実装のIMovie(Inner)に委譲し、
+/// Innerがnull（未ロード・失敗）でも各プロパティが安全な既定値を返すようにしている。
+/// </summary>
 public class Movie : IDisposable
 {
     private bool _disposed;

@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>プラットフォームが実装するキーボード入力の最小インターフェース。KeyInputはこれをラップして使う。</summary>
 public interface IInput
 {
     void Buffer();
@@ -429,6 +430,7 @@ public enum Key
     None = -1,
 }
 
+/// <summary>IME等を介したテキスト入力セッションの状態機械。開始→更新→確定/キャンセルの流れをITextInput実装の上で管理する。</summary>
 public sealed class TextEnter
 {
     private readonly ITextInput _impl;
@@ -452,6 +454,7 @@ public sealed class TextEnter
     /// </summary>
     public bool Update(ref string value)
         => Update(ref value, Option);
+    /// <summary>未開始なら入力セッションを開始し、開始済みならESCキャンセル判定とバックエンド状態の反映を行う。確定した瞬間だけtrueを返す。</summary>
     public bool Update(ref string value, TextInputOptions options)
     {
         // まだ入力を開始していない → 開始する
@@ -524,6 +527,7 @@ public sealed class TextEnter
     public bool IsCancel { get; set; }
 }
 
+/// <summary>テキスト入力セッションの動作を指定するオプション一式。</summary>
 public sealed record TextInputOptions
 {
     public string InitialText { get; init; } = "";
@@ -538,6 +542,7 @@ public sealed record TextInputOptions
 
 }
 
+/// <summary>テキスト入力中の選択範囲（開始～終了インデックス）。</summary>
 public readonly struct TextSelection
 {
     public int Start { get; }
@@ -549,6 +554,7 @@ public readonly struct TextSelection
     }
 }
 
+/// <summary>IME変換候補・入力欄の配色セット。Light/Darkの既定テーマを用意している。</summary>
 public readonly struct IMEColors(
     Color compositionBackColor, //変換候補
     Color compositionFrameColor, //変換候補
@@ -588,6 +594,7 @@ public readonly struct IMEColors(
 /// キー入力の状態。
 /// </summary>
 public enum KeyInputState { Typing, Finished, Canceled, Error = -1 }
+/// <summary>プラットフォーム（IME含む）が実装するテキスト入力バックエンド。TextEnterがこれをラップする。</summary>
 public interface ITextInput
 {
     bool IsActive { get; }
@@ -607,6 +614,7 @@ public interface ITextInput
     void Draw(double x, double y, Color? color, IFont font, bool caret);
 }
 
+/// <summary>画面上に仮想キーボードを描くデバッグ/演出用のヘルパー。押されているキーを虹色で光らせる。</summary>
 public class KeyBoard
 {
     public static Color GetKeyColor(Key key) => key.Hold() ?

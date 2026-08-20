@@ -2,6 +2,10 @@
 
 namespace AstrumLoom;
 
+/// <summary>
+/// 図形・テキスト描画のstatic API。実描画は Graphics(IGraphics) に委譲し、
+/// ここでは座標変換や省略可能引数の補完など呼び出しやすさのための薄いラッパーを提供する。
+/// </summary>
 public class Drawing
 {
     // AstrumCore.Graphic は Platform?.Graphics で nullable（Boot() 前は Platform が未設定）。
@@ -230,6 +234,10 @@ public class Drawing
             }
         }
     }
+    /// <summary>
+    /// 矩形領域にグラデーションを描く。回転角が0/90/180/270度に近いときは列/行単位で塗る高速パスを使い、
+    /// それ以外は各ピクセルを回転方向へ射影して位置を求める汎用パス（低速）を使う。
+    /// </summary>
     public static void Gradation(int x, int y, int width, int height, Gradation grad, double rotate = 0, ColorSpace? colorSpace = null)
     {
         if (width <= 0 || height <= 0) return;

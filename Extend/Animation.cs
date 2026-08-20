@@ -1,9 +1,15 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// 独自形式のアニメーションプロジェクト（<see cref="AnimeProject"/>）を IMovie として扱うためのラッパー。
+/// AsyncLoadableBase の非同期ロード基盤に乗せてファイルを読み込む。
+/// </summary>
 public class Animation : AsyncLoadableBase, IMovie
 {
+    /// <summary>読み込み元ファイルのパス。</summary>
     public string Path { get; private set; } = "";
 
+    /// <summary>読み込まれたアニメーションのプロジェクトデータ。</summary>
     public AnimeProject Project { get; private set; } = new AnimeProject();
 
     public Animation(string path, bool isLoop = true)
@@ -13,8 +19,10 @@ public class Animation : AsyncLoadableBase, IMovie
         Load();
     }
 
+    /// <summary>非同期でのファイル読み込みを開始します。</summary>
     public void Load()
         => LoadAsync(this, LoadAnim);
+    /// <summary>読み込みワーカースレッドから呼ばれる本体処理。ファイルの存在確認のみ行う。</summary>
     public bool LoadAnim()
     {
         bool file = FileCheck(Path);
@@ -32,6 +40,7 @@ public class Animation : AsyncLoadableBase, IMovie
         // Dispose animation resources here
         true;
 
+    /// <summary>毎フレーム呼び出し、非同期ロードの完了通知などを処理します。</summary>
     public void Pump()
     {
         PumpAsync();
@@ -53,7 +62,7 @@ public class Animation : AsyncLoadableBase, IMovie
 
     public bool IsPlaying => throw new NotImplementedException();
 
-    public bool Loop { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    public bool Loop { get; set; }
     public DrawOptions? Option { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     public void Play() => throw new NotImplementedException();
@@ -62,6 +71,9 @@ public class Animation : AsyncLoadableBase, IMovie
     public void Draw(double x, double y, DrawOptions option) => throw new NotImplementedException();
 }
 
+/// <summary>
+/// アニメーションプロジェクトのデータ。画像・サウンドオブジェクト群を保持する（現状未実装）。
+/// </summary>
 public class AnimeProject
 {
     public int Width { get; private set; }

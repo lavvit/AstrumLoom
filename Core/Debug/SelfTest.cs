@@ -23,6 +23,7 @@ public readonly record struct SelfTestResult(string Label, bool Passed, string D
 /// </summary>
 public static class SelfTest
 {
+    /// <summary>計画の 1 ステップ。Frames フレーム分だけ Advance で消費される。</summary>
     private abstract class Action_
     {
         public int Frames;
@@ -30,8 +31,10 @@ public static class SelfTest
         public virtual void OnEnd() { }
     }
 
+    /// <summary>何もせず Frames フレームだけ経過を待つ。</summary>
     private sealed class WaitAction : Action_ { }
 
+    /// <summary>開始時にキーを合成入力で押し、終了時に離す。</summary>
     private sealed class HoldAction : Action_
     {
         public required Key Key;
@@ -39,12 +42,14 @@ public static class SelfTest
         public override void OnEnd() => VirtualInput.Release(Key);
     }
 
+    /// <summary>開始時にスクリーンショットを要求する（0 フレームでは撮影要求と描画保存が同フレームにならないため Frames=1）。</summary>
     private sealed class ShotAction : Action_
     {
         public required string Name;
         public override void OnStart() => Snapshot.Request(Name);
     }
 
+    /// <summary>開始時に条件を評価し、結果を記録する。例外も FAIL として扱う。</summary>
     private sealed class CheckAction : Action_
     {
         public required string Label;
@@ -67,6 +72,7 @@ public static class SelfTest
         }
     }
 
+    /// <summary>開始時に任意処理を 1 回実行する。例外は FAIL として記録される。</summary>
     private sealed class DoAction : Action_
     {
         public required string Label;
@@ -87,10 +93,14 @@ public static class SelfTest
     private static readonly List<Action_> _plan = [];
     private static readonly List<SelfTestResult> _results = [];
 
+    /// <summary>現在実行中（または次に実行する）計画項目のインデックス。</summary>
     private static int _index;
+    /// <summary>現在の項目で残っている待機フレーム数。</summary>
     private static int _framesLeft;
+    /// <summary>現在の項目の OnStart が呼ばれ済みか。</summary>
     private static bool _current;
     private static bool _finished;
+    /// <summary>計画の走行を開始した論理フレーム。0 は未開始の意味も兼ねるため、Advance の初回に設定する。</summary>
     private static long _startFrame;
 
     /// <summary><c>--selftest</c> で起動されたか。</summary>
@@ -201,6 +211,7 @@ public static class SelfTest
         }
     }
 
+    /// <summary>計画を完了させ、合成入力の解除とプロセス終了コードの設定を行う。</summary>
     private static void Complete()
     {
         if (_finished) return;

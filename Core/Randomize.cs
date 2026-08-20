@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>アプリ全体で共有する乱数生成へのstaticアクセス窓口。Seedで再現可能な系列に切り替えられる（リプレイ・セルフテスト用）。</summary>
 public class Randomize
 {
     // ロック対象は差し替えない専用オブジェクトにする。

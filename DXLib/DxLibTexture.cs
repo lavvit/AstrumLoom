@@ -3,6 +3,7 @@ using static AstrumLoom.LayoutUtil;
 using static DxLibDLL.DX;
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでのテクスチャ実装。ロード/破棄はAsyncLoadableBase経由でメインスレッドに委ねる。</summary>
 internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
 {
     public string Path { get; private set; } = "";
@@ -10,6 +11,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     public int Width { get; private set; } = 0;
     public int Height { get; private set; } = 0;
 
+    /// <summary>既に作成済みのDxLibグラフィックハンドル（MakeScreen等）をそのままラップするコンストラクタ。DxLibPlatform.CreateTextureのレンダーターゲット用途で使う。</summary>
     public DxLibTexture(int handle)
     {
         // サイズ取得
@@ -29,6 +31,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         // （DxLibPlatform.CreateTexture はメインスレッド以外からの呼び出しを事前に弾いているので安全）。
         LoadAsync(this);
     }
+    /// <summary>ファイルパスからテクスチャをロードするコンストラクタ。</summary>
     public DxLibTexture(string path)
     {
         Path = path;
@@ -43,6 +46,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         DisposeAsync(DisposeTx);
         GC.SuppressFinalize(this);
     }
+    /// <summary>実際にDeleteGraphを叩く破棄処理本体。メインスレッド以外から来た場合は自分自身をAstrumCore.RequestDisposeへ積み直す。</summary>
     private bool DisposeTx()
     {
         if (IsMainThread)
@@ -70,6 +74,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     // Dispose() → DisposeAsync が Host.cs の「_obj == null なら即 return」ガードに引っかかって
     // DisposeTx が一度も呼ばれない＝DeleteGraph に到達せずハンドルが解放されない。
     public void Load() => LoadAsync(this, LoadTx);
+    /// <summary>LoadGraphでテクスチャをロードし、サイズを取得する。非同期ロード中ならState_Loadingのまま返す。</summary>
     private bool LoadTx()
     {
         bool file = FileCheck(Path);
@@ -107,6 +112,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;
 
+    /// <summary>非同期ロード完了の確認と、まだ取れていなかったサイズの遅延取得を行う。毎フレーム呼ばれる想定。</summary>
     public void Pump()
     {
         PumpAsync();
@@ -133,6 +139,12 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     }
     #endregion
 
+    /// <summary>
+    /// DrawOptionsをDxLibのDrawRotaGraph3F/DrawRectRotaGraph3Fの引数へ変換して描画する。
+    /// DxLibの回転描画APIは回転中心を「原点からの相対座標」で受け取るため、ReferencePointをPoint()で
+    /// 座標へ変換したうえで絶対値化している。RectangleがあればDrawRectRotaGraph3F（切り出し矩形指定）を、
+    /// なければ全体を描くDrawRotaGraph3Fを使う。角度はAngle(0.0〜1.0の周期)をラジアンへ変換して渡す。
+    /// </summary>
     public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
@@ -167,6 +179,7 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         }
         ResetOptions(use);
     }
+    /// <summary>ReferencePoint（基準点の種類）を、テクスチャ左上原点からの座標オフセットへ変換する。DxLibの回転中心APIに渡すための下準備。</summary>
     private Point Point(ReferencePoint point, Rect? rectangle = null)
     {
         if (!rectangle.HasValue) rectangle = new(0, 0, Width, Height);

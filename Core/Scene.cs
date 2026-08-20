@@ -109,6 +109,7 @@ return;
 
     public string Name => GetType().Name ?? "";
 
+    /// <summary>起動時に最初のシーンを設定する。Enableはまだ呼ばない（Startで別途呼ぶ）。</summary>
     public static void Set(Scene scene, Scene[]? child = null)
     {
         GC.Collect();
@@ -122,6 +123,7 @@ return;
         }
     }
     public static void Start() => NowScene.Enable();
+    /// <summary>現在のシーンから別のシーンへ切り替える（同一インスタンスへの「リスタート」も可）。</summary>
     public static void Change(Scene scene, Scene[]? child = null)
     {
         GC.Collect();

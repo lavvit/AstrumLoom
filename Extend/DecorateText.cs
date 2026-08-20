@@ -1,7 +1,13 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// IFont.Draw を拡張し、グラデーション塗り・テクスチャ塗りなど装飾つきのテキスト描画をまとめて呼び分ける。
+/// </summary>
 public static class DecorateText
 {
+    /// <summary>
+    /// <paramref name="option"/> の内容（グラデーション／テクスチャ／通常）に応じて、対応する描画メソッドへ振り分けます。
+    /// </summary>
     public static void Draw(this IFont font,
         double x, double y,
         object? text, DecorateOption? option,
@@ -45,6 +51,9 @@ public static class DecorateText
         }
     }
 
+    /// <summary>
+    /// グラデーション塗りでテキストを描画する簡易ショートカット。font が null の場合は既定フォントを使う。
+    /// </summary>
     public static void DrawGradient(this IFont? font,
         double x, double y,
         object? text, Gradation gradation,
@@ -54,6 +63,9 @@ public static class DecorateText
         => (font ?? Drawing.DefaultFont).Draw(x, y, text, new DecorateOption(gradation),
             point, edgecolor, blend, opacity);
 
+    /// <summary>
+    /// テキスト装飾の指定。グラデーションかテクスチャのどちらか一方を保持する（通常描画時はどちらも null）。
+    /// </summary>
     public class DecorateOption
     {
         public Gradation? Gradation { get; set; } = null;

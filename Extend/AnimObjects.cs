@@ -132,6 +132,9 @@ public class Object
 /// </summary>
 internal class GroupObject : Object
 {
+    /// <summary>
+    /// 元となる <see cref="Object"/> からフレーム・レイヤー情報を引き継いで生成します。
+    /// </summary>
     public GroupObject(Object Object)
     {
         StartFrame = Object.StartFrame;
@@ -170,6 +173,9 @@ internal class GroupObject : Object
 /// </summary>
 internal class ImageObject : Object
 {
+    /// <summary>
+    /// 元となる <see cref="Object"/> からフレーム・レイヤー情報を引き継いで生成します。
+    /// </summary>
     public ImageObject(Object Object)
     {
         StartFrame = Object.StartFrame;
@@ -218,6 +224,9 @@ internal class ImageObject : Object
     /// </summary>
     public bool IsAffectUpperGroup { get; set; }
 
+    /// <summary>
+    /// 指定座標・スケールを基準に、Transfrom の内容を反映して画像を描画します。
+    /// </summary>
     public void Draw(float x, float y, float scale)
     {
         if (Texture == null) return;
@@ -228,6 +237,7 @@ internal class ImageObject : Object
         Texture.Draw(x + Transfrom.Position.X * scale, y + Transfrom.Position.Y * scale);
     }
 
+    /// <summary>浅いコピーを作成します（Texture などの参照は共有されます）。</summary>
     public ImageObject Clone() => (ImageObject)this.MemberwiseClone();
 }
 
@@ -331,6 +341,7 @@ internal class SoundObject : Object
         }
     }
 
+    /// <summary>浅いコピーを作成します（Sound などの参照は共有されます）。</summary>
     public SoundObject Clone() => (SoundObject)this.MemberwiseClone();
 }
 
@@ -342,9 +353,11 @@ internal class SoundObject : Object
 /// </summary>
 public class Filter
 {
+    /// <summary>このフィルターが表す効果の種類。</summary>
     public FilterType FilterType { get; set; }
 }
 
+/// <summary>フィルターが表す効果の種類。</summary>
 public enum FilterType
 {
     None,
@@ -370,7 +383,9 @@ internal class OpacityFilter : Filter
 /// </summary>
 public class ReverseFilter : Filter
 {
+    /// <summary>X方向に反転するか</summary>
     public bool ReverseX { get; set; }
+    /// <summary>Y方向に反転するか</summary>
     public bool ReverseY { get; set; }
 }
 
@@ -391,10 +406,14 @@ internal class RotationFilter : Filter
 /// </summary>
 internal class ScaleFilter : Filter
 {
+    /// <summary>開始時点の基準拡大率</summary>
     public float StartBaseScale { get; set; }
+    /// <summary>終了時点の基準拡大率</summary>
     public float EndBaseScale { get; set; }
 
+    /// <summary>開始時点の縦横個別拡大率</summary>
     public SizeVector StartScale { get; set; } = new(1.0f, 1.0f);
+    /// <summary>終了時点の縦横個別拡大率</summary>
     public SizeVector EndScale { get; set; } = new(1.0f, 1.0f);
 }
 
@@ -420,17 +439,26 @@ internal class SoundFilter : Filter
 }
 #endregion
 #region Easing
+/// <summary>
+/// UfEasing の列挙値を実際の補間係数へ変換するユーティリティ。
+/// </summary>
 public class AnimationEasing
 {
+    /// <summary>
+    /// 進行度 <paramref name="t"/>（0〜1）を、指定イージングで補間した値に変換します。
+    /// </summary>
     public static float Get(UfEasing easing, float t)
     {
         if (easing == UfEasing.Linear) return t;
 
+        // UfEasing の並び（4個ごとにIn/Out/InOut/OutInの1セット）から
+        // 対応する EEasing 種別と EInOut 方向を逆算する
         var ease = (EEasing)(((int)easing + 2) / 4);
         var inout = (EInOut)(((int)easing + 2) % 4);
 
         return (int)inout <= 2
             ? (float)Easing.Ease(t, 1, 0, 1, ease, inout, 8)
+            // OutIn系は前半をOut・後半をInとして繋ぎ合わせる
             : t < 0.5
                 ? (float)Easing.Ease(t * 2, 1, 0, 1, ease, EInOut.Out, 8) / 2
                 : (float)Easing.Ease((t - 0.5) * 2, 1, 0, 1, ease, EInOut.In, 8) / 2 + 0.5f;

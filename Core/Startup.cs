@@ -356,6 +356,7 @@ public static class Startup
         return config;
     }
 
+    /// <summary>次のトークンがオプションの値ではなくフラグらしいか（負数は値として許容する）を判定する。</summary>
     private static bool IsFlagLike(string s)
         => s.Length > 1 && s[0] == '-' && !char.IsDigit(s[1]) && s[1] != '.';
 
@@ -397,6 +398,7 @@ public static class Startup
 /// WinExe から親のコンソールへ標準出力を戻すためのヘルパー。
 /// PowerShell から起動したときにログが見えるようになります。
 /// </summary>
+/// <summary>WinExe（コンソール非割り当て）アプリからでも、起動元の親コンソールに標準出力・標準エラーを繋ぎ直すためのヘルパー。</summary>
 public static class ConsoleBridge
 {
     private const int AttachParentProcess = -1;

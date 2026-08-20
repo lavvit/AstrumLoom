@@ -1,5 +1,10 @@
 ﻿namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IMovie の RayLib向け実装。動画再生は未実装の暫定スタブで、
+/// 実際の再生・デコードは一切行わず「常に再生不可・失敗状態」を返すのみ。
+/// FFmpeg 等を使った実装は後日差し替える想定。
+/// </summary>
 public class RayLibMovie : IMovie
 {
     public string Path { get; private set; } = "";

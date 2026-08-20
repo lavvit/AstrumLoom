@@ -4,15 +4,18 @@ using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでの複数ゲームパッド管理。接続/切断を毎フレーム検知してIJoyPadを出し入れする。</summary>
 internal class DxLibController : IController
 {
     public int Count => _joyPads.Count;
     public string[] List => [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")];
+    // DxLibのパッド番号は1始まりだが、IController.GetJoyPad の index は0始まりで受け取る前提のため+1する。
     public IJoyPad? GetJoyPad(int index) => _joyPads.FirstOrDefault(p => p.Index == index + 1);
 
     private List<IJoyPad> _joyPads = [];
     private readonly object _lock = new();
 
+    /// <summary>接続中のパッドを検出し、_joyPadsを実際の接続状況に同期させる。DateTime.Now.Millisecond&lt;100の判定で毎フレームではなく間欠的にReSetupJoypad（デバイス再列挙）を行う。</summary>
     public void SetController()
     {
         // 接続されているコントローラーを取得
@@ -59,6 +62,7 @@ internal class DxLibController : IController
         }
     }
 }
+/// <summary>DxLibバックエンドでの1台分のゲームパッド実装。ButtonはPush/Hold/Left相当の状態遷移(1押下開始/2保持/-1離鍵/0非押下)を持つ。</summary>
 internal class DxLibPad : IJoyPad
 {
     public int Index { get; }
@@ -79,6 +83,7 @@ internal class DxLibPad : IJoyPad
         Type = GetControllerType();
     }
 
+    /// <summary>DxLibのビットマスク/アナログ値を読み出し、_pressed/_axisへ生値として書き込む。実際の状態遷移計算はUpdateで行う。</summary>
     public void Buffer()
     {
         if (_pressed.Length != Button.Length)
@@ -98,10 +103,12 @@ internal class DxLibPad : IJoyPad
         GetJoypadXInputState(Index, out var xinput);
         _axis[4] = xinput.LeftTrigger / 255.0f;
         _axis[5] = xinput.RightTrigger / 255.0f;
+        // トリガーもボタンの1つとして扱えるよう、一定量踏み込んだらButtonビットにも反映する
         _pressed[14] |= _axis[4] > 0.1f;
         _pressed[15] |= _axis[5] > 0.1f;
     }
 
+    /// <summary>Bufferで取得した生の押下状態からButton配列を1(押下開始)/2(保持)/-1(離鍵)/0(非押下)の状態遷移に変換する。</summary>
     public void Update()
     {
         for (int i = 0; i < Button.Length; i++)
@@ -132,6 +139,7 @@ internal class DxLibPad : IJoyPad
     public bool IsReleased(int buttonIndex) => Button[buttonIndex] < 0;
     public int? NowPushedButton() => Button.ToList().FindIndex(b => b > 0) is int idx and >= 0 ? idx : null;
 
+    /// <summary>左右モーターの強さを計算するが、DxLibのStartJoypadVibrationは左右独立制御を持たないため、結局strengthのみを使い左右差(pan)は反映されていない。</summary>
     public void Vibrate(float pan, float strength, float length)
     {
         float leftMotor = strength * (pan <= 0 ? 1.0f : 1.0f - pan);
@@ -148,6 +156,7 @@ internal class DxLibPad : IJoyPad
         return (str.ToString(), prd.ToString());
     }
 
+    /// <summary>デバイス名の文字列から簡易的にメーカー種別を推測する（DxLib自体はコントローラ種別を直接教えてくれないため）。</summary>
     private ControllerType GetControllerType()
     {
         string name = Name;

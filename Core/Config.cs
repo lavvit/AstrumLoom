@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>
+/// ゲーム起動時に AstrumCore.Boot へ渡す設定一式。ウィンドウ・タイミング・リソース・デバッグ関連の
+/// 既定値をまとめて持つ。ここに無い項目は各ゲーム側で個別に扱う。
+/// </summary>
 public sealed class GameConfig
 {
     // --- Window ---

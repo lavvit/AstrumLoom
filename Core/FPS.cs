@@ -1,6 +1,7 @@
 ﻿namespace AstrumLoom;
 
 // MultiBeat.FPS の AstrumLoom 版
+/// <summary>直近区間のフレーム時刻列からFPS（平均・最大・最小）を求めるカウンタ。</summary>
 public sealed class FpsCounter
 {
     // Tick は更新スレッド、GetFPS/GetMaxFPS/GetMinFPS/ToString は描画スレッドから呼ばれうる
@@ -51,6 +52,7 @@ public sealed class FpsCounter
 
     public float Value => (float)NowValue;
 
+    /// <summary>直近rangeSeconds秒間の平均FPSを返す。データが足りない場合は0。</summary>
     public double GetFPS(double rangeSeconds = 1.0)
     {
         lock (_sync)
@@ -65,6 +67,7 @@ public sealed class FpsCounter
         }
     }
 
+    /// <summary>直近rangeSeconds秒間の最大FPSを返す。</summary>
     public double GetMaxFPS(double rangeSeconds = 1.0)
     {
         lock (_sync)
@@ -79,6 +82,7 @@ public sealed class FpsCounter
         }
     }
 
+    /// <summary>直近rangeSeconds秒間の最小FPSを返す。</summary>
     public double GetMinFPS(double rangeSeconds = 1.0)
     {
         lock (_sync)
@@ -94,10 +98,12 @@ public sealed class FpsCounter
     }
 }
 
+/// <summary>画面上にFPS表示を描くデバッグ用オーバーレイ。</summary>
 public class FPS
 {
     private static (float t, float draw, float update) _fpsHistory = (0, 0, 0);
     public static string GetFPSString() => $"FPS: {AstrumCore.NowFPS} / U: {AstrumCore.UpdateFPS.GetFPS():0.0}";
+    /// <summary>指定した基準点にFPSを描画する。表示値は毎フレーム更新せず60Hzに間引いてちらつきを抑える。</summary>
     public static void Draw(ReferencePoint point = ReferencePoint.TopLeft)
     {
         var platform = AstrumCore.Platform;

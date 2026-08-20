@@ -6,6 +6,12 @@ using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>
+/// DxLibバックエンドでのフォント実装。通常描画に加え、縁取り(_edgehandle)、行ごとに色を変える
+/// グラデーション描画(DrawGrad)、文字型抜きにテクスチャを貼るDrawTextureまでを提供する。
+/// グラデーション/テクスチャ描画は「白文字マスクをMakeScreenした一時画面に描いてから合成する」という
+/// 共通の手法を使っており、その一時画面は_screenCacheで使い回している。
+/// </summary>
 internal sealed class DxLibFont : IFont
 {
     public FontSpec Spec { get; }
@@ -16,6 +22,7 @@ internal sealed class DxLibFont : IFont
     private const int _defaulttype = DX_FONTTYPE_ANTIALIASING_8X8;
     private int _edgeThickness = 0;
     private int _spacing = 0;
+    /// <summary>フォント名/ファイルパスからCreateFontToHandleでフォントハンドルを作る。Edge&gt;0のときは縁取り専用のフォントハンドルも別途作成する。</summary>
     public DxLibFont(FontSpec spec)
     {
         Spec = spec;
@@ -43,6 +50,7 @@ internal sealed class DxLibFont : IFont
         }
     }
 
+    /// <summary>フォントが未初期化ならDrawing.DefaultTextSizeにフォールバックし、そうでなければDxLibのGetDrawStringSizeToHandleで実測する。</summary>
     public (int width, int height) Measure(string text)
     {
         if (!Enable)
@@ -54,6 +62,11 @@ internal sealed class DxLibFont : IFont
         return (w, h);
     }
 
+    /// <summary>
+    /// 通常のテキスト描画。縁取りハンドルがあれば先に1行ずつ縁取りを描いてから(SetFontOnlyDrawType(2))、
+    /// 本体のフォントで文字を描く(SetFontOnlyDrawType(0))。改行を含むテキストは行ごとの高さを均等割りして
+    /// 個別にDrawStringToHandleへ渡している（DxLibのDrawStringToHandleは複数行を一括では扱いにくいため）。
+    /// </summary>
     public void Draw(double x, double y, string text, DrawOptions options)
     {
         if (!Enable)
@@ -101,6 +114,7 @@ internal sealed class DxLibFont : IFont
         DrawStringToHandle(drawX, drawY, text, c, _handle);
         //ResetOptions(options);
     }
+    /// <summary>縁取りのみを描画する（本体文字は描かない）。DrawGrad/DrawTextureが本体を別手法で合成する前に縁取りだけ先出しするために使う。</summary>
     public void DrawEdge(double x, double y, string text, DrawOptions options)
     {
         if (!Enable || _edgehandle < 0)
@@ -135,6 +149,7 @@ internal sealed class DxLibFont : IFont
         ResetOptions(options);
     }
 
+    /// <summary>フォントハンドルと縁取りハンドルを解放し、DrawGrad/DrawTexture用に貯めていた_screenCacheの一時画面も全て解放する。</summary>
     public void Dispose()
     {
         if (_handle != -1)
@@ -170,6 +185,7 @@ internal sealed class DxLibFont : IFont
     // 5. 例外はキャッチして既定フォント名を返す。
     // メモ: SkiaSharp を参照していることが前提。SKTypeface を使うので using SkiaSharp; がプロジェクトに必要。
 
+    /// <summary>fontがファイルパスならDxLibへAddFontFileで登録しつつSkiaSharpでファミリー名を解決し、そうでなければフォント名としてそのまま返す。</summary>
     private static string GetFont(string? font)
     {
         string name = GetFontName() ?? "";
@@ -210,6 +226,11 @@ internal sealed class DxLibFont : IFont
     }
 
     #region Gradation Text
+    /// <summary>
+    /// 行方向にグラデーションがかかった文字を描画する。DxLibのDrawStringToHandleは単色描画しかできないため、
+    /// (1)白文字マスクを一時画面に描き、(2)そのマスクを1行ずつSetDrawBrightで色を変えながらDrawRectGraphで
+    /// 画面へ転写する、という手順で疑似的にグラデーションを実現している。
+    /// </summary>
     public void DrawGrad(double x, double y, string text, Gradation gradation, DrawOptions options)
     {
         if (!Enable)
@@ -283,6 +304,7 @@ internal sealed class DxLibFont : IFont
         ReleaseScreen(mask, w, h);
         ResetOptions(options);
     }
+    /// <summary>同サイズの一時画面(MakeScreen)を_screenCacheから再利用して取得する。無ければ新規作成する。DrawGrad/DrawTextureで毎回MakeScreenするコストを避けるためのキャッシュ。</summary>
     private int AcquireScreen(int width, int height)
     {
         lock (_screenLock)
@@ -303,6 +325,7 @@ internal sealed class DxLibFont : IFont
         return h;
     }
 
+    /// <summary>一時画面を_screenCacheへ返却する。キャッシュが上限(MaxScreenCache)に達していれば代わりに即DeleteGraphで解放する。</summary>
     private void ReleaseScreen(int handle, int width, int height)
     {
         if (handle <= 0) return;
@@ -340,6 +363,11 @@ internal sealed class DxLibFont : IFont
     #endregion
 
     #region Texture Text
+    /// <summary>
+    /// 文字の形にテクスチャを貼り付けて描画する。手順は (1)白文字マスク、(2)テクスチャを敷き詰めた画面、
+    /// (3)GraphBlendBltでRGBをテクスチャ側・AlphaをマスクのRから合成した画面、の3枚の一時画面(AcquireScreen)を
+    /// 作ってから最終結果だけをDrawGraphで転写する。DrawGradと似た手法だがアルファ合成(GraphBlendBlt)を挟む点が異なる。
+    /// </summary>
     public void DrawTexture(double x, double y, string text, ITexture[] texture, DrawOptions options)
     {
         if (!Enable)

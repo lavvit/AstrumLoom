@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>接続中のゲームコントローラ全体を管理するプラットフォーム実装のインターフェース。</summary>
 public interface IController
 {
     int Count { get; }
@@ -10,6 +11,7 @@ public interface IController
     void Buffer();
 }
 
+/// <summary>1台分のゲームパッド。ボタン/トリガー/スティックの状態取得と振動出力を提供する。</summary>
 public interface IJoyPad
 {
     int Index { get; }
@@ -32,6 +34,7 @@ public interface IJoyPad
 
     void Vibrate(float pan, float strength, float length);
 }
+/// <summary>アナログスティックの入力値。DeadZoneはこのスティック固有の不感帯設定。</summary>
 public struct StickState
 {
     public float X;
@@ -47,6 +50,7 @@ public enum ControllerType
     Generic
 }
 
+/// <summary>ゲームパッド入力へのstaticアクセス窓口。</summary>
 public class Pad
 {
     public static IController ControllerInstance => AstrumCore.Platform.Controller;

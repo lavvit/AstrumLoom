@@ -91,6 +91,7 @@ public static class Snapshot
         return Path.Combine(dir, file);
     }
 
+    /// <summary>ファイル名に使えない文字と空白をアンダースコアに置き換えます。</summary>
     private static string Sanitize(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "";

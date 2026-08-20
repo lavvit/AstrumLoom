@@ -16,8 +16,11 @@ public static class DebugSession
     public static bool Automated { get; private set; }
 
     private static bool _initialized;
+    /// <summary>RequestQuit に渡された理由。終了ログ・自動化モードのコンソール出力に使う。</summary>
     private static string _quitReason = "";
+    /// <summary>二重に終了処理が走らないようにするフラグ。</summary>
     private static bool _quitRequested;
+    /// <summary>--quit-after-sec 判定用の累積経過秒。</summary>
     private static float _elapsed;
 
     /// <summary>ブート時に 1 回だけ呼びます。</summary>

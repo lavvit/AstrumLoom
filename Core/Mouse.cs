@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>プラットフォームが実装するマウス入力の最小インターフェース。Mouseクラスがこれをラップする。</summary>
 public interface IMouse
 {
     /// <summary>マウスのX座標を取得します。</summary>
@@ -25,6 +26,7 @@ public interface IMouse
 public enum MouseState { None, Pressed, Held, Released }
 public enum MouseButton { Left, Right, Middle }
 
+/// <summary>マウス入力へのstaticアクセスと、演出用の拡張カーソル描画(Draw)を提供する。</summary>
 public class Mouse
 {
     public static IMouse MouseInstance { get; set; } = null!;
@@ -35,6 +37,7 @@ public class Mouse
         MouseInstance.Init(visible);
     }
 
+    /// <summary>毎フレーム呼び、前フレームとの座標差からSpeed（移動速度）を更新する。</summary>
     public static void Update()
     {
         MouseInstance.Update();

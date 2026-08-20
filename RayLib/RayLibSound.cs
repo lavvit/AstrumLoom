@@ -5,6 +5,11 @@ using static Raylib_cs.Raylib;
 using RSound = Raylib_cs.Sound;
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// ISound の raylib 実装。AsyncLoadableBase の非同期ロード基盤に乗り、ファイル読み込みはバックグラウンドスレッドで
+/// バイト列だけ取得し、実際の Sound/Music オブジェクト生成はメインスレッドの Pump() で行う。
+/// streaming=true のときは Music（ストリーム再生）を、false のときは Sfx（単発再生）を主に使う。
+/// </summary>
 public class RayLibSound : AsyncLoadableBase, ISound
 {
     public string Path { get; private set; } = "";
@@ -27,6 +32,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
         DisposeAsync(DisposeSfx);
         GC.SuppressFinalize(this);
     }
+    /// <summary>Sfx/Musicのネイティブリソースを解放する。メインスレッド以外から呼ばれた場合はAstrumCoreにメインスレッドでの破棄を依頼する。</summary>
     public bool DisposeSfx()
     {
         if (!Raylib.IsWindowReady())
@@ -59,8 +65,10 @@ public class RayLibSound : AsyncLoadableBase, ISound
     private bool _streamloaded => Music.FrameCount > 0;
 
     #region 読み込み
+    /// <summary>非同期ロードを開始する。メインスレッドならLoadSfxを即実行、そうでなければLoadBackGroundでバイト列だけ先に読んでおく。</summary>
     public void Load(bool streaming = true)
         => LoadAsync(this, () => LoadSfx(streaming), () => LoadBackGround(streaming));
+    /// <summary>メインスレッドから直接パスを読み込む経路。Sfx/Musicの両方をraylib APIで生成し、streaming=falseならMusicは即解放する。</summary>
     private bool LoadSfx(bool streaming)
     {
         bool file = FileCheck(Path);
@@ -88,6 +96,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
         }
         return true;
     }
+    /// <summary>バックグラウンドスレッドから呼ばれる経路。raylibのネイティブAPIはメインスレッド専用なので、ここではファイルをバイト列として読むだけに留める。</summary>
     private bool LoadBackGround(bool streaming)
     {
         try
@@ -110,6 +119,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;
 
+    /// <summary>毎フレーム呼び出す。バックグラウンドで読み込んだバイト列が届いていれば、ここでSound/Musicへ変換して読み込みを完了させる。</summary>
     public void Pump()
     {
         PumpAsync();
@@ -157,6 +167,10 @@ public class RayLibSound : AsyncLoadableBase, ISound
     private float _volume = 1.0f;
     private float _pan = 0.0f;
     private float _speed = 1.0f;
+    /// <summary>
+    /// 毎フレーム呼び出す。ストリーム再生（Music）ならraylibのUpdateMusicStreamを回して再生時間を取得し、
+    /// 単発再生（Sfx）にはraylib側に再生時間APIが無いため、経過時間を自前で積算して代用する。
+    /// </summary>
     public void Update()
     {
         Pump();
@@ -201,7 +215,10 @@ public class RayLibSound : AsyncLoadableBase, ISound
                     _time += GetFrameTime() * 1000.0;
                     if (Length > 0 && _time > Length) _time = Length;
                 }
-                _streaming = false;
+                else
+                {
+                    _streaming = false;
+                }
             }
         }
         else
@@ -270,6 +287,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
     public bool Loop { get; set; } = false;
     #endregion
 
+    /// <summary>再生位置を先頭に戻して再生を開始します。ストリーム/単発のどちらを使うかは読み込み方式に応じて自動選択されます。</summary>
     public void Play()
     {
         if (!Enable) return;
@@ -284,6 +302,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
         }
         _played = true;
     }
+    /// <summary>再生を停止し、再生位置・状態をリセットします。</summary>
     public void Stop()
     {
         if (!Enable) return;
@@ -300,6 +319,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
         _streaming = false;
         _time = 0;
     }
+    /// <summary>再生済みならストリーム更新のみ行い、未再生ならPlay()から開始します（BGMループ等の毎フレーム呼び出し向け）。</summary>
     public void PlayStream()
     {
         if (!Enable) return;

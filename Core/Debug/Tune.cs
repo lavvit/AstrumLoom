@@ -151,6 +151,7 @@ public static class Tune
         }
     }
 
+    /// <summary>tuning ファイルの行を key=value / key:value 形式でパースします。# ; は行コメント、引用符で囲めば # ; も値に含められます。</summary>
     private static Dictionary<string, string> Parse(IEnumerable<string> lines)
     {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

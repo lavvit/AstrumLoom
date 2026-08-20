@@ -42,12 +42,16 @@ public static class DebugControl
     /// <summary>スロー倍率の巡回順。</summary>
     private static readonly int[] SlowSteps = [1, 2, 4, 8];
 
+    /// <summary>更新を止めます。</summary>
     public static void Pause() => Paused = true;
+    /// <summary>更新を再開し、コマ送り要求も取り消します。</summary>
     public static void Resume() { Paused = false; _stepRequested = false; }
+    /// <summary>一時停止のオン/オフを切り替えます。再開時はコマ送り要求も取り消します。</summary>
     public static void TogglePause() { Paused = !Paused; if (!Paused) _stepRequested = false; }
     /// <summary>一時停止中に 1 フレームだけ進めます。停止していなければ停止させます。</summary>
     public static void Step() { Paused = true; _stepRequested = true; }
 
+    /// <summary>スロー倍率を設定します。切り替え時にカウンタをリセットしないと、直前の間引き状態を引きずってしまう。</summary>
     public static void SetSlow(int factor)
     {
         SlowFactor = Math.Max(1, factor);

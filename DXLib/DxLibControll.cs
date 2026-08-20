@@ -2,6 +2,7 @@
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでのマウス入力実装。IMouseを実装し、DxLibのグローバル関数群をラップする。</summary>
 public class DxLibMouse : IMouse
 {
     public double X { get => _x; set { _x = (int)value; SetPoint(); } }
@@ -40,6 +41,7 @@ public class DxLibMouse : IMouse
         }
         else
         {
+            // 現状はマージ無効時と同じ加算処理（上のif分岐は将来のタイムスタンプ統合用の余地）
             _curWheel = _prevWheel + wheelDelta;
         }
         WheelTotal = _curWheel;
@@ -56,6 +58,7 @@ public class DxLibMouse : IMouse
     private static int _prevMask, _curMask;
     private static float _prevWheel, _curWheel;
 
+    /// <summary>前フレームと今フレームのビットマスクを比較して、ボタンごとのPressed/Held/Released/Noneを判定する。</summary>
     private static MouseState GetMouseState(MouseButton button)
     {
         int bit = button switch

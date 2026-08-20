@@ -1,11 +1,19 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// Skin が読み込んだ Sound 群を、拡張再生機能を持つ <see cref="SoundExtend"/> として二重に読み込み直す橋渡しクラス。
+/// Skin.Sounds のパスをそのまま使うので、Skin 側の読み込みが完了している前提で Inport を呼ぶ。
+/// </summary>
 public class SkinExtend
 {
     public static Dictionary<string, SoundExtend> ExSounds = [];
 
     private static bool _loading = false;
     private static Queue<string> InportQue = [];
+    /// <summary>
+    /// Skin.Sounds の内容を ExSounds へ取り込みます。<paramref name="inque"/> なら即座に生成せず
+    /// InportQue に積み、<see cref="ReadQueue"/> で少しずつ処理します。
+    /// </summary>
     public static void Inport(bool inque = false)
     {
         if (_loading || Loaded)
@@ -25,9 +33,14 @@ public class SkinExtend
             }
         }
     }
+    /// <summary>取り込み完了フラグを立てます。</summary>
     public static void FinishInport() => Loaded = true;
     public static bool Loaded { get; private set; } = false;
     public static int QueueCount => InportQue.Count;
+    /// <summary>
+    /// 取り込みキューから最大 <paramref name="count"/> 件を実体化し、未読み込みのサウンドを Pump します。
+    /// 全て読み込み完了かつキューが空になったら自動的に FinishInport します。
+    /// </summary>
     public static void ReadQueue(int count = 1)
     {
         if (Loaded) return;
@@ -51,6 +64,7 @@ public class SkinExtend
         if (SoundLoaded() && InportQue.Count == 0)
             FinishInport();
     }
+    /// <summary>指定キーが未登録なら、対応する Skin.Sound のループ設定を引き継いで SoundExtend を生成します。</summary>
     public static void AddSound(string key, string path)
     {
         if (ExSounds.ContainsKey(key))
@@ -59,6 +73,7 @@ public class SkinExtend
         var sound = new SoundExtend(path, s?.Loop ?? false, true);
         ExSounds.Add(key, sound);
     }
+    /// <summary>Skin.Sounds と同じ件数取り込み済みで、かつ全て読み込み完了しているか。</summary>
     public static bool SoundLoaded()
     {
         if (ExSounds.Count < Skin.Sounds.Count)
@@ -72,6 +87,7 @@ public class SkinExtend
     }
 
     #region Sound
+    /// <summary>名前で SoundExtend を取得します。見つからない、または未読み込みなら null。</summary>
     public static SoundExtend? SoundExtend(string name, string? subname = null)
     {
         name = name.ToLower();

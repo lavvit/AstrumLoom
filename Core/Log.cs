@@ -2,6 +2,7 @@
 
 namespace AstrumLoom;
 
+/// <summary>アプリ全体のログ出力窓口。コンソール/Trace出力に加え、画面上への一定時間表示とファイル保存を提供する。</summary>
 public class Log
 {
     // LogMessages は更新スレッド・描画スレッド・バックグラウンドロードなど任意のスレッドから
@@ -153,6 +154,7 @@ public class Log
     private static int logCount(List<LogEntry> logs) => logs.Sum(l => l.Message.Split('\n').Length);
 }
 
+/// <summary>1件分のログ情報。表示用/保存用の文字列整形と、レベルに応じた表示色を持つ。</summary>
 public class LogEntry(string message, LogLevel level)
 {
     public DateTime Timestamp { get; set; } = DateTime.Now;

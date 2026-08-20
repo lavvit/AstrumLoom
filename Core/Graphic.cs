@@ -2,6 +2,7 @@
 
 namespace AstrumLoom;
 
+/// <summary>プラットフォーム（DxLib/raylib等）が実装する低レベル描画API。Drawing/GraphicsExtensionsはこれのラッパー。</summary>
 public interface IGraphics
 {
     Size Size { get; }
@@ -81,6 +82,7 @@ public enum ReferencePoint
     BottomRight,
 }
 
+/// <summary>描画1回分のオプションをまとめた値。全項目に既定値が入っているので必要な項目だけ初期化子で指定して使う。</summary>
 public struct DrawOptions
 {
     public DrawOptions() { }
@@ -103,6 +105,7 @@ public struct DrawOptions
     public IFont? Font { get; set; } = null;
     public Color? EdgeColor { get; set; } = null;
 
+    /// <summary>このDrawOptionsを基点に、DrawOption(null許容フィールドの差分)で指定された項目だけ上書きした結果を返す。</summary>
     public readonly DrawOptions Temp(DrawOption? option)
     {
         if (option == null) return this;
@@ -123,6 +126,7 @@ public struct DrawOptions
         return result;
     }
 }
+/// <summary>DrawOptionsに対する部分上書き用の差分。各項目がnullなら「変更しない」を意味する。</summary>
 public struct DrawOption
 {
     public DrawOption() { }
@@ -146,6 +150,7 @@ public struct DrawOption
     public Color? EdgeColor { get; set; } = null;
 }
 
+/// <summary>IGraphicsの各描画メソッドを、DrawOptionsを組み立てずに個別引数だけで呼べるようにする拡張メソッド群。</summary>
 public static class GraphicsExtensions
 {
     public static void Line(
@@ -269,8 +274,10 @@ public static class GraphicsExtensions
         object text)
         => g.MeasureText(text.ToString() ?? "", 16);
 }
+/// <summary>座標・サイズ・矩形の基本型（Point/Size/Rect）と、基準点(ReferencePoint)からのオフセット計算を提供する。</summary>
 public static class LayoutUtil
 {
+    /// <summary>幅w・高さhの矩形を基準点pointに合わせて左上原点に描くためのオフセットを返す。</summary>
     public static Point GetAnchorOffset(
         ReferencePoint point, double w, double h)
         => point switch
@@ -286,6 +293,7 @@ public static class LayoutUtil
             ReferencePoint.BottomRight => new Point(-w, -h),
             _ => new Point()
         };
+    /// <summary>2D座標。IDisposableを実装しているが実体はGC.SuppressFinalizeのみで、using式で値として扱うための互換用。</summary>
     public struct Point : IDisposable
     {
         public double X { get; set; }

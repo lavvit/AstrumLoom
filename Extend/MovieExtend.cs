@@ -4,6 +4,12 @@ using FFMpegCore;
 
 namespace AstrumLoom.Extend;
 
+/// <summary>
+/// FFmpeg（FFMpegCore）を使って動画ファイルを連番PNGフレーム＋WAV音声に事前展開し、
+/// IMovie として再生・描画できるようにするクラス。
+/// 音声トラックがあれば <see cref="SoundExtend"/> の再生時刻を基準にフレームを選ぶが、
+/// 音声が無い動画では内部の Stopwatch を時計代わりに使う。
+/// </summary>
 internal sealed class MovieExtend : IMovie, IDisposable
 {
     private const int TextureCacheLimit = 6;
@@ -30,6 +36,10 @@ internal sealed class MovieExtend : IMovie, IDisposable
     private volatile int _asyncState = -1; // -1=failed,0=loading,1=ready
     private bool _disposed;
 
+    /// <summary>
+    /// 動画ファイルのパスを受け取り、作業用一時ディレクトリを用意してフレーム抽出を非同期で開始します。
+    /// ファイルが存在しない場合は即座に失敗状態になります。
+    /// </summary>
     public MovieExtend(string path)
     {
         Path = path ?? throw new ArgumentNullException(nameof(path));
@@ -119,6 +129,9 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
+    /// <summary>
+    /// 再生を開始します。音声がある場合はサウンド側の再生に委ね、無い場合は Stopwatch を起点として時間を進めます。
+    /// </summary>
     public void Play()
     {
         if (!Enable) return;
@@ -128,6 +141,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         {
             if (!_sound.Enable)
             {
+                // サウンドの非同期ロードがまだなら一度 Pump して進める
                 _sound.Pump();
                 if (!_sound.Enable) return;
             }
@@ -152,6 +166,9 @@ internal sealed class MovieExtend : IMovie, IDisposable
 
     public void PlayStream() => Play();
 
+    /// <summary>
+    /// 毎フレーム呼び出し、再生時刻の更新・ループ／終端処理・準備タスクの監視を行います。
+    /// </summary>
     public void Pump()
     {
         if (_disposed) return;
@@ -167,6 +184,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         {
             if (_sound != null && _sound.Enable)
             {
+                // 音声があるときはサウンドの再生位置を正として同期する
                 _timeMs = _sound.Time;
             }
             else if (_clock.IsRunning)
@@ -204,6 +222,9 @@ internal sealed class MovieExtend : IMovie, IDisposable
         tex?.Draw(x, y, option);
     }
 
+    /// <summary>
+    /// キャッシュ済みテクスチャ・音声・準備タスクを破棄し、抽出したフレーム一式が入った作業ディレクトリを削除します。
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -238,6 +259,10 @@ internal sealed class MovieExtend : IMovie, IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// バックグラウンドで動画を解析し、フレーム・音声を抽出して再生可能状態にする。
+    /// キャンセルまたは失敗時は _asyncState を -1(失敗)にする。
+    /// </summary>
     private async Task PrepareAsync(CancellationToken token)
     {
         try
@@ -283,6 +308,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
+    /// <summary>FFmpeg で動画を連番PNG（RGBA・可変フレームレート維持）に書き出す。</summary>
     private async Task ExtractFramesAsync(CancellationToken token)
     {
         string pattern = System.IO.Path.Combine(_framesDir, "frame_%08d.png");
@@ -302,6 +328,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _frameFiles = files;
     }
 
+    /// <summary>FFmpeg で音声トラックを WAV（PCM16）に書き出し、SoundExtend として読み込む。</summary>
     private async Task ExtractAudioAsync(CancellationToken token)
     {
         _audioPath = System.IO.Path.Combine(_workDir, "audio.wav");
@@ -316,6 +343,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _sound = new SoundExtend(_audioPath, loop: Loop, prescan: true);
     }
 
+    /// <summary>抽出直後のサウンドに、これまで保持していた音量・パン・ピッチ・速度・ループ設定を反映する。</summary>
     private void ApplyAudioState()
     {
         if (_sound == null) return;
@@ -326,6 +354,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _sound.Loop = Loop;
     }
 
+    /// <summary>再生位置を指定ミリ秒へ移動する。音声があれば音声側もシークし、無ければ内部クロックの基準をずらす。</summary>
     private void Seek(double targetMs)
     {
         if (double.IsNaN(targetMs) || double.IsInfinity(targetMs)) return;
@@ -344,6 +373,9 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
+    /// <summary>
+    /// 現在の再生時刻に対応するフレームのテクスチャを取得する。LRUキャッシュに無ければ読み込んで追加する。
+    /// </summary>
     private ITexture? GetTextureForCurrentFrame()
     {
         if (_frameFiles.Count == 0) return null;
@@ -365,11 +397,12 @@ internal sealed class MovieExtend : IMovie, IDisposable
             texture.Pump();
             _textureCache[idx] = texture;
             _recentFrames.AddFirst(idx);
-            TrimCache();
+            TrimCache(); // キャッシュ上限を超えた分は古いものから破棄
             return texture;
         }
     }
 
+    /// <summary>現在時刻を _frameDurationMs で割ってフレーム番号に変換する（範囲外は端にクランプ）。</summary>
     private int GetFrameIndex()
     {
         if (_frameFiles.Count == 0 || _frameDurationMs <= 0) return 0;
@@ -380,6 +413,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         return idx;
     }
 
+    /// <summary>アクセスされたフレームをLRUリストの先頭（最も新しい）に移動する。</summary>
     private void TouchFrame(int idx)
     {
         var node = _recentFrames.Find(idx);
@@ -388,6 +422,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _recentFrames.AddFirst(node);
     }
 
+    /// <summary>キャッシュ件数が上限を超えている間、最も使われていないフレーム（リスト末尾）から破棄する。</summary>
     private void TrimCache()
     {
         while (_recentFrames.Count > TextureCacheLimit)
@@ -402,6 +437,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
+    /// <summary>準備タスクが例外で終わっていないかを確認し、その場合は失敗状態に反映する。</summary>
     private void MonitorPrepareTask()
     {
         var task = _prepareTask;
@@ -413,6 +449,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         }
     }
 
+    // AverageFrameRate → AvgFrameRate → FrameRate の順に有効な値を探す（フィールドによって未設定の場合があるため）
     private static double GetFrameRate(VideoStream? stream) => stream == null
             ? 0
             : stream.AverageFrameRate > 0

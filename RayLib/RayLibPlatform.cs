@@ -6,6 +6,10 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IGamePlatform の raylib 実装。ウィンドウ/オーディオデバイスの初期化、各サブシステム（Graphics/Input/Mouse/Controller等）の
+/// 生成、フレーム開始時のイベントポーリング、VSync・ドラッグ＆ドロップの切替、リソースのロードを一手に引き受ける。
+/// </summary>
 public sealed class RayLibPlatform : IGamePlatform
 {
     public GraphicsBackendKind BackendKind => GraphicsBackendKind.RayLib;
@@ -20,6 +24,7 @@ public sealed class RayLibPlatform : IGamePlatform
 
     public bool ShouldClose { get; private set; }
 
+    /// <summary>raylibウィンドウ/オーディオデバイスを初期化し、各サブシステムを構築します。</summary>
     public RayLibPlatform(GameConfig config)
     {
         InitWindow(config.Width, config.Height, config.Title);
@@ -54,6 +59,7 @@ public sealed class RayLibPlatform : IGamePlatform
         Controller = new RayLibController();
     }
 
+    /// <summary>毎フレーム冒頭で呼び出し、ウィンドウの閉じる要求を確認したうえでキー/パッドの生入力バッファを更新します。</summary>
     public void PollEvents()
     {
         if (ShouldClose) return;
@@ -93,6 +99,7 @@ public sealed class RayLibPlatform : IGamePlatform
     public IMovie LoadMovie(string path) =>
         new RayLibMovie(path);
 
+    /// <summary>Action(drawAction) を焼き込むレンダーターゲットとしてテクスチャを生成する。</summary>
     public ITexture CreateTexture(int width, int height, Action callback)
         => new RayLibTexture(width, height, callback);
 
@@ -102,6 +109,11 @@ public sealed class RayLibPlatform : IGamePlatform
     // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
     // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
     private readonly bool _multiThreadUpdate;
+    /// <summary>
+    /// VSyncのON/OFFを切り替える。有効化時はモニタのリフレッシュレートとTargetFpsの小さい方を採用し、
+    /// マルチスレッド更新構成のときだけUTime側にも同じ目標FPSを反映する（シングルスレッドだと同一ループ内で
+    /// Update/Drawが直列に待ってしまい実効FPSが半分になるため）。
+    /// </summary>
     public void SetVSync(bool enabled)
     {
         if (!_ready || VSync == enabled) return;
@@ -126,18 +138,21 @@ public sealed class RayLibPlatform : IGamePlatform
         }
     }
     private bool dragDrop = false;
+    /// <summary>ドラッグ＆ドロップの受付フラグを切り替える。実際のraylib側APIは常時有効なので、DropFilesの読み出しを許可/禁止するだけの内部フラグ。</summary>
     public void SetDragDrop(bool enabled)
     {
         if (!_ready || dragDrop == enabled) return;
         Log.Debug("Drag&Drop切替: " + enabled);
         dragDrop = enabled;
     }
+    /// <summary>ドラッグ＆ドロップが有効かつ今フレームでファイルがドロップされていれば、そのパス一覧を返す。</summary>
     public string[] DropFiles => dragDrop && IsFileDropped() ? GetDroppedFiles() : [];
 
     // ================================
     //  時間管理（DxLib版と同じノリ）
     // ================================
 
+    /// <summary>Stopwatchベースの ITime 実装。TargetFpsが正のときだけ EndFrame でフレーム末尾の余り時間をディレイして揃える。</summary>
     private sealed class SimpleTime : ITime
     {
         private readonly Stopwatch _sw = Stopwatch.StartNew();
@@ -151,6 +166,7 @@ public sealed class RayLibPlatform : IGamePlatform
         // バックエンドごとに変わる原因の一つになっていた。
         public float TargetFps { get; set; } = 0f;
 
+        /// <summary>フレーム冒頭で経過時間を測り、DeltaTime/CurrentFpsを更新する。初回呼び出しはDeltaTime=0とする。</summary>
         public void BeginFrame()
         {
             long now = _sw.ElapsedTicks;
@@ -170,6 +186,7 @@ public sealed class RayLibPlatform : IGamePlatform
             _lastTicks = now;
         }
 
+        /// <summary>目標FPSに対して余った時間だけ HiResDelay で待って、フレームレートを目標値に揃える。TargetFps<=0なら無制限で何もしない。</summary>
         public void EndFrame()
         {
             if (TargetFps <= 0) return;
@@ -187,6 +204,7 @@ public sealed class RayLibPlatform : IGamePlatform
             }
         }
 
+        /// <summary>Thread.Sleepだけでは精度が粗いため、大まかにSleepしたあとスピン待ちで仕上げる高精度ディレイ。</summary>
         private static class HiResDelay
         {
             // 目安: sub-ms の仕上げに

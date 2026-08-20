@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>プラットフォームが実装するサウンド1つ分の実体。Soundクラスがこれをラップする。</summary>
 public interface ISound : IResourse
 {
     int Length { get; }
@@ -18,6 +19,7 @@ public interface ISound : IResourse
 
     void PlayStream();
 }
+/// <summary>サウンドのラッパー。実体（ISound）がnull（未ロード）でも安全な既定値を返し、破棄はメインスレッドへ回す。</summary>
 public class Sound : IDisposable
 {
     private ISound? _sound { get; set; } = null;

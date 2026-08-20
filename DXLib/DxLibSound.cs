@@ -1,6 +1,7 @@
 ﻿using static DxLibDLL.DX;
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでのサウンド実装。ロード/破棄はAsyncLoadableBase経由でメインスレッドに委ねる。</summary>
 public class DxLibSound : AsyncLoadableBase, ISound
 {
     public string Path { get; private set; } = "";
@@ -22,6 +23,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
         DisposeAsync(DisposeSfx);
         GC.SuppressFinalize(this);
     }
+    /// <summary>実際にDeleteSoundMemを叩く破棄処理本体。メインスレッド以外から来た場合は自分自身をAstrumCore.RequestDisposeへ積み直す。</summary>
     private bool DisposeSfx()
     {
         if (IsMainThread)
@@ -48,6 +50,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
     // Dispose() → DisposeAsync が Host.cs の「_obj == null なら即 return」ガードに引っかかって
     // DisposeSfx が一度も呼ばれない＝DeleteSoundMem に到達せずハンドルが解放されない（DxLibTexture と同型の不具合）。
     public void Load() => LoadAsync(this, LoadSfx);
+    /// <summary>LoadSoundMemでサウンドをロードし、長さ・周波数を取得する。非同期ロード中ならState_Loadingのまま返す。</summary>
     private bool LoadSfx()
     {
         bool file = FileCheck(Path);
@@ -76,6 +79,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;
 
+    /// <summary>非同期ロード完了の確認と、まだ取れていなかった長さ・周波数の遅延取得を行う。毎フレーム呼ばれる想定。</summary>
     public void Pump()
     {
         PumpAsync();
@@ -110,6 +114,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
     private float _volume = 1.0f;
     private float _pan = 0.0f;
     private float _speed = 1.0f;
+    /// <summary>再生中フラグに応じて現在の再生位置・実効速度を同期し、ループ再生時は再生停止を検知して_playedをリセットする。</summary>
     public void Update()
     {
         Pump();
@@ -143,6 +148,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
             SetSoundCurrentTime(_time, Handle);
         }
     }
+    // Volume/Pan は 0.0〜1.0 / -1.0〜1.0 の正規化値を、DxLib API が要求する 0〜255 スケールへ変換する。
     public double Volume
     {
         get => _volume;
@@ -161,6 +167,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
             ChangePanSoundMem((int)(_pan * 255.0), Handle);
         }
     }
+    /// <summary>再生速度倍率。DxLibにはSpeed専用APIが無いため、周波数を一旦リセットしてから元の周波数×倍率で設定し直すことで実現している。</summary>
     public double Speed
     {
         get => _speed;
@@ -173,13 +180,14 @@ public class DxLibSound : AsyncLoadableBase, ISound
             SetFrequencySoundMem((int)(frequency * _speed), Handle);
         }
     }
+    /// <summary>再生周波数を取得する。GetFrequencySoundMemが0以下を返す場合は総サンプル数から概算する（フォールバック値は44100Hz）。</summary>
     private int GetFrequency()
     {
         int freq = GetFrequencySoundMem(Handle);
         if (freq > 0) return freq;
         long sample = GetSoundTotalSample(Handle);
-        long len = GetSoundTotalSample(Handle);
-        return sample > -1 ? (int)((double)sample / len) : 44100;
+        long timeMs = GetSoundTotalTime(Handle);
+        return sample > 0 && timeMs > 0 ? (int)(sample / (timeMs / 1000.0)) : 44100;
     }
     public double Pitch
     {
@@ -203,6 +211,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
         StopSoundMem(Handle);
         _played = false;
     }
+    /// <summary>まだ再生していなければPlayし、既に再生中ならUpdateで状態同期のみ行う（BGM等を毎フレーム呼んでも重複再生しないための入口）。</summary>
     public void PlayStream()
     {
         if (!Enable) return;

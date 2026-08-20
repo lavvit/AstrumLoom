@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>
+/// フォントを使わず、線分だけで文字を描く簡易ベクターフォント。ロード不要ですぐ使えるため、
+/// FPS表示など「フォント初期化前でも確実に出したい」文字列の描画に向く。
+/// </summary>
 public static class ShapeText
 {
     // Simple stroke-based vector glyphs (A-Z, 0-9) built from lines in a unit box (0..1)
@@ -8,6 +12,7 @@ public static class ShapeText
 
     private static Dictionary<char, (List<(double x1, double y1, double x2, double y2)> lines, bool closed)>
         Glyphs = [];
+    /// <summary>グリフ定義テーブルを構築する。Drawから初回呼び出し時に自動で呼ばれる。</summary>
     public static void SetGlyph()
     {
         Glyphs.Clear();
@@ -183,6 +188,7 @@ public static class ShapeText
         };
     }
 
+    /// <summary>指定位置からベクター文字列を描く。未定義の文字（記号等）は幅だけ消費して描画をスキップする。</summary>
     public static void Draw(double x, double y, string text,
         double size = 24,
         Color? color = null,

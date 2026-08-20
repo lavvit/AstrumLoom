@@ -9,14 +9,24 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IFont の raylib 実装。TTF/OTF/TTC を stb_truetype 経由で読み込み、日本語の常用コードポイントに
+/// 絞ったグリフアトラスを焼く。ふち取り・グラデーション・テクスチャ合成文字など通常のraylib APIには
+/// 無い描画を、オフスクリーンレンダーテクスチャを介して実現する。
+/// </summary>
 internal sealed class RayLibFont : IFont
 {
     public FontSpec Spec { get; }
     private readonly Font _font;
+    /// <summary>フォントの読み込みに成功しているか（失敗時は既定フォントへフォールバック済みでも false のまま）。</summary>
     public bool Enable => _font.Texture.Id > 0;
 
     private int _edgeThickness = 0;
     private int _spacing = 0;
+    /// <summary>
+    /// フォント指定からファイルを解決してグリフアトラスを焼きます。
+    /// パス解決や読み込みに失敗した場合は、その旨をログに残したうえで raylib の内蔵フォントにフォールバックします。
+    /// </summary>
     public RayLibFont(FontSpec spec)
     {
         Spec = spec;
@@ -28,7 +38,6 @@ internal sealed class RayLibFont : IFont
             _font = GetFontDefault();
             return;
         }
-        int thickness = spec.Thickness > 1 ? spec.Thickness : spec.Bold ? 4 : 1;
         _edgeThickness = spec.Edge;
         _spacing = spec.Spacing;
 
@@ -213,6 +222,7 @@ internal sealed class RayLibFont : IFont
         b[o] = (byte)(v >> 8); b[o + 1] = (byte)v;
     }
 
+    /// <summary>指定テキストをこのフォントで描画したときの幅・高さを計測します。</summary>
     public (int width, int height) Measure(string text)
     {
         var size = MeasureTextEx(_font, text, Spec.Size, 0);
@@ -231,6 +241,7 @@ internal sealed class RayLibFont : IFont
     new( sin45, -sin45),
     new(-sin45, -sin45),
 ];
+    /// <summary>テキストを描画します。EdgeThicknessが設定されていれば、本体の下に8方向へずらしたふちを先に描きます。</summary>
     public void Draw(double x, double y, string text, DrawOptions options)
     {
         if (!Enable)
@@ -282,6 +293,7 @@ internal sealed class RayLibFont : IFont
                    Spec.Size, spacing, c);
     }
 
+    /// <summary>ふちだけを単独で描画します（Draw()内から本体描画の前に呼ばれるほか、DrawGrad/DrawTextureからも共用されます）。</summary>
     public void DrawEdge(double x, double y, string text, DrawOptions options)
     {
         if (!Enable || _edgeThickness <= 0)
@@ -317,6 +329,7 @@ internal sealed class RayLibFont : IFont
         }
         ResetOptions(options);
     }
+    /// <summary>フォントアトラスと、キャッシュ済みのレンダーテクスチャ一式を解放します。</summary>
     public void Dispose()
     {
         UnloadFont(_font);
@@ -331,6 +344,7 @@ internal sealed class RayLibFont : IFont
         }
     }
 
+    /// <summary>フォント名/パス指定からフォントファイルの実パスを解決します（既存ファイルパスならそのまま、名前ならシステムフォント検索）。</summary>
     private static string GetFont(string? font, FontSpec spec)
     {
         if (string.IsNullOrEmpty(font)) return "";
@@ -427,6 +441,10 @@ internal sealed class RayLibFont : IFont
     private const uint MbErrInvalidChars = 0x00000008;
 
     #region Gradation Text
+    /// <summary>
+    /// 行ごとに色が変化するグラデーション文字を描画します。raylibには直接の機能が無いため、
+    /// 一旦白文字をオフスクリーンに焼いてマスクとして使い、行単位でグラデーション色を乗せて画面に転写します。
+    /// </summary>
     public void DrawGrad(double x, double y, string text, Gradation gradation, DrawOptions options)
     {
 
@@ -482,6 +500,7 @@ internal sealed class RayLibFont : IFont
     private readonly List<RenderTexture2D> _texcache = [];
     private readonly object _texcacheLock = new();
     private const int MaxTexCache = 16;
+    /// <summary>指定サイズのレンダーテクスチャをキャッシュから探し、無ければ新規作成して取得します。</summary>
     private RenderTexture2D AcquireRenderTexture(int width, int height)
     {
         lock (_texcacheLock)
@@ -509,6 +528,7 @@ internal sealed class RayLibFont : IFont
         // 見つからなければ新規作成
         return Raylib.LoadRenderTexture(width, height);
     }
+    /// <summary>使い終えたレンダーテクスチャをキャッシュへ返却します。キャッシュが上限に達していれば解放します。</summary>
     private void ReleaseRenderTexture(RenderTexture2D rtex)
     {
         if (rtex.Texture.Id == 0)
@@ -533,6 +553,10 @@ internal sealed class RayLibFont : IFont
     #endregion
 
     #region Texture Text
+    /// <summary>
+    /// 文字の形をマスクにして、指定テクスチャを乗算合成した「模様入り文字」を描画します。
+    /// 白文字をオフスクリーンに焼いた後、乗算ブレンドでテクスチャを重ねてからマスク済みの結果を画面へ転写します。
+    /// </summary>
     public void DrawTexture(double x, double y, string text, ITexture[] textures, DrawOptions options)
     {
         if (!Enable)

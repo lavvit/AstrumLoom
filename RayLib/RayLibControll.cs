@@ -2,20 +2,32 @@
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IMouse の raylib 実装。生の押下状態をそのまま返すのではなく、押下安定化（PressStabilityMs）と
+/// タップ移動許容量（TapMoveTolerance）を挟んでタッチパッド特有の微小なブレを吸収してからボタン状態を確定する。
+/// </summary>
 public class RayLibMouse : IMouse
 {
+    /// <summary>マウスX座標。setするとraylib側のカーソル位置も即座に移動させる。</summary>
     public double X { get => _x; set { _x = (int)value; SetPoint(); } }
+    /// <summary>マウスY座標。setするとraylib側のカーソル位置も即座に移動させる。</summary>
     public double Y { get => _y; set { _y = (int)value; SetPoint(); } }
     private void SetPoint() => SetMousePosition((int)X, (int)Y);
+    /// <summary>直近フレームでのホイール移動量（差分）。</summary>
     public double Wheel { get; private set; }
+    /// <summary>ホイール移動量の累積値。</summary>
     public double WheelTotal { get; private set; }
 
+    /// <summary>指定ボタンが押された瞬間かどうか。</summary>
     public bool Push(MouseButton button) => _state[(int)button] == MouseState.Pressed;
+    /// <summary>指定ボタンが押され続けているかどうか。</summary>
     public bool Hold(MouseButton button) => _state[(int)button] == MouseState.Held;
+    /// <summary>指定ボタンが離された瞬間かどうか。</summary>
     public bool Left(MouseButton button) => _state[(int)button] == MouseState.Released;
 
     private int _x, _y;
     private MouseState[] _state = new MouseState[3];
+    /// <summary>マウスカーソルの表示状態と内部状態を初期化します。</summary>
     public void Init(bool visible)
     {
         ShowCursor(); // Raylib は表示/非表示 API が逆（Hide/Show）
@@ -24,6 +36,9 @@ public class RayLibMouse : IMouse
         _prevWheel = _curWheel = 0;
         _downTickLeft = _downTickRight = _downTickMiddle = 0;
     }
+    /// <summary>
+    /// 毎フレーム呼び出し、raylibから生の入力を取得して安定化・ホイール差分・座標を更新します。
+    /// </summary>
     public void Update()
     {
         _prevMask = _curMask;
@@ -80,6 +95,7 @@ public class RayLibMouse : IMouse
         }
     }
 
+    /// <summary>前フレームと今フレームのビットマスクを比較し、Pressed/Held/Released/None を判定します。</summary>
     private static MouseState GetMouseState(MouseButton button)
     {
         int bit = button switch
@@ -109,6 +125,7 @@ public class RayLibMouse : IMouse
     private static System.Numerics.Vector2 _downPosLeft, _downPosRight, _downPosMiddle;
 
     // 押下/解放のエッジ検出 & 安定化
+    /// <summary>PressStabilityMs が経過するまでは押下と認めない安定化フィルタ。離した瞬間は即座に false を返す。</summary>
     private static bool IsStableDown(MouseButton button, bool rawDown, long now)
     {
         if (PressStabilityMs <= 0) return rawDown;
@@ -132,6 +149,7 @@ public class RayLibMouse : IMouse
         }
     }
 
+    /// <summary>押下開始時刻と座標を記録します（押しっぱなしの間は基準点を保持し続けるため上書きしない）。</summary>
     private static void RecordDown(MouseButton button, long now)
     {
         var pos = GetMousePosition();
@@ -149,6 +167,7 @@ public class RayLibMouse : IMouse
         }
     }
 
+    /// <summary>押下開始位置から TapMoveTolerance 以内に現在位置が収まっているかを判定します（ドラッグ誤爆防止）。</summary>
     private static bool WithinTolerance(MouseButton b)
     {
         if (TapMoveTolerance <= 0) return true;

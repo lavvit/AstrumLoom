@@ -2,6 +2,9 @@
 
 namespace AstrumLoom;
 
+/// <summary>
+/// IGame の既定実装。現在の Scene に Update/Draw/ドラッグ＆ドロップ通知を委譲するだけの薄いラッパー。
+/// </summary>
 internal class BaseProgram : IGame
 {
     private Scene _scene => Scene.NowScene;
@@ -290,6 +293,10 @@ public class AstrumCore
         => GameRunner.AddExtendAction(key, action, inEndStart);
 }
 
+/// <summary>
+/// 一定時間入力や更新が無いときにVSyncへ切り替えて省電力化する仕組み。
+/// アクティブ状態が続く限り WakeUp で最終起床時刻を更新し続け、それが途切れるとSleep状態に入る。
+/// </summary>
 public class Sleep
 {
     private static long SleepDuration => AstrumCore.WindowConfig.SleepDurationMs;
@@ -350,6 +357,7 @@ public class Sleep
     }
 }
 
+/// <summary>致命的エラー発生時のスナップショット。発生フェーズ・例外情報・整形済みスタックトレースを保持する。</summary>
 public sealed class FatalErrorInfo
 {
     public FatalErrorInfo(string phase, Exception exception)

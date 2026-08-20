@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// 連番画像ファイル（dir + prefix + index + ext）を読み込んでパラパラアニメとして再生するクラス。
+/// フレームは Skin のテクスチャキャッシュに登録され、キーのプレフィックスで自分のフレーム一覧を絞り込む。
+/// </summary>
 public class NumAnimation : IDisposable
 {
     public string Name = "";
@@ -39,9 +43,11 @@ public class NumAnimation : IDisposable
     public override string ToString() => $"Animation(Name={Name}, Count={Count}, Interval={Interval}, IsLoop={IsLoop}, IsPlaying={IsPlaying}, CurrentIndex={CurrentIndex})";
 
     private string _keyPrefix = "";
+    /// <summary>Skin のテクスチャキャッシュから、このアニメーションに属するフレームをキー順に集めたもの。</summary>
     public Texture[] Frames
         => [.. Skin.Textures.Where(kv => kv.Key.StartsWith($"{_keyPrefix}_")).OrderBy(kv => kv.Key).Select(kv => kv.Value)];
 
+    /// <summary>dir + prefix + 連番 + ext のファイルが何番まで存在するかを数えます。</summary>
     public static int GetCount(string dir, string prefix = "", string ext = ".png")
     {
         int num = 0;
@@ -52,6 +58,7 @@ public class NumAnimation : IDisposable
         return num;
     }
 
+    /// <summary>全フレームの読み込みが完了しているか。</summary>
     public bool Loaded
     {
         get
@@ -65,9 +72,11 @@ public class NumAnimation : IDisposable
         }
     }
 
+    /// <summary>フレームが1枚以上あり、かつ全て読み込み済みか。</summary>
     public bool Enable
         => Count > 0 && Loaded;
 
+    /// <summary>現在のフレームのサイズ（フレームが無ければ 0,0）。</summary>
     public (int Width, int Height) Size
         => Count > 0 ? (CurrentFrame?.Width ?? 0, CurrentFrame?.Height ?? 0) : (0, 0);
 
@@ -109,6 +118,7 @@ public class NumAnimation : IDisposable
         get => _counter.Interval; set => _counter.ChangeInterval(value);
     }
 
+    /// <summary>全フレームの非同期読み込みを進めます。</summary>
     public void Pump()
     {
         if (_disposed) return;
@@ -123,6 +133,7 @@ public class NumAnimation : IDisposable
     /// </summary>
     public long Update() => _disposed ? 0 : _counter.Tick();
 
+    /// <summary>指定インデックスのフレームテクスチャを取得します（範囲外や破棄済みなら null）。</summary>
     public Texture? GetFrame(int index) => _disposed ? null : index < 0 || index >= Count ? null :
         Skin.Texture($"{_keyPrefix}_{index}");
 
@@ -208,6 +219,7 @@ public class NumAnimation : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>描画基準点。設定すると全フレームに一括反映されます。</summary>
     public ReferencePoint Point
     {
         get => CurrentFrame?.Point ?? ReferencePoint.TopLeft;

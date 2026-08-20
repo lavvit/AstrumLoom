@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>
+/// バックエンド（DxLib/raylib等）が実装するプラットフォーム層の統合インターフェース。
+/// 描画・入力・時間・音・パッド等、フレームワークが必要とする全てのプラットフォーム依存機能をここに集約する。
+/// </summary>
 public interface IGamePlatform : IDisposable
 {
     GraphicsBackendKind BackendKind { get; }

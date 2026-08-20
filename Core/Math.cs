@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>整数論寄りの汎用ヘルパー（最大公約数・最小公倍数・素数判定）。</summary>
 public static class MathExtend
 {
     /// <summary>最大公約数を返します。</summary>
@@ -46,6 +47,7 @@ public static class MathExtend
         return m;
     }
 
+    /// <summary>試し割り法（6k±1最適化）で素数判定する。</summary>
     public static bool PrimeCheck(int n)
     {
         if (n <= 1) return false;
@@ -61,6 +63,7 @@ public static class MathExtend
 }
 
 // ---- 有理数表現 ----
+/// <summary>既約分数として保持する有理数。生成時に自動で約分し、分母は常に正になる。</summary>
 public readonly struct Rational : IDisposable
 {
     // 分子・分母は互いに素、分母は正
@@ -83,6 +86,7 @@ public readonly struct Rational : IDisposable
     }
 
     // 連分数で double → 分数近似
+    /// <summary>連分数展開で実数を分数に近似する。分母がmaxDenを超える手前、または誤差がepsを下回った時点の近似値を返す。</summary>
     public static Rational FromDouble(double x, int maxDen = 1_000_000, double eps = 1e-12)
     {
         if (double.IsNaN(x) || double.IsInfinity(x))
@@ -134,6 +138,10 @@ public readonly struct Rational : IDisposable
     public readonly void Dispose() => GC.SuppressFinalize(this);
 }
 
+/// <summary>
+/// イージング関数一式（Robert Pennerのイージング相当）。CounterやtとtotaltimeからEEasing種別・EInOut方向に応じた
+/// min〜maxの補間値を計算する。個々のQuad/Cubic/…メソッドはtype(0:In 1:Out 2:InOut)で計算式を切り替える。
+/// </summary>
 public class Easing
 {
     public static double Ease(Counter counter, double min = 0, double max = 1,
@@ -488,6 +496,10 @@ public enum EInOut
     OutIn
 }
 
+/// <summary>
+/// 桁あふれしやすい巨大な数を「仮数(1〜1000未満)×1000^Digit」の形で保持する、インクリメンタルゲーム向けの数値表現。
+/// K/M/B/T...のようなSI接頭辞的な表示を前提にしている。
+/// </summary>
 public readonly struct BigNum : IDisposable
 {
     public readonly double Mantissa; // [1,1000) に保つ

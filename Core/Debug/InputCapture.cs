@@ -6,14 +6,18 @@ namespace AstrumLoom;
 /// <summary>1 論理フレーム分の入力状態。記録・再生の最小単位。</summary>
 public readonly struct InputFrame
 {
+    /// <summary>この状態が有効になった論理フレーム番号。</summary>
     public required long Frame { get; init; }
+    /// <summary>そのフレームで押されているキーの集合。</summary>
     public required Key[] Keys { get; init; }
     public required double MouseX { get; init; }
     public required double MouseY { get; init; }
+    /// <summary>ホイールの累積回転量。差分ではなく総量を持つことで、記録の欠落フレームがあっても復元できる。</summary>
     public required double WheelTotal { get; init; }
     /// <summary>bit0=左 bit1=右 bit2=中。</summary>
     public required int Buttons { get; init; }
 
+    /// <summary>直前に記録した状態と同一かどうか。差分がなければ記録行を書かずに済ませる。</summary>
     public bool SameStateAs(in InputFrame other)
         => Buttons == other.Buttons
         && MouseX == other.MouseX
@@ -34,11 +38,13 @@ public static class VirtualInput
     /// <summary>合成入力を使っているか。</summary>
     public static bool Active { get; private set; }
 
+    /// <summary>キーを合成入力として押下状態にします。以後 Active が true になり、実入力より合成入力が優先されます。</summary>
     public static void Press(Key key)
     {
         if (key == Key.None) return;
         lock (_held) { _held.Add(key); Active = true; }
     }
+    /// <summary>合成入力のキーを解放します。</summary>
     public static void Release(Key key)
     {
         lock (_held) _held.Remove(key);
@@ -55,10 +61,12 @@ public static class VirtualInput
             Active = false;
         }
     }
+    /// <summary>キーが合成入力として押されているか。</summary>
     public static bool IsHeld(Key key)
     {
         lock (_held) return _held.Contains(key);
     }
+    /// <summary>合成入力中のキーを target に加えます。InputBridge.Update が実入力の押下集合に合成する用途。</summary>
     internal static void CopyInto(HashSet<Key> target)
     {
         lock (_held)
@@ -192,6 +200,7 @@ internal sealed class MouseBridge : IMouse
         }
     }
 
+    /// <summary>ボタン種別を Buttons のビットフラグに変換します。</summary>
     private static int Bit(MouseButton b) => b switch
     {
         MouseButton.Left => 1,
@@ -231,7 +240,9 @@ internal sealed class InputRecorder
         _lines.Add($"size {config.Width}x{config.Height}");
     }
 
+    /// <summary>今フレームの押下キー集合を記憶します。実際の書き込みは Commit まで遅延させます。</summary>
     internal void NoteKeys(IEnumerable<Key> keys) => _keys = [.. keys];
+    /// <summary>今フレームのマウス状態を記憶します。</summary>
     internal void NoteMouse(double x, double y, double wheelTotal, int buttons)
     {
         _mx = x; _my = y; _wheel = wheelTotal; _buttons = buttons;
@@ -435,6 +446,7 @@ internal static class InputCapture
         Player = null;
     }
 
+    /// <summary>InputFrame を記録ファイルの 1 行に整形します。</summary>
     internal static string FormatLine(in InputFrame f)
     {
         string keys = f.Keys.Length == 0 ? "-" : string.Join(',', f.Keys.Select(k => k.ToString()));
@@ -442,11 +454,12 @@ internal static class InputCapture
         return $"{f.Frame} {keys} {f.MouseX.ToString(ci)},{f.MouseY.ToString(ci)} {f.WheelTotal.ToString(ci)} {f.Buttons}";
     }
 
+    /// <summary>記録ファイルの 1 行を InputFrame に復元します。書式が壊れていれば false。</summary>
     internal static bool TryParseLine(string line, out InputFrame frame)
     {
         frame = default;
         string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 5) return false;
+        if (parts.Length < 5) return false; // frame keys pos wheel buttons の 5 トークン必須
         var ci = CultureInfo.InvariantCulture;
 
         if (!long.TryParse(parts[0], out long f)) return false;

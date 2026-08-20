@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// 毎フレームのテキスト描画をレンダーテクスチャ1枚にキャッシュし、テキストが変わったときだけ再描画するクラス。
+/// フォント描画は比較的重いため、同じ文字列を毎フレーム描く場合の負荷軽減に使う。
+/// </summary>
 public class TextSprite : IDisposable
 {
     public string Text { get; set; } = "";
@@ -52,6 +56,7 @@ public class TextSprite : IDisposable
         _dirty = true;
     }
 
+    /// <summary>表示テキストを変更します。内容が同じなら何もしません（キャッシュ再利用のため既存テクスチャは破棄して作り直す）。</summary>
     public void SetText(string text)
     {
         if (Text == text) return;
@@ -60,11 +65,13 @@ public class TextSprite : IDisposable
         _dirty = true;
     }
 
+    /// <summary>テキストを更新してから描画する簡易版。</summary>
     public void Draw(string text, double x, double y)
     {
         SetText(text);
         Draw(x, y);
     }
+    /// <summary>現在のテキストを描画します。内容が変わっていればレンダーテクスチャを再生成してから描画します。</summary>
     public void Draw(double x, double y)
     {
         UpdateTextureIfNeeded();
@@ -80,6 +87,9 @@ public class TextSprite : IDisposable
         _texture = null;
         GC.SuppressFinalize(this);
     }
+    /// <summary>
+    /// テキストの計測サイズが変わっていたら（初回含む）既存テクスチャを破棄し、次回描画時に再生成させます。
+    /// </summary>
     private void RecreateRenderTextureIfNeeded()
     {
         // テキストの想定サイズ
@@ -102,6 +112,7 @@ public class TextSprite : IDisposable
         }
     }
 
+    /// <summary>_dirty フラグが立っていれば、レンダーテクスチャへ実際にテキストを描き込んで確定させます。</summary>
     private void UpdateTextureIfNeeded()
     {
         if (!_dirty) return;
@@ -131,12 +142,18 @@ public class TextSprite : IDisposable
     public BlendMode Blend { get; set; } = BlendMode.None;
     public double Opacity { get; set; } = 1.0;
 }
+/// <summary>
+/// TextSprite をキー（テキスト・フォント・色/装飾）で自動キャッシュしながら、
+/// Drawing.Text 感覚の static メソッドで直接呼び出せるようにするラッパー。
+/// 使われなかったキャッシュは AddExtendAction 経由で毎フレーム終了後に自動破棄される。
+/// </summary>
 public static class TextSprites
 {
     // 直接動かすためのstaticメソッド
     #region キャッシュ管理
     private static Dictionary<string, TextSprite> _cache = [];
     private static Dictionary<string, bool> _used = [];
+    /// <summary>キーに対応する TextSprite をキャッシュから取得、無ければ生成します。使用済みマークも立てます。</summary>
     private static TextSprite Get(string text, IFont font, Color color)
     {
         string key = GetCacheKey(text, font, color);
@@ -161,6 +178,9 @@ public static class TextSprites
         AstrumCore.AddExtendAction($"TextSprite_CleanupCache", DisposeUnused, inEndStart: true);
         return sprite;
     }
+    /// <summary>
+    /// このフレームで使われなかった（_used が false の）キャッシュを破棄し、使用フラグを次フレーム用にリセットします。
+    /// </summary>
     private static void DisposeUnused()
     {
         string[] targetkeys = [.. _used.Where(u => !u.Value).Select(u => u.Key)];
@@ -182,6 +202,7 @@ public static class TextSprites
 
     public static void Draw(string text, double x, double y)
         => Draw(null, text, x, y, Color.White);
+    /// <summary>キャッシュされた TextSprite を使ってテキストを描画します（通常の単色描画版）。</summary>
     public static void Draw(IFont? font, object? text, double x, double y, Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft, Color? edgeColor = null, BlendMode blend = BlendMode.None, double opacity = 1)
     {
@@ -202,6 +223,7 @@ public static class TextSprites
         ReferencePoint point = ReferencePoint.TopLeft, Color? edgeColor = null,
         BlendMode blend = BlendMode.None, double opacity = 1)
         => DrawDeco(font, text, x, y, decorate, point, edgeColor, blend, opacity);
+    /// <summary>キャッシュされた TextSprite を使ってテキストを描画します（グラデーション／テクスチャ装飾版）。</summary>
     public static void DrawDeco(IFont? font, object? text, double x, double y, DecorateText.DecorateOption decorate,
         ReferencePoint point = ReferencePoint.TopLeft, Color? edgeColor = null,
         BlendMode blend = BlendMode.None, double opacity = 1)
@@ -219,6 +241,7 @@ public static class TextSprites
         sprite.Draw(x, y);
     }
 
+    /// <summary>テキスト・フォント・色からキャッシュキーを組み立てます。</summary>
     private static string GetCacheKey(string text, IFont font, Color color)
     {
         string fontKey = font.GetHashCode().ToString();

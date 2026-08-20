@@ -76,12 +76,17 @@ public class Number
         InitSize();
     }
 
+    /// <summary>テクスチャを解放し、パーツ情報をクリアします。</summary>
     public void Dispose()
     {
         Texture.Dispose();
         Nums = [];
     }
 
+    /// <summary>
+    /// テクスチャのサイズと文字リストから、各文字が画像上のどこにあるか（NumPart）を計算します。
+    /// Width/Height が未指定（0）ならテクスチャのサイズから自動算出します。
+    /// </summary>
     public void InitSize()
     {
         Width = Width > 0 ? Width : Texture.Width / _chars.Length;
@@ -94,6 +99,7 @@ public class Number
             Nums[i] = new NumPart(_chars[i], x, y, Width, Height);
             Nums[i].x += Width * StartX;
             Nums[i].y += Height * StartY;
+            // 1行に収まる文字数を超えたら次の行へ折り返す
             if (Nums[i].x + Width >= Width * (_chars.Length + StartX))
             {
                 x = 0;
@@ -104,6 +110,9 @@ public class Number
         ;
     }
 
+    /// <summary>
+    /// テクスチャの読み込みとサイズ計算が完了しているか。未完了ならここで InitSize を試みる。
+    /// </summary>
     public bool Loaded
     {
         get
@@ -220,18 +229,23 @@ public class Number
     public override string ToString() => $"{Path.GetFileName(Texture.Path)},{Width}*{Height},{Nums} ({Texture})";
 }
 
+/// <summary>
+/// 1文字分の数字パーツ情報。テクスチャ上での位置（グリッド座標×セルサイズ）と対応する文字を保持する。
+/// </summary>
 public struct NumPart
 {
     public char ch;
     public int x;
     public int y;
 
+    /// <summary>グリッド座標 (x,y) をセルサイズ (width,height) 倍してピクセル座標に変換して保持します。</summary>
     public NumPart(char ch, int x, int y, int width, int height)
     {
         this.ch = ch;
         this.x = x * width;
         this.y = y * height;
     }
+    /// <summary>"文字,X,Y" 形式の文字列から復元します（先頭1文字が文字、以降がカンマ区切りの座標）。</summary>
     public NumPart(string str)
     {
         ch = str[0];

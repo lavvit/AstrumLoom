@@ -22,7 +22,7 @@ public class Overlay
     private static readonly Color BodyColor = new(180, 200, 220);
     private static readonly Color WarnColor = new(255, 214, 102);
 
-    // ここがベースの描画
+    /// <summary>Composeで組み立てた行を、右上に背景帯付きで右揃え描画する。ベースの描画処理。</summary>
     public virtual void Draw()
     {
         var platform = AstrumCore.Platform;

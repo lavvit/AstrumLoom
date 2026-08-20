@@ -6,6 +6,10 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// ITexture の raylib 実装。AsyncLoadableBase の非同期ロード基盤に乗り、通常のファイルテクスチャに加えて
+/// Action(drawAction) を焼き込むRenderTexture（オフスクリーン描画結果を保持するテクスチャ）の両方を扱う。
+/// </summary>
 internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
 {
     public string Path { get; private set; } = "";
@@ -16,11 +20,13 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     // RenderTexture の所有を持つ場合に保持する
     private (Size size, Action callback)? _renderInfo;
     private RenderTexture2D _renderTex;
+    /// <summary>指定サイズのRenderTextureを作成し、callbackで即座に描画してテクスチャとして保持する。</summary>
     public RayLibTexture(int width, int height, Action callback)
     {
         _renderInfo = (new Size(width, height), callback);
         Load();
     }
+    /// <summary>指定パスの画像ファイルをテクスチャとして読み込む。</summary>
     public RayLibTexture(string path)
     {
         Path = path;
@@ -33,6 +39,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         DisposeAsync(DisposeTx);
         GC.SuppressFinalize(this);
     }
+    /// <summary>RenderTexture/通常テクスチャのネイティブリソースを解放する。メインスレッド以外から呼ばれた場合はAstrumCoreにメインスレッドでの破棄を依頼する。</summary>
     private bool DisposeTx()
     {
         if (!Raylib.IsWindowReady())
@@ -90,15 +97,17 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         return false;
     }
     #region 読み込み
+    /// <summary>RenderTextureへの描画callback実行中、他のコード（RayLibFontのグラデーション描画等）がそこへ描き込めるよう公開する現在の描画先。</summary>
     internal static RenderTexture2D RenderTexture2D { get; private set; }
+    /// <summary>非同期ロードを開始する。メインスレッドならLoadTxを即実行、そうでなければLoadBackGroundでバイト列だけ先に読んでおく。</summary>
     public void Load() => LoadAsync(this, LoadTx, LoadBackGround);
+    /// <summary>メインスレッドから直接パスまたはRenderTexture生成を行う経路。</summary>
     private bool LoadTx()
     {
         bool file = FileCheck(Path);
         if (_renderInfo == null && !file)
             return false;
 
-        bool pathLoad = file && _renderInfo == null;
         if (_renderInfo != null)
         {
             int width = (int)_renderInfo.Value.size.Width;
@@ -134,6 +143,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         return true;
     }
 
+    /// <summary>バックグラウンドスレッドから呼ばれる経路。raylibのネイティブAPIはメインスレッド専用なので、ここではファイルをバイト列として読むだけに留める（RenderTexture生成時は対象外）。</summary>
     public bool LoadBackGround()
     {
         bool file = FileCheck(Path);
@@ -154,6 +164,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         return false;
     }
 
+    /// <summary>毎フレーム呼び出す。バックグラウンドで読み込んだバイト列が届いていれば、ここでTexture2Dへ変換して読み込みを完了させる。</summary>
     public void Pump()
     {
         PumpAsync();
@@ -192,6 +203,10 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     public bool Loaded => LoadFinished;
 
     #endregion
+    /// <summary>
+    /// DrawOptions（切り出し矩形/基準点/スケール/回転/反転/色/ブレンド）を反映してテクスチャを描画する。
+    /// RenderTexture由来のテクスチャはOpenGLのUV原点がファイルテクスチャと上下逆になるため、その場合だけ src矩形を反転して補正する。
+    /// </summary>
     public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;

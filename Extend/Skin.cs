@@ -6,6 +6,11 @@ using FHandle = AstrumLoom.FontHandle;
 
 namespace AstrumLoom.Extend;
 
+/// <summary>
+/// 「スキン」単位でテクスチャ・サウンド・フォント・数字画像・exo素材をまとめて管理するリソースマネージャ。
+/// System/&lt;スキン名&gt;/Skin.ini を読み、フォルダ内のファイルを名前で自動登録する。
+/// 読み込みは同期（即時）または <see cref="SkinQue"/> を介した分割ロード（非同期・段階的）を選べる。
+/// </summary>
 public class Skin
 {
     public static Dictionary<string, Texture> Textures { get; set; } = [];
@@ -45,6 +50,10 @@ public class Skin
     } = "";
 
     private static bool _loading = false;
+    /// <summary>
+    /// 現在の <see cref="SkinPath"/> からスキン一式を読み込みます。
+    /// <paramref name="inque"/> が true の場合は即座に実体化せず SkinQue に積み、後で <see cref="ReadQue"/> で少しずつ処理します。
+    /// </summary>
     public static void Load(bool inque = false, bool? asyncload = null)
     {
         //if (asyncload.HasValue) AsyncLoad = asyncload.Value;
@@ -168,6 +177,10 @@ public class Skin
         }
         SetSize(w, h, inque);
     }
+    /// <summary>
+    /// Skin.ini をパースし、Texture/Sound/Exo の直接指定行と Number/Font 用の付加情報行を分けて返します。
+    /// それ以外の行は <see cref="Configs"/>（TextConf）に渡され、通常の設定値として扱われます。
+    /// </summary>
     public static (List<(string name, string path)> names, List<(string name, string data)> nums) LoadConfig(string file = "Skin.ini")
     {
         _configCache.Clear();
@@ -229,12 +242,17 @@ public class Skin
         return (namedic, numdic);
     }
 
+    /// <summary>既定フォントを差し替えます。</summary>
     public static void SetFont(string font)
     {
         var f = FHandle.Create(font, 12);
         if (f != null)// && f.Enable
             Drawing.DefaultFont = f;
     }
+    /// <summary>
+    /// ウィンドウ基準サイズを設定します。初期化済みでサイズが実質変わらない場合は何もせず、
+    /// 変わる場合はスキンを再読み込みします（inque 中は再読み込みしない）。
+    /// </summary>
     public static void SetSize(int width, int height, bool inque = false)
     {
         Width = width;
@@ -260,6 +278,10 @@ public class Skin
     }
 
     private static int _logcount = 0;
+    /// <summary>
+    /// 読み込みキューの残りを一括消化しつつ、全リソースの非同期読み込みが終わるまで待って完了ログを出します。
+    /// まだ非同期読み込みが終わっていない場合は何もせず戻り、次フレーム以降の呼び出しで再チェックする想定です。
+    /// </summary>
     public static void FinishLoad()
     {
         if (!_loading) return;
@@ -297,9 +319,14 @@ public class Skin
         _loading = false;
     }
 
+    /// <summary>読み込み中でなく、キューも空であれば true（スキンの読み込みが完了している）。</summary>
     public static bool Loaded => !_loading && SkinQue.Count == 0;
 
     public static int QueMax = 0;
+    /// <summary>
+    /// 読み込みキューから最大 <paramref name="count"/> 件を取り出し、実体（Texture/Sound/Font/Number/Exo）を生成します。
+    /// キーの先頭3文字（tex/snd/fon/num/exo）で種別を判別します。キューが空になったら FinishLoad を呼びます。
+    /// </summary>
     public static int ReadQue(int count = 1)
     {
         if (!_loading) return QueMax;
@@ -360,6 +387,7 @@ public class Skin
     }
 
     public static int ReadedCount = 0;
+    /// <summary>各リソース種別ごとに読み込み完了済みの件数を数え、合計を返します（フォントは即時読み込みなので全件カウント）。</summary>
     private static int ReadedAsync()
     {
         int count = 0;
@@ -384,6 +412,10 @@ public class Skin
         return count;
     }
 
+    /// <summary>
+    /// 無効・破棄済みになったリソースを各辞書から取り除きます（Pump による状態更新も兼ねる）。
+    /// フォントは既定フォントのフォールバックがあるため null のもののみ除去します。
+    /// </summary>
     public static void CheckResource()
     {
         // Remove invalid or disposed Textures
@@ -439,6 +471,7 @@ public class Skin
         }
     }
 
+    /// <summary>拡張子からリソース種別（画像/音声/exo）を判定し、名前の重複を避けつつ登録します。</summary>
     private static void Add(string name, string file, bool inque)
     {
         if (string.IsNullOrEmpty(name)) return;
@@ -496,6 +529,10 @@ public class Skin
             }
         }
     }
+    /// <summary>
+    /// テクスチャを名前付きで登録します。同名が既にあれば親ディレクトリ名を接頭辞にして衝突を避けます。
+    /// 実際に割り当てられた名前（衝突回避後）を返します。
+    /// </summary>
     public static string AddTexture(string name, string file, bool inque = false)
     {
         name = name.ToLower();
@@ -520,6 +557,7 @@ public class Skin
         }
         return name;
     }
+    /// <summary>登録済みテクスチャを破棄して辞書・キャッシュから取り除きます。</summary>
     public static void RemoveTexture(string name)
     {
         name = name.ToLower();
@@ -542,7 +580,12 @@ public class Skin
 
     #region Resourse
     #region Texture
+    /// <summary>名前でテクスチャを取得します（見つからなければ空の Texture を返す非 null 版）。</summary>
     public static Texture GetTexture(string name, string subname = "") => Texture(name) ?? new();
+    /// <summary>
+    /// 名前でテクスチャを取得します。結果は _textureCache にキャッシュし、次回以降は辞書検索を省略します。
+    /// 見つからない、または読み込み未完了(Enable=false)の場合は null を返します。
+    /// </summary>
     public static Texture? Texture(string name, string subname = "")
     {
         name = name.ToLower();
@@ -565,6 +608,7 @@ public class Skin
         result?.Pump();
         return result != null && result.Enable ? result : null;
     }
+    /// <summary>名前を指定してテクスチャを直接描画する簡易ヘルパー。</summary>
     public static void Tx(string name, double x, double y, double opacity = 1, ReferencePoint point = ReferencePoint.TopLeft)
     {
         name = name.ToLower();/*
@@ -582,6 +626,7 @@ public class Skin
             value.Draw(x, y);
         }
     }
+    /// <summary>"dir_" プレフィックスを持つテクスチャを全て集めます（連番読み込みなどで使用）。</summary>
     public static Texture[] TextureList(string dir)
     {
         dir = dir.ToLower();
@@ -597,6 +642,7 @@ public class Skin
     }
     #endregion
     #region Sound
+    /// <summary>名前でサウンドを取得します。見つからない、または未読み込みなら null。</summary>
     public static Sound? Sound(string name, string subname = "")
     {
         name = name.ToLower();
@@ -616,6 +662,7 @@ public class Skin
         }
         return result != null && result.Enable ? result : null;
     }
+    /// <summary>名前を指定して効果音を再生する簡易ヘルパー。loop=true ならストリーム再生を使う。</summary>
     public static void Sfx(string name, bool loop = false)
     {
         name = name.ToLower();
@@ -681,6 +728,7 @@ public class Skin
         => Configs.GetBool(key);
     #endregion
 
+    /// <summary>現在読み込まれている全リソースの一覧をログ出力用のテキスト行として整形します。</summary>
     public static List<string> LogExport()
     {
         List<string> log = [];
@@ -724,11 +772,16 @@ public class Skin
     }
 
     private static List<string> _skinList = [];
+    /// <summary>
+    /// System フォルダ配下で Skin.ini を持つサブディレクトリ名を列挙します（結果はキャッシュされる）。
+    /// フォルダ数が増えていた場合はキャッシュを破棄して再列挙します。
+    /// </summary>
     public static List<string> SkinList()
     {
         string inifile = "Skin.ini";
         string targetdir = FilePath("System");
 
+        // フォルダが増えている可能性があるのでキャッシュ件数と実際のディレクトリ数を比較して無効化判定する
         if (_skinList.Count < Directory.GetDirectories(targetdir).Length)
             _skinList = [];
         if (_skinList.Count > 0) return _skinList;
@@ -752,6 +805,7 @@ public class Skin
     }
 
     #region WindowSize
+    /// <summary>解像度をよく使う略称（HD/FHD/WQHD/4K）に変換します。該当しなければ "幅*高さ" 表記。</summary>
     public static string WindowSize((int, int) value) => value == (1280, 720)
             ? "HD"
             : value == (1920, 1080) ? "FHD" : value == (2560, 1440) ? "WQHD" : value == (3840, 2160) ? "4K" : $"{value.Item1}*{value.Item2}";

@@ -15,6 +15,7 @@ public readonly record struct FontSpec(
     // 末尾に省略可能引数として追加してあるので、位置引数で呼んでいる既存コードはそのまま動く。
     string? ExtraGlyphs = null
 );
+/// <summary>プラットフォームが生成したフォントの実体。テキスト計測と各種描画（通常/エッジのみ/グラデーション/テクスチャ）を提供する。</summary>
 public interface IFont : IDisposable
 {
     bool Enable { get; }
@@ -36,11 +37,13 @@ public interface IFont : IDisposable
         ITexture[] texture, DrawOptions options);
 }
 
+/// <summary>IFontの生成・描画に関するstaticヘルパー群。</summary>
 public static class FontHandle
 {
     public static string SystemFont => GetSystemFontName();
 
     // フォント作成
+    /// <summary>プラットフォームのグラフィックスにフォント生成を委譲する。Boot前など未初期化ならnull。</summary>
     public static IFont? Create(FontSpec spec)
         => AstrumCore.Graphic?.CreateFont(spec) ?? null;
     public static IFont? Create(string nameOrPath, int size = 16, int thick = 1, int edge = 0, int spacing = 0, bool bold = false, bool italic = false)
@@ -88,6 +91,7 @@ public static class FontHandle
     public static (int width, int height) Measure(this IFont? font, object text)
         => (font ?? Drawing.DefaultFont).Measure(text?.ToString() ?? "");
 
+    /// <summary>OSごとに無難な既定フォント名を返す（実ファイルの存在は保証しない）。</summary>
     private static string GetSystemFontName()
     {
         try
@@ -126,6 +130,7 @@ public static class SystemFontResolver
 {
     // Windows のレジストリに登録されているフォント名 → ファイル名の対応を引く
     // HKCU / HKLM の両方を見る。戻り値は優先候補の列挙（Bold/Italic考慮用）
+    /// <summary>Windows専用。レジストリからインストール済みフォントの表示名とファイルパスを列挙する。他OSでは空を返す。</summary>
     public static IEnumerable<(string displayName, string path)> EnumerateWindowsFonts()
     {
         if (!OperatingSystem.IsWindows())

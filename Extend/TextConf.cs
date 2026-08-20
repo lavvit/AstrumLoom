@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// "キー=値" 形式のシンプルな設定ファイル（コメント行対応）を読み書きするための簡易パーサー。
+/// Skin.ini など、決まったフォーマットの設定を持つゲーム素材の読み込みに使う。
+/// </summary>
 public class TextConf : IDisposable
 {
     public string FilePath { get; private set; } = "";
@@ -12,6 +16,7 @@ public class TextConf : IDisposable
         (Items.Count > 0 ? "\n" + string.Join("\n", Items.Select(i => i.ToString())) : "");
 
     #region Get
+    /// <summary>名前（大文字小文字を区別しない）で項目を検索します。無ければ null。</summary>
     public ConfItem? GetItem(string name)
     {
         foreach (var item in Items)
@@ -58,6 +63,10 @@ public class TextConf : IDisposable
     }
     public LayoutUtil.Point GetPoint(string key, LayoutUtil.Point? defaultValue, char separator = ',')
         => GetPoint(key, defaultValue?.X ?? 0, defaultValue?.Y ?? 0, separator);
+    /// <summary>
+    /// 座標を取得します。"KeyX"/"KeyY" の個別指定と "Key=x,y" のカンマ区切り指定の両方に対応し、
+    /// カンマ区切りの値が見つかればそちらを優先します。
+    /// </summary>
     public LayoutUtil.Point GetPoint(string key, double defaultx = 0, double defaulty = 0, char separator = ',')
     {
         double x = GetDouble(key + "X", defaultx);
@@ -65,6 +74,10 @@ public class TextConf : IDisposable
         double[] value = GetDoubleArray(key, separator);
         return value.Length < 2 ? new((int)x, (int)y) : new((int)value[0], (int)value[1]);
     }
+    /// <summary>
+    /// 矩形を取得します。GetPoint 同様、"KeyX/KeyY/KeyWidth(orW)/KeyHeight(orH)" の個別指定と
+    /// カンマ区切り指定の両方に対応します。
+    /// </summary>
     public LayoutUtil.Rect GetRect(string key, char separator = ',', LayoutUtil.Rect? defaultValue = null)
     {
         double defaultx = defaultValue?.X ?? 0;
@@ -103,6 +116,10 @@ public class TextConf : IDisposable
     private const string CommentPrefix = "#";
     public void Load(string path, char separator = DefaultSeparator, string commentPrefix = CommentPrefix)
         => Load([.. Text.Read(path)], separator, commentPrefix, path);
+    /// <summary>
+    /// 行配列をパースします。"//" 始まりと空行は無視、commentPrefix 始まりの行はコメントとして直後の項目に紐付け、
+    /// それ以外は separator で name/value に分割して項目として追加します。
+    /// </summary>
     public void Load(string[] lines, char separator = DefaultSeparator, string commentPrefix = CommentPrefix, string path = "")
     {
         FilePath = path;
@@ -114,6 +131,7 @@ public class TextConf : IDisposable
                 continue;
             if (line.StartsWith(commentPrefix))
             {
+                // 複数行のコメントは連結して次の項目にまとめて紐付ける
                 if (lastComment != null)
                     lastComment += "\n" + line;
                 else lastComment = line;
@@ -125,9 +143,11 @@ public class TextConf : IDisposable
             string key = parts[0].Trim();
             string value = parts[1].Trim();
             Items.Add(new(key, value, lastComment ?? ""));
+            lastComment = null;
         }
     }
 
+    /// <summary>保持している項目を "name=value"（コメントがあれば直後の行）の形式でファイルに書き出します。</summary>
     public void Save(string path, char separator = DefaultSeparator)
     {
         List<string> lines = [];
@@ -141,6 +161,7 @@ public class TextConf : IDisposable
     }
 }
 
+/// <summary>TextConf が保持する1件の設定項目（名前・値・直前のコメント）。</summary>
 public struct ConfItem(string name, string value, string comment = "")
 {
     public string Name { get; set; } = name;

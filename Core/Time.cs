@@ -2,6 +2,7 @@
 
 namespace AstrumLoom;
 
+/// <summary>プラットフォームが実装するフレーム時間の計測インターフェース。描画用・更新用でそれぞれ別インスタンスを持つ。</summary>
 public interface ITime
 {
     float DeltaTime { get; }
@@ -333,6 +334,7 @@ public enum TimerState
     Started
 }
 
+/// <summary>ミリ秒単位の時間を日/時/分/秒/ミリ秒へ分解する変換用構造体。CounterのValueや経過時間の表示に使う。</summary>
 public struct TimeConvert
 {
     public int MiliSeconds;

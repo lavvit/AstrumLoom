@@ -4,6 +4,11 @@ using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>
+/// DxLibバックエンドでの動画実装。DxLibは動画も「グラフィックハンドル」1つで音声・映像両方を扱うため、
+/// ISoundとITextureを両方満たすIMovieをこのクラス単体で実装している（AsyncLoadableBaseは使わず、
+/// 独自の_asyncStateで簡易的な非同期ロード管理を行う）。
+/// </summary>
 internal sealed class DxLibMovie : IMovie
 {
     public string Path { get; private set; } = "";
@@ -20,8 +25,14 @@ internal sealed class DxLibMovie : IMovie
         Load();
     }
 
+    /// <summary>動画ハンドルを解放する。メインスレッド以外から呼ばれた場合はAstrumCore.RequestDisposeへ回し、実際の破棄は次のメインスレッド処理まで遅延する。</summary>
     public void Dispose()
     {
+        if (!IsMainThread)
+        {
+            AstrumCore.RequestDispose(this);
+            return;
+        }
         if (Handle > 0)
         {
             DeleteGraph(Handle);
@@ -32,6 +43,10 @@ internal sealed class DxLibMovie : IMovie
 
     #region 読み込み
 
+    /// <summary>
+    /// LoadGraphで動画をロードする。呼び出しがメインスレッドでない場合はネイティブAPIを叩かず
+    /// _deferred=trueにして即returnし、実際のロードは次にPumpがメインスレッドから呼ばれたときに行う。
+    /// </summary>
     public void Load()
     {
         if (!File.Exists(Path))
@@ -105,6 +120,7 @@ internal sealed class DxLibMovie : IMovie
     private const int DefaultTimeoutMs = 15000;
     public int TimeoutMs { get; set; } = DefaultTimeoutMs;
 
+    /// <summary>メインスレッドから毎フレーム呼ぶ想定の更新処理。保留中ロードの開始、非同期ロード完了待ち、タイムアウト検知、ループ再生の再始動を行う。</summary>
     public void Pump()
     {
         if (!IsMainThread) return;
@@ -164,6 +180,7 @@ internal sealed class DxLibMovie : IMovie
 
     #region 再生プロパティ
 
+    /// <summary>再生位置(ミリ秒)。setはLengthが分かっている場合のみ範囲外シークを防ぐためclampする。</summary>
     public double Time
     {
         get
@@ -182,6 +199,7 @@ internal sealed class DxLibMovie : IMovie
         }
     }
 
+    // 0.0〜1.0 の正規化値を、SetMovieVolumeToGraphが要求する0〜10000スケールへ変換する。
     public double Volume
     {
         get;
@@ -251,6 +269,7 @@ internal sealed class DxLibMovie : IMovie
 
     #region 描画
 
+    /// <summary>DrawOptionsをDxLibの回転描画API(DrawRotaGraph3F/DrawRectRotaGraph3F)の引数へ変換して描画する。DxLibTexture.Drawと同様の変換ロジック。</summary>
     public void Draw(double x, double y, DrawOptions option)
     {
         if (!Enable) return;
@@ -299,6 +318,7 @@ internal sealed class DxLibMovie : IMovie
         ResetOptions(use);
     }
 
+    /// <summary>ReferencePoint（基準点の種類）を、動画左上原点からの座標オフセットへ変換する。DxLibの回転中心APIに渡すための下準備。</summary>
     private Point Point(ReferencePoint point, Rect? rectangle = null)
     {
         if (!rectangle.HasValue) rectangle = new(0, 0, Width, Height);

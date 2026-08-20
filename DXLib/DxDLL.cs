@@ -6,6 +6,13 @@
 using System.Runtime.InteropServices;
 namespace DxLibDLL;
 
+/// <summary>
+/// DxLib（DxLib_x64.dll）そのものが公開するC言語APIを、定数(DX_*/KEY_INPUT_*等)とP/Invoke宣言(extern)
+/// としてほぼそのままC#へ持ち込んだバインディング層。中身はDxLib公式リファレンスの関数・定数を機械的に
+/// 対応付けたものであり、AstrumLoom独自のロジックは含まない。個々の定数・関数の意味はDxLib本家のドキュメント
+/// を参照。このファイルの内容をラップしてAstrumLoomのIGamePlatform等のインターフェースに適合させているのが
+/// 同フォルダのDxLibPlatform/DxLibGraphics/DxLibTexture等（そちらに実際のロジックとコメントがある）。
+/// </summary>
 public static class DX
 {
     public const int TRUE = 1;

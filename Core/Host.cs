@@ -1,5 +1,6 @@
 ﻿namespace AstrumLoom;
 
+/// <summary>ゲーム設定・プラットフォーム・GameRunnerをまとめて保持し、起動と後始末（Dispose）の窓口になる。</summary>
 public sealed class GameHost : IDisposable
 {
     public GameConfig Config { get; }
@@ -34,6 +35,11 @@ public sealed class GameHost : IDisposable
     public void Dispose() => Platform.Dispose();
 }
 
+/// <summary>
+/// テクスチャ・サウンドなど、非同期でロード/破棄しうるリソースの共通基盤。
+/// 実際のロード/破棄はメインスレッドで行う必要があるバックエンド（DxLib/raylib等）が多いため、
+/// 別スレッドから呼ばれた場合は「メインスレッドで後から実行」するよう遅延させる。
+/// </summary>
 public abstract class AsyncLoadableBase
 {
     // IResource 状態管理 (-1=Failed/Disposed, 0=Loading, 1=Ready)
@@ -68,6 +74,7 @@ public abstract class AsyncLoadableBase
 
     private IDisposable? _obj;
     private Func<bool>? _disposefunc;
+    /// <summary>リソースを破棄する。メインスレッド以外から呼ばれた場合はAstrumCore.RequestDisposeへ回し、実際の破棄は次のメインスレッド処理まで遅延する。</summary>
     protected void DisposeAsync(Func<bool>? disposeAction = null)
     {
         if (disposeAction != null)
@@ -117,6 +124,10 @@ public abstract class AsyncLoadableBase
         _obj = obj;
         LoadAsync(loadAction);
     }
+    /// <summary>
+    /// リソースをロードする。メインスレッド以外から呼ばれた場合、バックグラウンド読み込み関数があれば
+    /// Task.Runで先行実行しつつ、本体のロードは「次にメインスレッドから来たとき」まで遅延させる（_deferred）。
+    /// </summary>
     public void LoadAsync(Func<bool>? loadAction = null)
     {
         if (loadAction != null)
@@ -173,6 +184,7 @@ public abstract class AsyncLoadableBase
         }
     }
 
+    /// <summary>毎フレーム（メインスレッドから）呼び、遅延ロードの実行とタイムアウト監視を行う。State取得のたびに内部で呼ばれる（呼び忘れ対策）。</summary>
     protected void PumpAsync()
     {
         // メインスレッドのみが状態更新
@@ -211,6 +223,7 @@ public abstract class AsyncLoadableBase
         }
     }
 }
+/// <summary>Texture/Soundなど、非同期ロード可能なリソースが実装する共通インターフェース。</summary>
 public interface IResourse : IDisposable
 {
     bool IsReady { get; }

@@ -2,6 +2,7 @@
 
 namespace AstrumLoom;
 
+/// <summary>ゲーム本体が実装するインターフェース。GameRunnerがこれのUpdate/Drawをループから呼び出す。</summary>
 public interface IGame
 {
     void Initialize();
@@ -9,6 +10,12 @@ public interface IGame
     void Draw();
 }
 
+/// <summary>
+/// メインループの実体。シングルスレッド構成では Update→Draw を1ループで交互に、
+/// マルチスレッド構成（UseMultiThreadUpdate）では専用の更新スレッドを立てて
+/// メインスレッドは描画とプラットフォームイベントのポーリングに専念する。
+/// 固定ステップ／可変ステップ／ロックステップの3つの時間進行モードもここで吸収する。
+/// </summary>
 public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig config)
 {
     private static readonly Color BackgroundColor = new(10, 10, 11);
@@ -25,6 +32,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
     private float _accumulator;
     private InputBridge? _inputBridge;
 
+    /// <summary>ゲームの初期化からメインループ開始までを行う。GameHost.Runから1度だけ呼ばれる想定。</summary>
     public void Run()
     {
         AstrumCore.Platform = platform;
@@ -43,6 +51,10 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         Loop();
     }
 
+    /// <summary>
+    /// メインループ本体。MultiThreading設定でシングル/マルチスレッド構成を切り替える。
+    /// 致命的エラーが起きた場合は途中でループを抜け、末尾でエラー画面表示に切り替わる。
+    /// </summary>
     public void Loop()
     {
         if (!AstrumCore.MultiThreading)
@@ -106,6 +118,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             RenderFatalAndClose();
         }
     }
+    /// <summary>マルチスレッド構成時、更新専用スレッドで回り続けるループ。例外は握りつぶさずHandleFatalへ回す。</summary>
     private void UpdateLoop()
     {
         try
@@ -122,6 +135,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         }
     }
 
+    /// <summary>1回分の更新処理（入力の確定・ホットキー・デバッグ制御・論理フレーム進行）を行う。</summary>
     public void Update(IGame game)
     {
         platform.UTime.BeginFrame();
@@ -221,6 +235,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
         DebugSession.OnLogicFrame(deltaTime);
     }
+    /// <summary>1フレーム分の描画。BeginFrame/EndFrameで囲み、ゲーム本体・オーバーレイ・ログの順に描く。</summary>
     public void Draw(IGame game)
     {
         platform.Time.BeginFrame();
@@ -271,9 +286,11 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         if (_fatalTriggered)
             return;
     }
+    /// <summary>ウィンドウ/OSイベントのポーリングのみ行う。マルチスレッド時もメインスレッドから毎ループ呼ばれる。</summary>
     public void MainUpdate(IGame game) => platform.PollEvents();
 
     private static ConcurrentQueue<Action> _mainThreadActions = new();
+    /// <summary>メインスレッド専用の処理を依頼する。既にメインスレッドなら即実行、そうでなければキューに積んで次のDrawループで実行される。</summary>
     internal static void RequestToMainThread(Action action)
     {
         if (Environment.CurrentManagedThreadId == AstrumCore.MainThreadId)
@@ -286,6 +303,10 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
     private static ConcurrentQueue<(string key, Action action)> _mainThreadBeginActions = new();
     private static ConcurrentQueue<(string key, Action action)> _mainThreadEndActions = new();
+    /// <summary>
+    /// 描画フレームの開始前/終了後に1回だけ実行される拡張フックを登録する。
+    /// 同じkeyが既にキューにあれば追加しない（1フレームに複数回積まれるのを防ぐ）。
+    /// </summary>
     internal static void AddExtendAction(string key, Action action, bool inEndStart = true)
     {
         var queue = inEndStart ? _mainThreadEndActions : _mainThreadBeginActions;
@@ -293,6 +314,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             return;
         queue.Enqueue((key, action));
     }
+    /// <summary>Draw内で開始前/終了後に登録済みの拡張フックを全て実行する。個々の例外はログに残して継続する。</summary>
     private static void ExtendAction(bool end)
     {
         var queue = end ? _mainThreadEndActions : _mainThreadBeginActions;
@@ -309,6 +331,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         }
     }
 
+    /// <summary>致命的エラーを記録してループを止める。複数スレッドから同時に呼ばれても最初の1件だけを採用する。</summary>
     private void HandleFatal(Exception ex, string phase)
     {
         if (_fatalTriggered)
@@ -319,6 +342,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         AstrumCore.ReportFatalError(phase, ex);
     }
 
+    /// <summary>致命的エラー発生後、一定時間だけエラー画面を表示してからウィンドウを閉じる。</summary>
     private void RenderFatalAndClose()
     {
         var info = AstrumCore.FatalError;

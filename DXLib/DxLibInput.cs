@@ -4,6 +4,7 @@ using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでのキーボード入力実装。DxLibのキーコード(KEY_INPUT_*)とCore側のKey列挙をToDxKeyCodeで相互変換する。</summary>
 internal sealed class DxLibInput : IInput
 {
     private readonly byte[] _now = new byte[256];
@@ -19,6 +20,7 @@ internal sealed class DxLibInput : IInput
         // 現在のキー状態を取得
         GetHitKeyStateAll(_now);
     }
+    /// <summary>Bufferで取得した生の押下状態から_stateを1(押下開始)/2(保持)/-1(離鍵)/0(非押下)の状態遷移に変換する。</summary>
     public void Update()
     {
         for (int i = 0; i < _state.Length; i++)
@@ -45,6 +47,7 @@ internal sealed class DxLibInput : IInput
         return code >= 0 && _state[code] < 0;
     }
 
+    /// <summary>Core共通のKey列挙値をDxLibのKEY_INPUT_*定数へ変換する。未対応キーは-1を返す。</summary>
     private static int ToDxKeyCode(Key key) => key switch
     {
         // Numbers
@@ -173,6 +176,7 @@ internal sealed class DxLibInput : IInput
     };
 }
 
+/// <summary>DxLibバックエンドでのIME対応テキスト入力実装。DxLibのMakeKeyInput/CheckKeyInputハンドルをラップする。TextEnterがこれを介してテキスト入力セッションを管理する。</summary>
 internal sealed class DxLibTextInput : ITextInput
 {
     private readonly int _candidateCount = 10;
@@ -223,6 +227,7 @@ internal sealed class DxLibTextInput : ITextInput
         IsActive = true;
     }
 
+    /// <summary>入力中テキスト・選択範囲のハイライト・キャレット・IME変換候補ウィンドウ(DrawIMEInputExtendString)を描画する。</summary>
     public void Draw(double x = 0, double y = 0, Color? color = null, IFont font = null!, bool caret = true)
     {
         if (!IsActive) return;
@@ -291,11 +296,14 @@ internal sealed class DxLibTextInput : ITextInput
     public void Update()
     {
         if (!IsActive) return;
+        // DxLibのキー入力バッファは全選択操作時などに制御文字を混入させることがあるので、
+        // その手前までで切り詰めて全選択状態にする。
         if (Text.Contains('\u0001'))
         {
             Text = Text[..Text.IndexOf('\u0001')];
             Selection = new(0, Text.Length);
         }
+        // 入力欄へファイルがドラッグ＆ドロップされた場合は、そのパスをテキストとして追記する
         if (GetDragFileNum() > 0)
         {
             var sb = new StringBuilder("", 256);

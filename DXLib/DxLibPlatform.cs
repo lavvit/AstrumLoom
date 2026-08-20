@@ -5,6 +5,10 @@ using static DxLibDLL.DX;
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>
+/// DxLibバックエンドのIGamePlatform実装。DxLib_Initによるネイティブ初期化と、
+/// Graphics/Input/Time/Mouse/Controller/TextInputなど各サブシステムのDxLib実装を束ねて提供する。
+/// </summary>
 public sealed class DxLibPlatform : IGamePlatform
 {
     public GraphicsBackendKind BackendKind => GraphicsBackendKind.DxLib;
@@ -21,6 +25,7 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public bool VSync { get; private set; }
 
+    /// <summary>DxLibのウィンドウ・レンダリング設定を行ってDxLib_Initし、各サブシステム実装を生成する。失敗時は例外を投げる。</summary>
     public DxLibPlatform(GameConfig config)
     {
         SetOutApplicationLogValidFlag(0); // ログファイル無効化
@@ -69,6 +74,7 @@ public sealed class DxLibPlatform : IGamePlatform
         SetVSync(config.VSync);
     }
 
+    /// <summary>DxLibのウィンドウメッセージを処理し、×ボタンでの終了要求を検知する。あわせてキー・パッドの生状態を毎フレームBufferする。</summary>
     public void PollEvents()
     {
         if (ShouldClose) return;
@@ -97,6 +103,7 @@ public sealed class DxLibPlatform : IGamePlatform
     public IMovie LoadMovie(string path) =>
         new DxLibMovie(path);
 
+    /// <summary>callbackの描画内容を焼き込んだレンダーターゲット用テクスチャを作る。DxLibのMakeScreen/SetDrawScreenで一時的な描画先へ切り替えてから元に戻す。メインスレッド専用。</summary>
     public ITexture CreateTexture(int width, int height, Action callback)
     {
         if (Environment.CurrentManagedThreadId != AstrumCore.MainThreadId)
@@ -126,6 +133,10 @@ public sealed class DxLibPlatform : IGamePlatform
     // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
     // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
     private readonly bool _multiThreadUpdate;
+    /// <summary>
+    /// VSyncのON/OFFをDxLibへ反映する。ONにする際はモニタのリフレッシュレートを取得し、
+    /// config.TargetFpsとの小さい方をTargetFpsとして採用する（TargetFpsが0＝無制限ならモニタFPSに合わせる）。
+    /// </summary>
     public void SetVSync(bool enabled)
     {
         if (VSync == enabled)
@@ -182,6 +193,7 @@ public sealed class DxLibPlatform : IGamePlatform
 
     // --- 以下 stub 実装たち ---
 
+    /// <summary>Stopwatchベースの簡易ITime実装。DeltaTime計測とTargetFpsに基づくフレーム待機(EndFrame)を行う。</summary>
     private sealed class SimpleTime : ITime
     {
         private readonly Stopwatch _sw = Stopwatch.StartNew();
@@ -192,6 +204,7 @@ public sealed class DxLibPlatform : IGamePlatform
         public float CurrentFps { get; private set; }
         public float TargetFps { get; set; } = 0f;
 
+        /// <summary>前回のBeginFrameからの経過時間をDeltaTimeとして記録する。初回呼び出し時はDeltaTime=0。</summary>
         public void BeginFrame()
         {
             long now = _sw.ElapsedTicks;
@@ -209,6 +222,7 @@ public sealed class DxLibPlatform : IGamePlatform
             _lastTicks = now;
         }
 
+        /// <summary>TargetFpsが設定されていれば、理想フレーム時間に足りない分だけHiResDelayで待機してフレームレートを一定に保つ。</summary>
         public void EndFrame()
         {
             if (TargetFps <= 0) return;
@@ -237,12 +251,12 @@ public sealed class DxLibPlatform : IGamePlatform
                 if (sleepUntil > TimeSpan.Zero)
                     Thread.Sleep(sleepUntil);
 
-                // 仕上げはスピンで追い込む
+                // 仕上げはスピンで追い込む（Thread.Sleepはミリ秒未満の指定でもOS既定の
+                // スケジューラ量子(数ms)分眠ってしまい、sub-ms精度を狙う意味が無くなるため、
+                // ここは本当にSleepを挟まないビジーウェイトにする）
                 while (sw.Elapsed < duration)
                 {
-                    /* busy wait */
-                    var span = TimeSpan.FromMicroseconds(1);
-                    Thread.Sleep(span);
+                    Thread.SpinWait(50);
                 }
                 double actualMs = sw.Elapsed.TotalMilliseconds;
                 //Log.Debug($"HiResDelay actual: {actualMs} ms");

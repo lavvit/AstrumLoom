@@ -23,6 +23,7 @@ public readonly struct Color : IEquatable<Color>
     public static implicit operator DrawingColor(Color c) => c.ToDrawingColor();
     public static implicit operator Color(DrawingColor c) => FromDrawing(c);
 
+    /// <summary>0-255の各成分から色を作る。範囲外の値は自動的にクリップされる。</summary>
     public Color(int red, int green, int blue, int alpha = 255)
     {
         r = ClipToByte(red);
@@ -31,6 +32,7 @@ public readonly struct Color : IEquatable<Color>
         a = ClipToByte(alpha);
     }
 
+    /// <summary>アルファのみ0-1の実数(float)で指定する。</summary>
     public Color(int red, int green, int blue, float alpha)
         : this(red, green, blue, (int)MathF.Round(alpha * 255f)) { }
 
@@ -39,6 +41,7 @@ public readonly struct Color : IEquatable<Color>
         r = red; g = green; b = blue; a = alpha;
     }
 
+    /// <summary>System.Drawing.Color.ToArgb() が返す 0xAARRGGBB 形式の整数から色を作る。</summary>
     public Color(uint argb)
     {
         // ARGB as 0xAARRGGBB or passed from System.Drawing.Color.ToArgb()
@@ -47,12 +50,14 @@ public readonly struct Color : IEquatable<Color>
         r = dc.R; g = dc.G; b = dc.B; a = dc.A;
     }
 
+    /// <summary>各成分0-1のVector3からRGBを作る。アルファは255固定。</summary>
     public Color(Vector3 v)
     {
         a = 255;
         r = ToByte(v.X); g = ToByte(v.Y); b = ToByte(v.Z);
     }
 
+    /// <summary>各成分0-1のVector4からRGBAを作る。</summary>
     public Color(Vector4 v)
     {
         r = ToByte(v.X); g = ToByte(v.Y); b = ToByte(v.Z); a = ToByte(v.W);
@@ -60,6 +65,7 @@ public readonly struct Color : IEquatable<Color>
 
     private static byte ToByte(float f) => ClipToByte((int)MathF.Round(f * 255f));
     private static byte ClipToByte(int v) => (byte)(v < 0 ? 0 : (v > 255 ? 255 : v));
+    /// <summary>0xAARRGGBB 形式の整数に変換する。</summary>
     public uint ToARGB() => (uint)((a << 24) | (r << 16) | (g << 8) | b);
 
     public DrawingColor ToDrawingColor() => DrawingColor.FromArgb(a, r, g, b);
@@ -86,6 +92,7 @@ public readonly struct Color : IEquatable<Color>
     public static Color FromDrawing(DrawingColor d) => new(d.R, d.G, d.B, d.A);
     public static Color FromRGB(int r, int g, int b) => new(r, g, b, 255);
     public static Color FromARGB(int a, int r, int g, int b) => new(r, g, b, a);
+    /// <summary>"#RRGGBB" または "#AARRGGBB" 形式（#は省略可）の16進文字列から色を作る。不正な長さは例外を投げる。</summary>
     public static Color FromHex(string hex)
     {
         if (string.IsNullOrWhiteSpace(hex)) throw new ArgumentNullException(nameof(hex));
@@ -109,6 +116,9 @@ public readonly struct Color : IEquatable<Color>
         throw new FormatException("Hex color must be 6 (RRGGBB) or 8 (AARRGGBB) digits");
     }
 
+    /// <summary>
+    /// 文字列から色を解釈する。"#RRGGBB"、10進ARGB整数、"R,G,B[,A]"、System.Drawing の色名のいずれかに対応。
+    /// </summary>
     public static bool TryParse(string? input, out Color color)
     {
         color = default;
@@ -152,10 +162,13 @@ public readonly struct Color : IEquatable<Color>
 
         return false;
     }
+    /// <summary>TryParseに失敗した場合はWhiteを返す簡易版。</summary>
     public static Color Parse(string? input) => TryParse(input, out var color) ? color : White;
+    /// <summary>アルファ成分が立っていない（0x01000000未満の）値はアルファ255を補って解釈する。</summary>
     public static Color Parse(int hex) => FromDrawing(DrawingColor.FromArgb(hex |
         (hex < 0x01000000 ? unchecked((int)0xFF000000) : 0)));
 
+    /// <summary>RGBA各成分を線形補間する（t=0..1にクランプ）。</summary>
     public static Color Lerp(Color a, Color b, float t)
     {
         t = t < 0f ? 0f : (t > 1f ? 1f : t);
@@ -168,6 +181,7 @@ public readonly struct Color : IEquatable<Color>
     }
 
     // HSBColor and Rainbow left mostly unchanged
+    /// <summary>色相(Hue)・彩度(Saturation)・明度(Brightness)によるHSB表現。ColorとHSBColorは相互変換できる。</summary>
     public struct HSBColor
     {
         public double Hue, Saturation, Brightness;
@@ -197,6 +211,7 @@ public readonly struct Color : IEquatable<Color>
             Brightness = max;
         }
 
+        /// <summary>HSB値からRGBのColorへ変換する。</summary>
         public readonly Color ToColor(float alpha = 1f)
         {
             double percent = Hue / 60.0;
@@ -242,6 +257,7 @@ public readonly struct Color : IEquatable<Color>
             return new Color(R, G, B, alpha);
         }
     }
+    /// <summary>このColorをHSB表現に変換する。</summary>
     public HSBColor ToHSB()
     {
         float fr = R / 255f;
@@ -277,6 +293,7 @@ public readonly struct Color : IEquatable<Color>
     public double Brightness => ToHSB().Brightness;
 
     // 背景色と被らない色
+    /// <summary>背景色として与えたcolorの上で読みやすい文字色（黒 or 白）を返す。人間の視覚の輝度感度に合わせた重み付けで明度を算出。</summary>
     public static Color VisibleColor(Color color)
     {
         // 黒か白かを選択
@@ -285,8 +302,10 @@ public readonly struct Color : IEquatable<Color>
         return brightness >= 128 ? Black : White;
     }
     public Color VisibleColor() => VisibleColor(this);
+    /// <summary>RGBを反転させる（アルファはそのまま）。</summary>
     public static Color Invert(Color color) => new(255 - color.R, 255 - color.G, 255 - color.B, color.A);
     public Color Invert() => Invert(this);
+    /// <summary>輝度加重平均でグレースケール化する。</summary>
     public static Color Grayscale(Color color)
     {
         int gray = (int)MathF.Round(color.R * 0.299f + color.G * 0.587f + color.B * 0.114f);
@@ -294,6 +313,10 @@ public readonly struct Color : IEquatable<Color>
     }
     public Color Grayscale() => Grayscale(this);
 
+    /// <summary>
+    /// HSB空間で色相・彩度・明度を操作した新しい色を返す。
+    /// h は加算、s/b は乗算後にstaticS/staticBを加算する（例: b=0.5, staticB=0.2 は明度を半分にしてから+0.2）。
+    /// </summary>
     public Color Shift(double h = 0, double s = 1, double b = 1, double staticS = 0, double staticB = 0)
     {
         var hsb = ToHSB();

@@ -24,6 +24,7 @@ using System.Diagnostics;
 
 namespace AstrumLoom;
 
+/// <summary>1セクション分の計測結果（名前・生tick数・ミリ秒・ループ全体に対する割合）。</summary>
 public readonly struct ProfilerReport
 {
     public string Name { get; init; }
@@ -33,6 +34,11 @@ public readonly struct ProfilerReport
     public override string ToString() => $"{Name}: {Milliseconds:F3} ms ({Percent:F1}%)";
 }
 
+/// <summary>
+/// ループ内の各処理区間（セクション）の所要時間を計測するstaticプロファイラ。
+/// BeginLoop/EndLoopで1ループ分を区切り、その間のBeginSection/EndSection（またはMeasureのusing）で
+/// 名前ごとの累積時間を集計する。処理落ち（FreezeThresholdMs超過）はログにも出す。
+/// </summary>
 public static class Profiler
 {
     // 設定

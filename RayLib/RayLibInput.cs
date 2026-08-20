@@ -6,6 +6,10 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IInput の raylib 実装。キーボードの押下状態をバッファリングし、押した瞬間/離した瞬間を
+/// フレーム単位で判定できるようにする。Key（Core側の抽象キー種別）と raylib の KeyboardKey の対応表を持つ。
+/// </summary>
 internal sealed class RayLibInput : IInput
 {
     // Key の全要素配列（固定）
@@ -40,6 +44,7 @@ internal sealed class RayLibInput : IInput
             _now[i] = isDown;
         }
     }
+    /// <summary>Buffer()で取り込んだ現在/前フレームの押下状態から、各キーの遷移状態(1/2/-1/0)を確定します。</summary>
     public void Update()
     {
         for (int i = 0; i < _state.Length; i++)
@@ -55,24 +60,28 @@ internal sealed class RayLibInput : IInput
         return idx >= 0 ? _state[idx] : 0;
     }
 
+    /// <summary>指定キーが押されている（押した瞬間・押しっぱなし含む）かどうか。</summary>
     public bool GetKey(Key key)
     {
         var rk = ToRayKey(key);
         return rk != KeyboardKey.Null && GetBufferedState(key) > 0;
     }
 
+    /// <summary>指定キーが押された瞬間かどうか。</summary>
     public bool GetKeyDown(Key key)
     {
         var rk = ToRayKey(key);
         return rk != KeyboardKey.Null && GetBufferedState(key) == 1;
     }
 
+    /// <summary>指定キーが離された瞬間かどうか。</summary>
     public bool GetKeyUp(Key key)
     {
         var rk = ToRayKey(key);
         return rk != KeyboardKey.Null && GetBufferedState(key) < 0;
     }
 
+    /// <summary>Core側の抽象キー種別をraylibのKeyboardKeyへ変換します。対応が無いキーはNullを返します。</summary>
     private static KeyboardKey ToRayKey(Key key) => key switch
     {
         // 数字キー
@@ -215,6 +224,10 @@ internal sealed class RayLibInput : IInput
     };
 }
 
+/// <summary>
+/// ITextInput の raylib 実装。Raylib には組み込みのテキスト入力管理機能がないため、
+/// 文字入力・カーソル・確定/キャンセル判定を自前で持つ簡易IME的な実装。
+/// </summary>
 internal sealed class RayLibTextInput : ITextInput
 {
     // Raylib には組み込みのテキスト入力管理機能がないため、
@@ -226,6 +239,7 @@ internal sealed class RayLibTextInput : ITextInput
     public string Text => _textBuilder.ToString();
     public int Cursor { get; private set; }
     public TextSelection Selection { get; private set; } = new(0, 0);
+    /// <summary>テキスト入力を開始します。初期文字列をセットし、カーソルを末尾に置きます。</summary>
     public void Begin(TextInputOptions options)
     {
         _options = options;
@@ -235,6 +249,7 @@ internal sealed class RayLibTextInput : ITextInput
         Selection = new TextSelection(Cursor, Cursor);
         IsActive = true;
     }
+    /// <summary>EscapeCancelableが有効な場合のみ、入力を中断してアクティブ状態を解除します。</summary>
     public void Cancel()
     {
         if (_options.EscapeCancelable)
@@ -242,7 +257,9 @@ internal sealed class RayLibTextInput : ITextInput
             IsActive = false;
         }
     }
+    /// <summary>入力内容を確定し、アクティブ状態を解除します。</summary>
     public void Commit() => IsActive = false;
+    /// <summary>Enter/Escapeの押下から、現在の入力状態（継続中/確定/キャンセル/非アクティブ）を判定します。</summary>
     public KeyInputState KeyState
     {
         get
@@ -261,6 +278,7 @@ internal sealed class RayLibTextInput : ITextInput
         }
     }
 
+    /// <summary>入力中の文字・バックスペースをraylibから取得し、テキストとカーソル位置に反映します。</summary>
     public void Update()
     {
         if (!IsActive) return;
@@ -268,7 +286,7 @@ internal sealed class RayLibTextInput : ITextInput
         while (key != 0)
         {
             char c = (char)key;
-            // 簡易的にバイト数制限のみ考慮
+            // 簡易的に文字数（UTF-16 char数）制限のみ考慮
             if ((ulong)_textBuilder.Length < _options.MaxLength)
             {
                 _textBuilder.Insert(Cursor, c);
@@ -283,6 +301,7 @@ internal sealed class RayLibTextInput : ITextInput
             Cursor--;
         }
     }
+    /// <summary>入力中のテキストと、必要ならキャレット（カーソル位置の縦線）を描画します。</summary>
     public void Draw(double x = 0, double y = 0, Color? color = null, IFont font = null!, bool caret = true)
     {
         if (!IsActive) return;

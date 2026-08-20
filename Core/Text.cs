@@ -6,8 +6,13 @@ using Newtonsoft.Json.Serialization;
 
 namespace AstrumLoom;
 
+/// <summary>
+/// テキストファイルの読み書き（文字コード自動判定つき）とJSONの読み書きをまとめたユーティリティ。
+/// 日本語圏のツールが吐くファイルはUTF-8/Shift-JIS/EUC-JPが混在しがちなので、GetEncodingで簡易推定する。
+/// </summary>
 public class Text
 {
+    /// <summary>ファイルを文字コード自動判定で読み込み、改行で分割した行のリストを返す。存在しなければ空リスト。</summary>
     public static List<string> Read(string path, bool allsplit = true, bool removeempty = true)
     {
         List<string> list = [];
@@ -34,6 +39,7 @@ public class Text
     }
     public static void Save(string path, List<string> list, string encode = "utf-8", bool append = false) =>
         Save(list, path, encode, append);
+    /// <summary>行のリストをファイルへ保存する。末尾の空行は書き込まない。ディレクトリが無ければ作成する。</summary>
     public static void Save(List<string> list, string path, string encode = "utf-8", bool append = false)
     {
         // エンコーディングの取得（例外は呼び出し元で処理）
@@ -67,6 +73,7 @@ public class Text
         return encode;
     }
     #region Encoding
+    /// <summary>ファイル先頭をmaxSizeバイトまで読み、BOM判定→簡易ISO-2022-JP判定→再変換一致判定→日本語らしさ判定の順で文字コードを推定する。</summary>
     public static Encoding? GetJpEncoding(string file, long maxSize = 50 * 1024)//ファイルパス、最大読み取りバイト数
     {
         try

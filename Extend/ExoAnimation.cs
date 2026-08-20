@@ -1,5 +1,9 @@
 ﻿namespace AstrumLoom.Extend;
 
+/// <summary>
+/// AviUtl の exedit プロジェクトファイル（.exo / .aup2）を独自パースし、
+/// 画像オブジェクト・グループ制御・各種フィルターをタイムライン再生できる形に変換して描画するクラス。
+/// </summary>
 public class Exo
 {
     public string FilePath { get; set; } = "";
@@ -22,6 +26,7 @@ public class Exo
 
     public bool Enable => imageObjects.Count > 0;
 
+    // exoファイルの "key=value" 形式の行を解釈するための小さなヘルパー群
     private static string Key(string line) => line.Split('=', 2)[0];
     private static string Parse(string line) => line.Split('=', 2)[1];
     private static int ParseInt(string line) => int.TryParse(Parse(line), out int r) ? r : 0;
@@ -274,7 +279,7 @@ public class Exo
                             if (!string.IsNullOrEmpty(plaginPart))
                             {
                                 // easing_normal@uf_easing
-                                groupObject.Position.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
+                                groupObject.Scale.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
                             }
                         }
                         else if (currentObject is ImageObject imageObject)
@@ -290,7 +295,7 @@ public class Exo
                             if (!string.IsNullOrEmpty(plaginPart))
                             {
                                 // easing_normal@uf_easing
-                                imageObject.Position.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
+                                imageObject.Scale.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
                             }
                         }
                     }
@@ -369,7 +374,7 @@ public class Exo
                             if (!string.IsNullOrEmpty(plaginPart))
                             {
                                 // easing_normal@uf_easing
-                                imageObject.Position.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
+                                imageObject.Opacity.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
                             }
                         }
                     }
@@ -404,7 +409,7 @@ public class Exo
                             if (!string.IsNullOrEmpty(plaginPart))
                             {
                                 // easing_normal@uf_easing
-                                imageObject.Position.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
+                                imageObject.Rotation.Easing = plaginPart.StartsWith("easing_normal") ? (UfEasing)numbers[3] : numbers.Length > 3 ? (UfEasing)numbers[3] : UfEasing.Linear;
                             }
                         }
                     }
@@ -703,6 +708,9 @@ public class Exo
         }
     }
 
+    /// <summary>
+    /// 全ての画像オブジェクトのテクスチャ読み込みが完了しているか確認します（未完了のものは Pump してロードを進める）。
+    /// </summary>
     public bool Loaded()
     {
         int loadedCount = 0;

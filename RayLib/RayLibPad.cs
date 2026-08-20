@@ -4,6 +4,9 @@ using static Raylib_cs.Raylib;
 
 namespace AstrumLoom.RayLib;
 
+/// <summary>
+/// IController の raylib 実装。接続中のゲームパッドを毎フレーム走査し、RayLibPad の集合として管理する。
+/// </summary>
 public class RayLibController : IController
 {
     public int Count => _joyPads.Count;
@@ -13,6 +16,7 @@ public class RayLibController : IController
     private List<IJoyPad> _joyPads = [];
     private readonly object _lock = new();
 
+    /// <summary>接続中のゲームパッドをスキャンし、新規接続分の追加・切断分の削除を行います。</summary>
     public void SetController()
     {
         // 接続されているコントローラーを取得
@@ -32,6 +36,7 @@ public class RayLibController : IController
             }
         }
     }
+    /// <summary>接続状態の更新と、各パッドの生入力の取り込みをスレッドセーフに行います。</summary>
     public void Buffer()
     {
         lock (_lock)
@@ -44,6 +49,7 @@ public class RayLibController : IController
             }
         }
     }
+    /// <summary>Buffer() で取り込んだ生入力から、各パッドの押下/スティック状態を確定させます。</summary>
     public void Update()
     {
         lock (_lock)
@@ -55,6 +61,10 @@ public class RayLibController : IController
         }
     }
 }
+/// <summary>
+/// IJoyPad の raylib 実装。1台分のゲームパッドを表し、Buffer() で生の軸/ボタン値を取り込み、
+/// Update() でそれを押下エッジ付きの状態に変換する。
+/// </summary>
 public class RayLibPad : IJoyPad
 {
     public int Index { get; }
@@ -74,6 +84,7 @@ public class RayLibPad : IJoyPad
         Product = "RayLib Gamepad";
         Type = GetControllerType();
     }
+    /// <summary>raylibから今フレームの生のボタン押下・軸移動量を取得して保持します（状態の確定はUpdate()で行う）。</summary>
     public void Buffer()
     {
         // Buffer button, trigger, and stick states
@@ -89,9 +100,11 @@ public class RayLibPad : IJoyPad
         }
     }
 
+    /// <summary>Buffer()で取り込んだ生入力から、各ボタンの押下エッジ状態とスティック/トリガー値を確定します。</summary>
     public void Update()
     {
         // Update button, trigger, and stick states
+        // Button[i] の値: 1=押した瞬間, 2=押しっぱなし, -1=離した瞬間, 0=無入力
         for (int i = 0; i < Button.Length; i++)
         {
             bool pressed = _pressed[i];
@@ -116,11 +129,16 @@ public class RayLibPad : IJoyPad
         };
     }
 
+    /// <summary>指定ボタンが押された瞬間かどうか。</summary>
     public bool IsPushed(int buttonIndex) => Button[buttonIndex] == 1;
+    /// <summary>指定ボタンが押されている（押した瞬間・押しっぱなし含む）かどうか。</summary>
     public bool IsHeld(int buttonIndex) => Button[buttonIndex] > 0;
+    /// <summary>指定ボタンが離された瞬間かどうか。</summary>
     public bool IsReleased(int buttonIndex) => Button[buttonIndex] < 0;
+    /// <summary>現在押されているボタンのうち最初に見つかったもののインデックスを返します。無ければ null。</summary>
     public int? NowPushedButton() => Button.ToList().FindIndex(b => b > 0) is int idx and >= 0 ? idx : null;
 
+    /// <summary>左右モーターの強さをパン(左右バランス)から算出し、指定時間だけ振動させます。</summary>
     public void Vibrate(float pan, float strength, float length)
     {
         float leftMotor = strength * (pan <= 0 ? 1.0f : 1.0f - pan);
@@ -129,6 +147,7 @@ public class RayLibPad : IJoyPad
     }
 
     private static GamepadButton GetButton(int index) => (GamepadButton)index;
+    /// <summary>パッド名の文字列に含まれるキーワードから、対応するコントローラー種別を推定します。</summary>
     private ControllerType GetControllerType()
     {
         string name = Name;

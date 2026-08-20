@@ -2,6 +2,7 @@
 
 namespace AstrumLoom;
 
+/// <summary>プラットフォームが実装するテクスチャ1枚分の実体。Textureクラスがこれをラップする。</summary>
 public interface ITexture : IResourse
 {
     int Width { get; }
@@ -15,11 +16,16 @@ public static class TextureExtensions
     public static void Draw(this ITexture texture, double x = 0, double y = 0)
         => texture.Draw(x, y, new());
 }
+/// <summary>
+/// テクスチャのラッパー。実体（ITexture）がnull（未ロード）でも安全に振る舞い、
+/// Color/Scale/Angle等の描画オプションをDrawOptionsとして内部に保持してDraw時に反映する（プロキシプロパティ群）。
+/// </summary>
 public class Texture : IDisposable
 {
     private ITexture? _texture { get; set; } = null;
     public Texture() { }
 
+    /// <summary>drawAction（Action method）を焼き込むレンダーターゲットとしてテクスチャを作る。</summary>
     public Texture(Size size, Action method)
         => _texture = AstrumCore.Platform?.CreateTexture((int)size.Width, (int)size.Height, method);
 
@@ -51,6 +57,7 @@ public class Texture : IDisposable
         };
         Draw(x, y, opt);
     }
+    /// <summary>X/Yスケールを表す小さな値型。double単体やタプルから暗黙変換できるので、等倍・非等倍のどちらも書きやすい。</summary>
     public struct txScale
     {
         public double X;
@@ -65,6 +72,7 @@ public class Texture : IDisposable
 
     public void Draw(double x, double y, Rect rectangle)
         => DrawRect(x, y, rectangle);
+    /// <summary>指定サイズにフィットするようScaleを一時的に変更して描画し、直後に元の値へ戻す。</summary>
     public void DrawSize(double x, double y, Size size)
     {
         // 変更前の Scale を退避し、描画後に必ず戻す。DrawRect が Rectangle を
@@ -78,6 +86,7 @@ public class Texture : IDisposable
         _texture?.Draw(x, y, Option);
         XYScale = before;
     }
+    /// <summary>テクスチャの一部矩形（切り出し範囲）だけを描画する。Rectangleを一時的に差し替えて元に戻す。</summary>
     public void DrawRect(double x, double y, Rect rectangle)
     {
         Rect? before = Rectangle != null ? new Rect(Rectangle.Value.X, Rectangle.Value.Y, Rectangle.Value.Width, Rectangle.Value.Height) : null;
@@ -85,6 +94,7 @@ public class Texture : IDisposable
         _texture?.Draw(x, y, Option);
         Rectangle = before;
     }
+    /// <summary>デバッグ用。テクスチャの外形と20px間隔のグリッド線を描く。</summary>
     public void Grid(double x, double y)
     {
         var tplt = LayoutUtil.GetAnchorOffset(Point, Width * Scale, Height * Scale);
@@ -204,6 +214,7 @@ public class Texture : IDisposable
     public void Expand(double width, double height)
         => XYScale = (width / Width, height / Height);
 
+    /// <summary>同じパスから新たにロードし直し、現在の描画オプション（色・スケール等）だけをコピーした別インスタンスを作る。</summary>
     public Texture Clone()
     {
         var tex = new Texture(Path);
@@ -211,6 +222,7 @@ public class Texture : IDisposable
         return tex;
     }
 
+    /// <summary>現在の描画オプション一式をDrawOptionsとして取り出す。</summary>
     public DrawOptions Export() => new()
     {
         Color = Color,
@@ -224,6 +236,7 @@ public class Texture : IDisposable
         Rectangle = Rectangle,
         Flip = Flip,
     };
+    /// <summary>DrawOptions一式をこのテクスチャのプロキシプロパティへ反映する。ScaleはW/Hが等しければ等倍のScale、違えばXYScaleに割り振る。</summary>
     public void Import(DrawOptions opt)
     {
         Color = opt.Color ?? Color.White;
@@ -262,6 +275,7 @@ public class Texture : IDisposable
     }
 }
 
+/// <summary>Action(drawAction)を焼き込んだテクスチャを1枚だけ保持し、2回目以降のGetは再生成せず使い回すキャッシュ。</summary>
 public class TextureCathe
 {
     private Texture? Cathe;

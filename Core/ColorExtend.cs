@@ -2,8 +2,10 @@
 
 namespace AstrumLoom;
 
+/// <summary>Colorの補間・変換まわりの拡張メソッド群。HSB補間、知覚的に自然なOKLab/OKLCH補間を提供する。</summary>
 public static class ColorEx
 {
+    /// <summary>RainbowのHSB値をColorへ変換する。</summary>
     public static Color From(this Rainbow rainbow)
         => rainbow.Color.ToColor();
 
@@ -44,6 +46,8 @@ public static class ColorEx
 
     #region oklab/oklch
     // ===== OKLab / OKLCH 変換＆知覚補間 =====
+    // OKLabは人間の知覚的な均一性を目指した色空間。単純なRGB/HSB補間だと途中で
+    // 灰色っぽく濁ったり明るさが不自然に変化したりするが、OKLabならそれが起きにくい。
     private struct OKLab(float L, float a, float b)
     { public float L = L, a = a, b = b; }
     private struct OKLCH(float L, float C, float h)
@@ -119,6 +123,7 @@ public static class ColorEx
         return new OKLab(lch.L, a, b);
     }
 
+    /// <summary>OKLab空間で線形補間する（知覚的に自然なグラデーションになる）。</summary>
     public static Color LerpOKLab(Color a, Color b, float t)
     {
         t = t < 0f ? 0f : (t > 1f ? 1f : t);
@@ -133,6 +138,7 @@ public static class ColorEx
     }
     #endregion
     #region oklch
+    /// <summary>OKLCH（OKLabの円柱座標表現）で補間する。色相を最短経路で回すため、レインボー的な補間に向く。</summary>
     public static Color LerpOKLCH(Color a, Color b, float t)
     {
         t = Math.Clamp(t, 0f, 1f);
@@ -247,6 +253,10 @@ public static class ColorEx
     #endregion
 }
 
+/// <summary>
+/// 色相環上の位置（0-360度）を色として扱うためのラッパー。white/blackは彩度・明度を下げるための補助パラメータ。
+/// Counterを渡すコンストラクタでは、進捗(0-1)を色相の1周に対応させ、時間経過で虹色に変化する演出に使える。
+/// </summary>
 public struct Rainbow(float potition, float white = 0, float black = 0)
 {
     internal HSBColor Color = new(potition % 360, 1.0 - white, 1.0 - black);
@@ -258,9 +268,11 @@ public struct Rainbow(float potition, float white = 0, float black = 0)
     { }
 }
 
+/// <summary>複数の色を位置(0-1)に紐づけたグラデーション。位置に応じた区間を選び、指定した色空間で補間して返す。</summary>
 public class Gradation
 {
     private readonly ColorPoint[] Points;
+    /// <summary>(位置, 色) の組から作る。位置は昇順である前提。</summary>
     public Gradation((float pos, Color color)[] points)
     {
         Points = new ColorPoint[points.Length];
@@ -269,6 +281,7 @@ public class Gradation
             Points[i] = new ColorPoint(points[i].pos, points[i].color);
         }
     }
+    /// <summary>色の配列から作る。位置は0から1まで等間隔に自動割り当てされる。</summary>
     public Gradation(Color[] colors)
     {
         Points = new ColorPoint[colors.Length];
@@ -280,8 +293,10 @@ public class Gradation
 
     public ColorSpace UseColorSpace = ColorSpace.OKLab;
 
+    /// <summary>UseColorSpaceで指定した色空間で補間した色を取得する。</summary>
     public Color GetColor(float position)
         => GetColor(position, UseColorSpace);
+    /// <summary>指定位置の色を、範囲外なら端の色をクランプして、区間内なら指定色空間で補間して返す。</summary>
     public Color GetColor(float position, ColorSpace colorSpace)
     {
         if (Points.Length == 0)

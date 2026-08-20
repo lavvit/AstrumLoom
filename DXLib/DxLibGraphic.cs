@@ -2,6 +2,7 @@
 
 namespace AstrumLoom.DXLib;
 
+/// <summary>DxLibバックエンドでのIGraphics実装。図形・テキスト描画API群をDxLibのAA付き関数(DrawLineAA等)へ委譲する。</summary>
 internal sealed class DxLibGraphics : IGraphics
 {
     public DxLibGraphics() =>
@@ -9,6 +10,7 @@ internal sealed class DxLibGraphics : IGraphics
         DefaultFont = CreateFont(new FontSpec("", 12));
 
     private (int w, int h) _size = (-1, -1);
+    /// <summary>ウィンドウサイズ。初回アクセス時のみGetWindowSizeで取得しキャッシュする（ウィンドウサイズは実行中に変わらない前提）。</summary>
     public LayoutUtil.Size Size
     {
         get
@@ -29,6 +31,7 @@ internal sealed class DxLibGraphics : IGraphics
         // 今は特に何もしない（必要ならここで状態リセット）
     }
 
+    /// <summary>裏画面(DX_SCREEN_BACK)を指定色でクリアする。</summary>
     public void Clear(Color color)
     {
         SetDrawScreen(DX_SCREEN_BACK);
@@ -38,6 +41,7 @@ internal sealed class DxLibGraphics : IGraphics
         ClearDrawScreen();
     }
 
+    /// <summary>裏画面の描画結果をScreenFlipで表画面へ切り替える（ダブルバッファのフリップ）。</summary>
     public void EndFrame() => ScreenFlip();
 
     public void Blackout(double opacity = 1.0, Color? color = null)
@@ -50,6 +54,9 @@ internal sealed class DxLibGraphics : IGraphics
         });
     }
 
+    // Line/Box/Circle/Oval/Triangle は共通のパターン：色とThickness/Opacity/BlendをDxLibのブレンドモードへ設定し、
+    // DrawXxxAA系のアンチエイリアス付き描画関数を呼んでから、ブレンド設定を必ず既定(None/255)に戻す。
+    // 戻し忘れると以降の描画全てに前回のブレンドが残ってしまうため、各メソッドの最後で必ずリセットしている。
     public void Line(double x, double y, double dx, double dy,
         DrawOptions options)
     {
@@ -115,6 +122,7 @@ internal sealed class DxLibGraphics : IGraphics
     }
 
     // Text
+    /// <summary>DxLibの既定フォントでテキストを描画する（IFont経由ではなくSetFontSize等のグローバル状態を直接操作する簡易版）。フォントサイズはEnsureFontSizeで変更が必要な時だけ切り替える。</summary>
     public void Text(double x, double y, string text, int fontSize,
         DrawOptions options)
     {
@@ -158,6 +166,7 @@ internal sealed class DxLibGraphics : IGraphics
     }
 
     private int _currentFontSize = -1;
+    /// <summary>DxLibのSetFontSizeはグローバル状態を書き換えるコストがあるため、直前と同じサイズなら呼び出しを省略する。</summary>
     private void EnsureFontSize(int fontSize)
     {
         if (_currentFontSize == fontSize) return; // 変わらないなら何もしない
@@ -169,6 +178,7 @@ internal sealed class DxLibGraphics : IGraphics
     public IFont CreateFont(FontSpec spec)
         => new DxLibFont(spec);
 
+    /// <summary>拡張子からDxLibの保存形式(BMP/JPEG/DDS/既定でPNG)を判定し、裏画面の内容をファイルへ保存する。</summary>
     public bool SaveScreenshot(string path)
     {
         // SaveDrawScreen は「現在の描画対象」を保存するので、裏画面に戻してから撮る。
@@ -195,6 +205,7 @@ internal sealed class DxLibGraphics : IGraphics
         }
     }
 
+    /// <summary>共通のBlendMode列挙をDxLibのDX_BLENDMODE_*定数へ変換する。</summary>
     internal static int GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => DX_BLENDMODE_ALPHA,
@@ -208,6 +219,10 @@ internal sealed class DxLibGraphics : IGraphics
     internal static int ToDxColor(Color col)
         => (int)GetColor(col.R, col.G, col.B);
 
+    /// <summary>
+    /// DxLibTexture/DxLibMovieの描画前に呼ぶ共通のブレンド設定。ブレンドが既定(None)かつOpacity=1.0のときは
+    /// SetDrawBlendModeの呼び出し自体を省略する（コスト削減）。色がWhite以外ならSetDrawBrightで乗算色として反映する。
+    /// </summary>
     internal static void SetColorBlend(BlendMode blend, double opacity, Color col)
     {
         if (blend > BlendMode.None || opacity < 1.0)
@@ -218,6 +233,7 @@ internal sealed class DxLibGraphics : IGraphics
         if (col != Color.White)
             SetDrawBright(col.R, col.G, col.B);
     }
+    /// <summary>DrawOptionsからSetColorBlendを呼ぶ薄いラッパー。色のアルファ値もOpacityへ掛け合わせる。</summary>
     internal static void SetOptions(DrawOptions option)
     {
         double opacity = Math.Clamp(option.Opacity, 0.0, 1.0);
@@ -226,6 +242,7 @@ internal sealed class DxLibGraphics : IGraphics
 
         SetColorBlend(option.Blend, opacity, color);
     }
+    /// <summary>SetColorBlendで変更したDxLibのブレンド/明度設定を既定値へ戻す。SetColorBlendと対で呼ぶ必要がある。</summary>
     internal static void ResetColorBlend(BlendMode blend, double opacity, Color col)
     {
         if (blend > BlendMode.None || opacity < 1.0)

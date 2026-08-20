@@ -2,6 +2,10 @@
 
 namespace AstrumLoom.Extend;
 
+/// <summary>
+/// ManagedBass（BASSライブラリ）を使ってピッチ・速度変更などに対応した音声再生を行う ISound 実装。
+/// メインスレッド以外から生成された場合はロードを遅延させ、次の Pump 呼び出し時にメインスレッドで実体化する。
+/// </summary>
 public sealed class SoundExtend : ISound, IDisposable
 {
     private static readonly object s_initLock = new();
@@ -24,6 +28,10 @@ public sealed class SoundExtend : ISound, IDisposable
 
     private static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
 
+    /// <summary>
+    /// 音声ファイルを開きます。呼び出しがメインスレッドでない場合は即座にロードせず、
+    /// 次に Pump がメインスレッドから呼ばれたタイミングで実際の BASS ストリーム生成を行います。
+    /// </summary>
     public SoundExtend(string filePath, bool loop = false, bool prescan = false)
     {
         Path = filePath;
@@ -55,6 +63,7 @@ public sealed class SoundExtend : ISound, IDisposable
         Load();
     }
 
+    /// <summary>BASS を初期化し、実際にストリームを生成します。メインスレッドから呼ばれる想定。</summary>
     private void Load()
     {
         if (IsReady) return; // 既に Ready
@@ -88,6 +97,7 @@ public sealed class SoundExtend : ISound, IDisposable
         }
     }
 
+    /// <summary>遅延ロードの実行、およびロード中タイムアウトの監視を行います（メインスレッド専用）。</summary>
     public void Pump()
     {
         // メインスレッドのみが状態更新
@@ -216,6 +226,7 @@ public sealed class SoundExtend : ISound, IDisposable
         }
     }
 
+    /// <summary>再生を開始します。既に再生中なら一度 Stop してから開始し直します。</summary>
     public void Play(bool restart = false)
     {
         if (!Enable) return;
@@ -253,6 +264,9 @@ public sealed class SoundExtend : ISound, IDisposable
     // ISound 互換
     void ISound.Play() => Play(false);
     void ISound.Stop() => Pause();
+    /// <summary>
+    /// 1回目の呼び出しで再生を開始し、以降は毎フレーム Update() を呼ぶだけの「呼びっぱなしBGM」用ヘルパー。
+    /// </summary>
     public void PlayStream()
     {
         if (!Enable) return;
@@ -265,6 +279,9 @@ public sealed class SoundExtend : ISound, IDisposable
         _played = true;
     }
     private bool _played = false;
+    /// <summary>
+    /// PlayStream の継続処理。ループしない曲が終端に近づいたら止め、ループ曲や巻き戻り時は再生フラグをリセットする。
+    /// </summary>
     public void Update()
     {
         Pump();
@@ -294,6 +311,7 @@ public sealed class SoundExtend : ISound, IDisposable
         }
     }
 
+    /// <summary>プロセス全体で一度だけ BASS ライブラリを初期化する（複数の SoundExtend で共有）。</summary>
     private static void EnsureBassInitialized()
     {
         if (s_bassInitialized) return;
