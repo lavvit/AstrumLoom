@@ -24,4 +24,12 @@
     <ProjectReference Include="..\Game\AstrumLoom.GameUtil.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      デモシーンの素材。tools\make-sandbox-assets.ps1 で手続き生成できるので、
+      消えても作り直せる。出力先（..\Debug\Assets）へそのままコピーする。
+    -->
+    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
