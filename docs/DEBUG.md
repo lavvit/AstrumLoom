@@ -69,6 +69,33 @@ AstrumLoom で作ったゲームは、何もしなくても以下のホットキ
 | `--no-log-overlay` | 画面左上のログ表示を消す（スクショを綺麗に撮る用） |
 | `--no-hotkeys` | F1〜F6 を無効化 |
 
+### ゲームごとの引数を足す
+
+`Startup.Register` で登録すると、そのゲーム固有の引数を「不明な引数」にせず受け取れます。
+`--help` にも並びます。登録は `GameApp.Run` より前に行ってください。
+
+```csharp
+Startup.Register("demo", false, "自動操縦で遊ばせる");
+Startup.Register("start-wave", true, "開始ウェーブ");
+
+// 受け取り側
+var options = Startup.Parse(args);
+bool demo = options.Flag("demo");
+int wave  = (int)options.Number("start-wave", 1);
+string s  = options.Text("mode", "normal");
+```
+
+| 呼び出し | 意味 |
+| --- | --- |
+| `Register(name, takesValue, description)` | 引数を 1 つ登録する。`--` は付けても付けなくてもよい |
+| `options.Flag(name)` | 値を取らない引数が指定されたか |
+| `options.Text(name, fallback)` | 値を文字列で読む |
+| `options.Number(name, fallback)` | 値を数として読む |
+| `Startup.HelpText` | 共通オプション＋登録したぶんの一覧 |
+
+共通オプションと同じ名前（`seed` や `out` など）は登録できません。黙って上書きされて
+`--seed` が効かなくなるのを防ぐため、登録時に例外になります。
+
 ---
 
 ## 3 つの時間モード

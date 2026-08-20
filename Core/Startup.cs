@@ -48,6 +48,28 @@ public sealed class LaunchOptions
     public bool? LogOverlay { get; set; }
     public bool? DebugHotkeys { get; set; }
 
+    // --- ゲーム固有 ---
+    /// <summary>
+    /// <see cref="Startup.Register"/> で登録した、ゲームごとの引数の値。
+    /// 値を取らないフラグは空文字が入ります。<see cref="Flag"/> / <see cref="Text"/> /
+    /// <see cref="Number"/> から読んでください。
+    /// </summary>
+    public Dictionary<string, string> Game { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>登録済みのフラグが指定されたか。</summary>
+    public bool Flag(string name) => Game.ContainsKey(name.TrimStart('-'));
+
+    /// <summary>登録済みオプションの値。指定が無ければ <paramref name="fallback"/>。</summary>
+    public string Text(string name, string fallback = "")
+        => Game.TryGetValue(name.TrimStart('-'), out string? v) && v.Length > 0 ? v : fallback;
+
+    /// <summary>登録済みオプションの値を数として読む。読めなければ <paramref name="fallback"/>。</summary>
+    public double Number(string name, double fallback)
+        => Game.TryGetValue(name.TrimStart('-'), out string? v)
+           && double.TryParse(v, System.Globalization.NumberStyles.Float,
+               System.Globalization.CultureInfo.InvariantCulture, out double d)
+            ? d : fallback;
+
     // --- その他 ---
     public bool ShowHelp { get; set; }
     public List<string> Errors { get; } = [];
@@ -101,6 +123,77 @@ public static class Startup
         --selftest / --record / --replay を指定すると、再現性のため
         自動的に単一スレッド + 固定ステップ更新に切り替わります。
         """;
+
+    /// <summary>ゲームごとに追加したオプション 1 件。</summary>
+    private readonly record struct GameOption(string Name, bool TakesValue, string Description);
+
+    private static readonly Dictionary<string, GameOption> _gameOptions
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// ゲーム固有のコマンドライン引数を登録します。<c>GameApp.Run</c> より前に呼んでください。
+    /// 登録したものは「不明な引数」にならず、<c>--help</c> にも並びます。
+    /// <code>
+    /// Startup.Register("demo", false, "自動操縦で遊ばせる");
+    /// Startup.Register("level", true, "開始ウェーブ");
+    /// // 受け取り側
+    /// if (options.Flag("demo")) ...
+    /// int level = (int)options.Number("level", 1);
+    /// </code>
+    /// </summary>
+    /// <param name="name">先頭の <c>--</c> は付けても付けなくても構いません。</param>
+    /// <param name="takesValue">値を取るなら true（<c>--level 3</c> / <c>--level=3</c>）。</param>
+    /// <param name="description"><c>--help</c> に出す説明。</param>
+    public static void Register(string name, bool takesValue = false, string description = "")
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        string key = name.TrimStart('-').ToLowerInvariant();
+        // 共通オプションと同じ名前を後から潰されると、--seed などが黙って効かなくなる。
+        if (IsBuiltInOption(key))
+            throw new ArgumentException($"'{key}' は AstrumLoom の共通オプションなので登録できません。", nameof(name));
+        _gameOptions[key] = new GameOption(key, takesValue, description);
+    }
+
+    /// <summary>登録したゲーム固有オプションを全部消します。主にテスト用。</summary>
+    public static void ClearRegistered() => _gameOptions.Clear();
+
+    /// <summary>登録済みのゲーム固有オプションがあるか。</summary>
+    public static bool HasRegistered => _gameOptions.Count > 0;
+
+    /// <summary><c>--help</c> に出す文面。共通オプションにゲーム固有のぶんを足したもの。</summary>
+    public static string HelpText
+    {
+        get
+        {
+            if (_gameOptions.Count == 0) return Usage;
+            var sb = new System.Text.StringBuilder(Usage);
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine("このゲーム固有のオプション");
+            sb.AppendLine();
+            foreach (var opt in _gameOptions.Values.OrderBy(v => v.Name, StringComparer.Ordinal))
+            {
+                string left = opt.TakesValue ? $"--{opt.Name} <値>" : $"--{opt.Name}";
+                sb.AppendLine($"  {left,-26} {opt.Description}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+    }
+
+    /// <summary>共通オプションとして解釈される名前かどうか。</summary>
+    private static bool IsBuiltInOption(string key) => key switch
+    {
+        "h" or "help" or "?" or "backend" or "dxlib" or "raylib"
+        or "width" or "w" or "height" or "hgt" or "scale"
+        or "fullscreen" or "windowed" or "no-fullscreen"
+        or "fps" or "vsync" or "no-vsync" or "mt" or "multithread"
+        or "no-mt" or "single-thread" or "fixed" or "no-fixed" or "hz" or "seed"
+        or "shot-every" or "quit-after" or "quit-after-sec" or "quit-after-seconds"
+        or "selftest" or "self-test" or "record" or "replay" or "tuning"
+        or "out" or "outdir" or "overlay" or "no-overlay"
+        or "no-log-overlay" or "log-overlay" or "no-hotkeys" or "hotkeys" => true,
+        _ => false,
+    };
 
     /// <summary>コマンドライン引数を解釈します。例外は投げません。</summary>
     public static LaunchOptions Parse(string[]? args)
@@ -194,7 +287,18 @@ public static class Startup
                 case "hotkeys": o.DebugHotkeys = true; break;
 
                 default:
-                    o.Unknown.Add(raw);
+                    // 登録済みのゲーム固有オプションならここで受ける。
+                    // 登録が無いものだけを「不明」に落とす。
+                    if (_gameOptions.TryGetValue(name, out var game))
+                    {
+                        if (!game.TakesValue) o.Game[game.Name] = "";
+                        else
+                        {
+                            string? v = Value();
+                            if (v != null) o.Game[game.Name] = v;
+                        }
+                    }
+                    else o.Unknown.Add(raw);
                     break;
             }
         }

@@ -57,7 +57,8 @@ public static class GameApp
         if (options.ShowHelp)
         {
             Console.WriteLine($"{config.Title}\n");
-            Console.WriteLine(Startup.Usage);
+            // Startup.Register で足したゲーム固有のオプションも一緒に出す。
+            Console.WriteLine(Startup.HelpText);
             return ExitOk;
         }
 

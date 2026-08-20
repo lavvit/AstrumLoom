@@ -565,6 +565,7 @@ FFmpeg を利用した MP4 再生機能を検討・実装中です。
 - [x] Debug Overlay
 - [x] 実機デバッグの道具（セルフテスト / 入力の記録・再生 / スクショ自動化 / tuning ホットリロード）
 - [x] プロジェクト雛形の生成とビルドスクリプト
+- [x] ゲームごとのコマンドライン引数（`Startup.Register`）
 - [ ] Game Editor 向けAPI
 - [x] ドキュメント整備（[WORKFLOW](docs/WORKFLOW.md) / [DEBUG](docs/DEBUG.md)）
 - [x] サンプルプロジェクト（`Sandbox` と `newgame.ps1` の雛形）
