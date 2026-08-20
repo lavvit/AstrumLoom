@@ -1,76 +1,265 @@
-﻿using System.Diagnostics;
-
-using AstrumLoom;
+﻿using AstrumLoom;
 
 namespace Sandbox;
 
-// 図形描画テスト用のオシャレなシーン
-internal sealed class FancyShapesScene : Scene
+/// <summary>
+/// テーマ「万華鏡工房」。
+///
+/// Drawing の図形プリミティブを 6 枚のカードに分けて見せる。派手な合成だけを見せると
+/// 「なんとなく綺麗」で終わってしまうので、各カードは 1〜2 個の API に絞って
+/// パラメータと絵を対応づける。演出はすべて DemoUi.Delta（経過秒）で進める
+/// （[[astrumloom-library]] にある通り、フレーム数で進めると実機の無制限 FPS で暴走する）。
+/// </summary>
+internal sealed class ShapesDemoScene : Scene
 {
-    private readonly int _width;
-    private readonly int _height;
-    private readonly Stopwatch _sw = Stopwatch.StartNew();
-    private readonly Random _rand = new(12345);
+    private double _time;
+    private bool _spin = true;
+    private int _thicknessIndex = 1;
+    private static readonly int[] Thicknesses = [0, 3, 6, 12];
 
-    public FancyShapesScene()
+    public override void Enable()
     {
-        _width = AstrumCore.Width;
-        _height = AstrumCore.Height;
+        base.Enable();
+        _time = 0;
+        _spin = true;
+        _thicknessIndex = 1;
+    }
+
+    public override void Update()
+    {
+        double dt = DemoUi.Delta;
+        if (_spin) _time += dt;
+
+        if (Key.Space.Push()) _spin = !_spin;
+        if (Key.T.Push()) _thicknessIndex = (_thicknessIndex + 1) % Thicknesses.Length;
     }
 
     public override void Draw()
     {
-        // 背景に回転グラデーション
-        double t = _sw.Elapsed.TotalSeconds;
-        var bg = new Gradation(new[]
-        {
-            (0.00f, Color.FromHSB(220, 0.20, 0.12)),
-            (0.35f, Color.FromHSB(250, 0.35, 0.18)),
-            (0.65f, Color.FromHSB(290, 0.40, 0.20)),
-            (1.00f, Color.FromHSB(330, 0.50, 0.22)),
-        });
-        Drawing.Gradation(0, 0, _width, _height, bg, colorSpace: Gradation.ColorSpace.OKLCH);
-        // rotate: (t * 12) % 360,
+        DrawBackdrop();
 
-        // タイトル
-        Drawing.Text(_width / 2.0, 32, "AstrumLoom Shapes", Color.White, ReferencePoint.TopCenter, edgecolor: Color.Black);
-        Drawing.Text(_width / 2.0, 68, "- simple, clean and animated -", new Color(220, 225, 235), ReferencePoint.TopCenter);
-        Drawing.DefaultFont.DrawEdge(_width / 2.0, 92, "日本語のテキスト", new Color(180, 185, 195), ReferencePoint.TopCenter);
-        Drawing.Line(_width / 2.0 - 100, 120, 200, 0, new Color(255, 255, 255, 100), thickness: 1);
+        Drawing.Text(20, 16, "万華鏡工房 / 図形の見本帳", Color.White, edgecolor: new Color(10, 8, 20));
+        DemoUi.Note(20, 52, 820,
+            "[Space] 全体の回転を止める/動かす  [T] 円と楕円の枠の太さを切り替える",
+            new Color(196, 186, 226));
 
-        // 左: ラインとクロス
-        double leftX = 120;
-        for (int i = 0; i < 8; i++)
+        Card(0, 0, "1) Line / Cross", DrawLineCard);
+        Card(1, 0, "2) Circle / Oval", DrawCircleCard);
+        Card(2, 0, "3) Triangle / Polygon", DrawTriangleCard);
+        Card(0, 1, "4) Box / Alpha", DrawBoxCard);
+        Card(1, 1, "5) Gradation", DrawGradationCard);
+        Card(2, 1, "6) 合成", DrawKaleidoscopeCard);
+    }
+
+    #region 背景とカードの枠
+
+    private void DrawBackdrop()
+    {
+        var bg = new Gradation(
+        [
+            (0.00f, Color.FromHSB(260, 0.24, 0.10)),
+            (0.45f, Color.FromHSB(290, 0.34, 0.15)),
+            (1.00f, Color.FromHSB(320, 0.42, 0.18)),
+        ]);
+        Drawing.Gradation(0, 0, AstrumCore.Width, AstrumCore.Height, bg, colorSpace: Gradation.ColorSpace.OKLCH);
+    }
+
+    private const int CardW = 404;
+    private const int CardH = 292;
+    private const int CardTop = 84;
+    private const int Pad = 10;
+    private const double TextW = CardW - Pad * 2;
+
+    private static void Card(int col, int row, string title, Action<double, double> body)
+    {
+        double x = 16 + col * (CardW + 12);
+        double y = CardTop + row * (CardH + 10);
+        DemoUi.Card(x, y, CardW, CardH, title, (bx, by, _) => body(bx, by));
+    }
+
+    #endregion
+
+    #region 1) Line / Cross
+
+    private void DrawLineCard(double x, double y)
+    {
+        double cx = x + CardW / 2.0, cy = y + 96;
+        for (int i = 0; i < 12; i++)
         {
-            double ang = i / 8.0 * Math.PI * 2 + t * 0.6;
-            double len = 70 + 40 * Math.Sin(t * 1.7 + i);
-            var col = ColorEx.From(new Rainbow(i * 45));
-            Drawing.Line(leftX, 160, Math.Cos(ang) * len, Math.Sin(ang) * len, col, thickness: 2);
+            double ang = i / 12.0 * Math.PI * 2 + _time * 0.5;
+            double len = 60 + 26 * Math.Sin(_time * 1.3 + i);
+            var col = ColorEx.From(new Rainbow(i * 30 + (float)(_time * 40)));
+            Drawing.Line(cx, cy, Math.Cos(ang) * len, Math.Sin(ang) * len, col, thickness: 2);
         }
-        Drawing.Cross(leftX, 160, 14, new Color(255, 255, 255, 220), thickness: 3);
+        Drawing.Cross(cx, cy, 14, new Color(255, 255, 255, 220), thickness: 3);
 
-        // 中央: サークル/オーバルのリング
-        double cx = _width / 2.0, cy = _height / 2.0 + 20;
-        for (int i = 0; i < 5; i++)
+        double ny = y + 168;
+        ny = DemoUi.Notes(x + Pad, ny, TextW, new Color(196, 212, 240),
+            "Line(x, y, dx, dy) は始点と「差分」で引く。終点ではない。");
+        DemoUi.Notes(x + Pad, ny, TextW, new Color(152, 170, 202),
+            "Cross は十字。基準合わせの目印としてよく使う。");
+    }
+
+    #endregion
+
+    #region 2) Circle / Oval
+
+    private void DrawCircleCard(double x, double y)
+    {
+        double cx = x + CardW / 2.0, cy = y + 96;
+        int thickness = Thicknesses[_thicknessIndex];
+
+        for (int i = 0; i < 4; i++)
         {
-            double r = 60 + i * 22 + 6 * Math.Sin(t * 2 + i);
-            var col = Color.Lerp(new Color(255, 255, 255, 16), new Color(255, 255, 255, 140), (float)(0.2 + i * 0.15));
-            Drawing.Circle(cx, cy, r, col, thickness: 2);
+            double r = 28 + i * 20 + 4 * Math.Sin(_time * 2 + i);
+            var col = Color.FromHSB((_time * 40 + i * 30) % 360, 0.7, 1.0);
+            if (thickness == 0)
+                Drawing.Circle(cx, cy, r, col.WithAlpha(160));
+            else
+                Drawing.Circle(cx, cy, r, col, thickness: thickness);
         }
-        // 少し歪んだ楕円のレイヤ
-        for (int i = 0; i < 3; i++)
+        Drawing.Oval(cx, cy + 74, 70, 24, new Color(255, 255, 255, 40));
+        Drawing.Oval(cx, cy + 74, 70, 24, new Color(255, 255, 255, 200),
+            thickness: thickness == 0 ? 0 : thickness);
+
+        double ny = y + 210;
+        ny = DemoUi.Notes(x + Pad, ny, TextW, new Color(196, 212, 240),
+            $"Thickness = {thickness}（[T] で切替）");
+        DemoUi.Notes(x + Pad, ny, TextW, new Color(212, 172, 112),
+            "注: RayLib は枠線 Circle/Oval の太さを無視し、常に細線で描く。"
+            + "DxLib では効く。--backend で見比べること。");
+    }
+
+    #endregion
+
+    #region 3) Triangle / Polygon
+
+    private void DrawTriangleCard(double x, double y)
+    {
+        double cx = x + CardW / 2.0, cy = y + 96;
+        const int petals = 6;
+        for (int i = 0; i < petals; i++)
         {
-            double a = 120 + i * 36 + 8 * Math.Sin(t * 1.3 + i);
-            double b = 70 + i * 28 + 5 * Math.Sin(t * 1.6 + i * 0.7);
-            double rot = t * 25 + i * 30;
-            var ring = new Gradation(new[]
+            double a0 = i / (double)petals * Math.PI * 2 + _time * 0.4;
+            double a1 = (i + 1) / (double)petals * Math.PI * 2 + _time * 0.4;
+            double r = 78;
+            double x1 = cx, y1 = cy;
+            double x2 = cx + Math.Cos(a0) * r, y2 = cy + Math.Sin(a0) * r;
+            double x3 = cx + Math.Cos(a1) * r, y3 = cy + Math.Sin(a1) * r;
+            var col = ColorEx.From(new Rainbow(i * 60 + (float)(_time * 50)));
+            bool fill = i % 2 == 0;
+            Drawing.Triangle(x1, y1, x2, y2, x3, y3, fill ? col.WithAlpha(150) : col, thickness: fill ? 0 : 2);
+        }
+
+        // 星形の輪郭を Polygon で。
+        var points = new (double x, double y)[10];
+        for (int i = 0; i < 10; i++)
+        {
+            double r = i % 2 == 0 ? 30 : 14;
+            double a = i / 10.0 * Math.PI * 2 - _time * 0.6;
+            points[i] = (cx + Math.Cos(a) * r, cy + Math.Sin(a) * r + 4);
+        }
+        Drawing.Polygon(points, new Color(255, 255, 255, 230), thickness: 2);
+
+        double ny = y + 190;
+        ny = DemoUi.Notes(x + Pad, ny, TextW, new Color(196, 212, 240),
+            "花びらは Triangle（3 点指定）、星の輪郭は Polygon（点列）。");
+        DemoUi.Notes(x + Pad, ny, TextW, new Color(152, 170, 202),
+            "thickness:0 は塗りつぶし、それ以外は枠線だけになる。");
+    }
+
+    #endregion
+
+    #region 4) Box / Alpha
+
+    private void DrawBoxCard(double x, double y)
+    {
+        double gx = x + Pad, gy = y + 6, cell = 54;
+
+        // 市松模様の下地。左半分は黒、右半分は白にして、同じ半透明色でも
+        // 「下地が違うとどう見えるか」を並べて比べられるようにする。
+        for (int j = 0; j < 3; j++)
+        {
+            for (int i = 0; i < 6; i++)
             {
-                (0.00f, new Color(255,255,255,16)),
-                (0.50f, new Color(255,255,255,70)),
-                (1.00f, new Color(255,255,255,16)),
-            });
-            // 疑似的に線で楕円リングを構成
-            int seg = 96;
+                bool dark = i < 3;
+                Drawing.Box(gx + i * cell, gy + j * cell, cell, cell, dark ? new Color(18, 18, 24) : new Color(230, 230, 236));
+            }
+        }
+
+        for (int j = 0; j < 3; j++)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                double hue = (_time * 30 + (i * 3 + j) * 22) % 360;
+                var col = Color.FromHSB(hue, 0.8, 1.0);
+                int alpha = 60 + j * 70;
+                double cx = gx + i * cell + cell / 2.0, cy = gy + j * cell + cell / 2.0;
+                Drawing.Box(cx - 18, cy - 18, 36, 36, col.WithAlpha(alpha));
+            }
+        }
+
+        double ny = gy + 3 * cell + 14;
+        ny = DemoUi.Notes(x + Pad, ny, TextW, new Color(196, 212, 240),
+            "同じ WithAlpha(60/130/200) を、黒地（左）と白地（右）に重ねている。");
+        DemoUi.Notes(x + Pad, ny, TextW, new Color(152, 170, 202),
+            "半透明の色は下地によって見え方が変わる、という当たり前だが忘れやすい確認。");
+    }
+
+    #endregion
+
+    #region 5) Gradation
+
+    private static readonly (string Label, Gradation.ColorSpace Space)[] Spaces =
+    [
+        ("RGB", Gradation.ColorSpace.RGB),
+        ("OKLCH", Gradation.ColorSpace.OKLCH),
+        ("OKLab", Gradation.ColorSpace.OKLab),
+    ];
+
+    private void DrawGradationCard(double x, double y)
+    {
+        // どの色空間も同じ 2 色（鮮やかな黄 → 鮮やかな青紫）を渡す。
+        // RGB 補間は中間で彩度が抜けて灰色っぽくなり、OKLCH/OKLab は鮮やかなまま繋がる。
+        var grad = new Gradation([(0.0f, Color.FromHSB(52, 0.85, 1.0)), (1.0f, Color.FromHSB(268, 0.75, 0.95))]);
+
+        double gx = x + Pad, gw = TextW, gh = 56;
+        double gy = y + 8;
+        for (int i = 0; i < Spaces.Length; i++)
+        {
+            Drawing.Gradation((int)gx, (int)gy, (int)gw, (int)gh, grad, colorSpace: Spaces[i].Space);
+            Drawing.Box(gx, gy, gw, gh, new Color(255, 255, 255, 60), thickness: 1);
+            DemoUi.NoteFont.Draw(gx + gw / 2, gy + gh / 2 - 8, Spaces[i].Label,
+                Color.Black, ReferencePoint.TopCenter);
+            gy += gh + 8;
+        }
+
+        double ny = gy + 6;
+        ny = DemoUi.Notes(x + Pad, ny, TextW, new Color(196, 212, 240),
+            "同じ黄から青紫への 2 色を、3 通りの補間で繋いだもの。");
+        DemoUi.Notes(x + Pad, ny, TextW, new Color(152, 170, 202),
+            "RGB は中間で彩度が落ちて灰色がかる。OKLCH/OKLab は鮮やかさを保ったまま繋がる。");
+    }
+
+    #endregion
+
+    #region 6) 合成
+
+    private void DrawKaleidoscopeCard(double x, double y)
+    {
+        double cx = x + CardW / 2.0, cy = y + 130;
+        const int seg = 72;
+        for (int layer = 0; layer < 3; layer++)
+        {
+            double a = 70 + layer * 30;
+            double b = 40 + layer * 22;
+            double rot = _time * (18 + layer * 6);
+            var ring = new Gradation(
+            [
+                (0.00f, new Color(255, 255, 255, 10)),
+                (0.50f, Color.FromHSB((_time * 30 + layer * 90) % 360, 0.8, 1.0, 0.55f)),
+                (1.00f, new Color(255, 255, 255, 10)),
+            ]);
             for (int s = 0; s < seg; s++)
             {
                 double th1 = s * (Math.PI * 2 / seg);
@@ -80,66 +269,19 @@ internal sealed class FancyShapesScene : Scene
                 double x2 = cx + Math.Cos(th2 + rot * Math.PI / 180) * a;
                 double y2 = cy + Math.Sin(th2 + rot * Math.PI / 180) * b;
                 var c = ring.GetColor((float)s / (seg - 1), Gradation.ColorSpace.OKLab);
-                Drawing.LineZ(x1, y1, x2, y2, c, thickness: 1);
+                Drawing.LineZ(x1, y1, x2, y2, c, thickness: 2);
             }
         }
+        Drawing.Cross(cx, cy, 8, new Color(255, 255, 255, 200), thickness: 2);
 
-        // 右: ボックスと三角形のタイル
-        double rightX = _width - 280;
-        for (int j = 0; j < 4; j++)
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                double x = rightX + i * 76;
-                double y = 120 + j * 76;
-                var col = ColorEx.From(new Rainbow((float)((i + j * 0.5) * 60 + t * 60)));
-                Drawing.Box(x, y, 60, 60, col.WithAlpha(40));
-                Drawing.Box(x, y, 60, 60, Color.VisibleColor(col).WithAlpha(180), thickness: 2);
-
-                // 三角（交互に塗り/線）
-                double x1 = x + 8, y1 = y + 52;
-                double x2 = x + 30, y2 = y + 12;
-                double x3 = x + 52, y3 = y + 52;
-                bool fill = (i + j) % 2 == 0;
-                Drawing.Triangle(x1, y1, x2, y2, x3, y3, fill ? col.WithAlpha(120) : col, thickness: fill ? 0 : 2);
-            }
-        }
-
-        // デモ: グラデパネル
-        var panel = new Gradation(new[]
-        {
-            (0.00f, Color.FromHSB(45, 0.68, 0.98)),
-            (0.50f, Color.FromHSB(355, 0.65, 0.98)),
-            (1.00f, Color.FromHSB(210, 0.55, 0.98)),
-        });
-        double pw = Math.Min(520, _width - 80);
-        double ph = 80;
-        double px = (_width - pw) / 2.0;
-        double py = _height - ph - 40;
-        Drawing.Box(px - 6, py - 6, pw + 12, ph + 12, new Color(0, 0, 0, 60));
-        Drawing.Gradation((int)px, (int)py, (int)pw, (int)ph, panel, colorSpace: Gradation.ColorSpace.OKLCH);
-        // rotate: (t * 40) % 360,
-        Drawing.Text(_width / 2.0, py + ph / 2.0, "OKLCH gradient", Color.Black, ReferencePoint.Center);
-
-        // 端に目印
-        DrawCornerGuides();
+        DemoUi.Notes(x + Pad, y + 220, TextW, new Color(152, 170, 202),
+            "ここまでのカードで使った API（Line / Gradation / 色空間）だけで組んだ飾り。");
     }
 
-    private void DrawCornerGuides()
-    {
-        int m = 14;
-        var c = new Color(255, 255, 255, 180);
-        // 左上
-        Drawing.Line(m, m, 28, 0, c, thickness: 2);
-        Drawing.Line(m, m, 0, 28, c, thickness: 2);
-        // 右上
-        Drawing.Line(_width - m, m, -28, 0, c, thickness: 2);
-        Drawing.Line(_width - m, m, 0, 28, c, thickness: 2);
-        // 左下
-        Drawing.Line(m, _height - m, 28, 0, c, thickness: 2);
-        Drawing.Line(m, _height - m, 0, -28, c, thickness: 2);
-        // 右下
-        Drawing.Line(_width - m, _height - m, -28, 0, c, thickness: 2);
-        Drawing.Line(_width - m, _height - m, 0, -28, c, thickness: 2);
-    }
+    #endregion
+
+    // --- セルフテストから中を覗くための入口 ---------------------------------
+
+    public bool Spinning => _spin;
+    public int ThicknessIndex => _thicknessIndex;
 }

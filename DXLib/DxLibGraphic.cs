@@ -205,13 +205,20 @@ internal sealed class DxLibGraphics : IGraphics
         }
     }
 
-    /// <summary>共通のBlendMode列挙をDxLibのDX_BLENDMODE_*定数へ変換する。</summary>
+    /// <summary>
+    /// 共通のBlendMode列挙をDxLibのDX_BLENDMODE_*定数へ変換する。
+    /// Screen(src+dst-src*dst)はSPINE_SCREENがそのままの式を持つのでそれを使う（RayLib側と同じ結果になる）。
+    /// Reverse(src-dst想定)はDxLibにOpenGLのような合成係数のカスタム指定がないため、
+    /// SUB(dst-src)の逆方向として一番近いSUB2を割り当てる（厳密な一致はRayLib側と保証されない）。
+    /// </summary>
     internal static int GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => DX_BLENDMODE_ALPHA,
         BlendMode.Add => DX_BLENDMODE_ADD,
         BlendMode.Subtract => DX_BLENDMODE_SUB,
         BlendMode.Multiply => DX_BLENDMODE_MULA,
+        BlendMode.Screen => DX_BLENDMODE_SPINE_SCREEN,
+        BlendMode.Reverse => DX_BLENDMODE_SUB2,
         _ => DX_BLENDMODE_NOBLEND,
     };
 

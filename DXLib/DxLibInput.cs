@@ -298,10 +298,19 @@ internal sealed class DxLibTextInput : ITextInput
         if (!IsActive) return;
         // DxLibのキー入力バッファは全選択操作時などに制御文字を混入させることがあるので、
         // その手前までで切り詰めて全選択状態にする。
-        if (Text.Contains('\u0001'))
+        //
+        // Text は毎回 GetKeyInputString でネイティブの入力バッファを読み直すプロパティなので、
+        // Contains と IndexOf で別々に呼ぶと2回のネイティブ読み取りの間にバッファが変わりうる
+        // （タイピング中は常に変わる）。1回目は制御文字を含んでいたのに2回目には無くなっていると
+        // IndexOf が -1 を返し、下の Text[..-1] が Substring に負の長さを渡して落ちる
+        // （実際に発生した Fatal Error: ArgumentOutOfRangeException 'length' (-1)）。
+        // 1回だけ読んでローカル変数に固定してから使う。
+        string text = Text;
+        int marker = text.IndexOf('');
+        if (marker >= 0)
         {
-            Text = Text[..Text.IndexOf('\u0001')];
-            Selection = new(0, Text.Length);
+            Text = text[..marker];
+            Selection = new(0, marker);
         }
         // 入力欄へファイルがドラッグ＆ドロップされた場合は、そのパスをテキストとして追記する
         if (GetDragFileNum() > 0)

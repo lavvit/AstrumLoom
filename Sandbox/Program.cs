@@ -12,15 +12,15 @@ internal sealed class SimpleTestGame : Scene
     [
         ("Texture の見本帳（星図アトラス）", () => new TextureDemoScene()),
         ("Sound の見本帳（灯台の夜）", () => new SoundDemoScene()),
-        ("図形", () => new FancyShapesScene()),
-        ("入力", () => new InputTestScene()),
+        ("図形の見本帳（万華鏡工房）", () => new ShapesDemoScene()),
+        ("Input の見本帳（入力コックピット）", () => new InputDemoScene()),
         ("描画負荷", () => new LoadCheckScene()),
         ("ゲームの雛形", () => new GameTemplateScene()),
     ];
 
     public override void Enable()
     {
-        var ft = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 24, edge: 2);
+        var ft = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 12, edge: 1);
         if (ft != null) Drawing.DefaultFont = ft;
 
         // --scene で起動時のシーンを指定できる（1 始まり）。証跡を撮るときに便利。
@@ -54,7 +54,7 @@ internal sealed class SimpleTestGame : Scene
 
     public override void Update()
     {
-        if (Key.Esc.Push()) AstrumCore.End();
+        if (KeyInput.Ctrl && Key.Esc.Push()) AstrumCore.End();
 
         // 数字キーでシーンを切り替える。子シーン側は数字キーを使っていない。
         for (int i = 0; i < Menu.Length; i++)
@@ -213,6 +213,62 @@ internal static class Program
         SelfTest.Wait(4);
         SelfTest.Check("霧笛の要求が届いた", () => Snd?.HornCount >= 1);
 
+        // ---- 図形の見本帳 -------------------------------------------------------
+        SelfTest.Do("3 番のシーンへ", () => VirtualInput.Press(Key.Key_3));
+        SelfTest.Wait(2);
+        SelfTest.Do("3 を離す", () => VirtualInput.Release(Key.Key_3));
+        SelfTest.Wait(20);
+        SelfTest.Check("図形の見本帳へ切り替わった", () => Root?.Child is ShapesDemoScene);
+        SelfTest.Check("デフォルトで回転している", () => Shapes?.Spinning == true);
+
+        SelfTest.Do("Space で回転を止める", () => VirtualInput.Press(Key.Space));
+        SelfTest.Wait(2);
+        SelfTest.Do("Space を離す", () => VirtualInput.Release(Key.Space));
+        SelfTest.Wait(2);
+        SelfTest.Check("回転が止まった", () => Shapes?.Spinning == false);
+
+        SelfTest.Do("T で枠の太さを切り替える", () => VirtualInput.Press(Key.T));
+        SelfTest.Wait(2);
+        SelfTest.Do("T を離す", () => VirtualInput.Release(Key.T));
+        SelfTest.Wait(2);
+        SelfTest.Check("Thickness が切り替わった", () => Shapes?.ThicknessIndex == 2);
+        SelfTest.Shot("shapes");
+
+        // ---- Input の見本帳 -------------------------------------------------------
+        SelfTest.Do("4 番のシーンへ", () => VirtualInput.Press(Key.Key_4));
+        SelfTest.Wait(2);
+        SelfTest.Do("4 を離す", () => VirtualInput.Release(Key.Key_4));
+        SelfTest.Wait(20);
+        SelfTest.Check("Input の見本帳へ切り替わった", () => Root?.Child is InputDemoScene);
+
+        // KeyInput.Push はテキスト入力中(Typing)は常に false を返す
+        // （Core/Input.cs の Typing ゲート）。だから通常キーのログ確認は
+        // テキスト入力を始める前に済ませる。
+        SelfTest.Do("Z キーを押す", () => VirtualInput.Press(Key.Z));
+        SelfTest.Wait(2);
+        SelfTest.Do("Z キーを離す", () => VirtualInput.Release(Key.Z));
+        SelfTest.Wait(2);
+        SelfTest.Check("キー入力がイベントログへ流れた", () => Inp != null && Inp.LogCount > 0);
+
+        SelfTest.Do("T でテキスト入力を開始する", () => VirtualInput.Press(Key.T));
+        SelfTest.Wait(2);
+        SelfTest.Do("T を離す", () => VirtualInput.Release(Key.T));
+        SelfTest.Wait(2);
+        SelfTest.Check("テキスト入力が始まった", () => Inp?.TextActive == true);
+        SelfTest.Shot("input");
+
+        // Enter による確定はここでは確認しない。ITextInput はバックエンドのネイティブな
+        // キー状態を直接見ており（docs\KNOWN-ISSUES.md の「RayLibTextInput が buffered
+        // state 経由でなく IsKeyPressed 直呼び」）、VirtualInput 経由の合成入力が
+        // 確実に届く保証が無いため。
+        // 後片付け: KeyInput.Typing が true のままだと、これ以降すべての Key.Push/Left が
+        // 常に false になり（Typing ゲート）、次のシーン切り替えの数字キーすら効かなくなる。
+        // Esc は Typing 中に Push が false を返すゲートのせいで機能しない（このカードの注釈の通り）。
+        // 唯一の脱出口である KeyInput.Cancel() で閉じる。
+        SelfTest.Do("テキスト入力を閉じる（後片付け）", () => KeyInput.Cancel());
+        SelfTest.Wait(4);
+        SelfTest.Check("Typing が終わった", () => !KeyInput.Typing);
+
         // ---- 後片付けまで見る -------------------------------------------------
         SelfTest.Do("1 番のシーンへ戻す", () => VirtualInput.Press(Key.Key_1));
         SelfTest.Wait(2);
@@ -230,4 +286,6 @@ internal static class Program
     private static SimpleTestGame? Root => Scene.NowScene as SimpleTestGame;
     private static TextureDemoScene? Tex => Root?.Child as TextureDemoScene;
     private static SoundDemoScene? Snd => Root?.Child as SoundDemoScene;
+    private static ShapesDemoScene? Shapes => Root?.Child as ShapesDemoScene;
+    private static InputDemoScene? Inp => Root?.Child as InputDemoScene;
 }

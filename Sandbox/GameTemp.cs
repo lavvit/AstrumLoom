@@ -13,9 +13,19 @@ internal class GameTemplateScene : Scene
     private const float EnemyRadius = 22f;
 
     private readonly Random _random = new();
+    // 更新スレッド(Update)専用の作業用リスト。RemoveAt/インデクサ代入で毎フレーム書き換える。
     private readonly List<Enemy> _enemies = [];
     private readonly List<Bullet> _bullets = [];
     private readonly List<Item> _items = [];
+
+    // 描画スレッド(Draw)はこちらだけを読む。Update の最後に ToArray() で丸ごと差し替える
+    // （配列参照の代入は原子的なので、Draw が読んでいる最中に作業用リストを書き換えても壊れない）。
+    // 素の List を Update/Draw で共有すると、UseMultiThreadUpdate=true のとき Draw が
+    // foreach で列挙している最中に Update が RemoveAt するタイミングで
+    // ArgumentOutOfRangeException 等の Fatal Error に落ちる（[[astrumloom-library]]）。
+    private Enemy[] _enemiesView = [];
+    private Bullet[] _bulletsView = [];
+    private Item[] _itemsView = [];
 
     private Vector2 _playerPos;
     private float _enemySpawnTimer;
@@ -38,6 +48,9 @@ internal class GameTemplateScene : Scene
         _enemies.Clear();
         _bullets.Clear();
         _items.Clear();
+        _enemiesView = [];
+        _bulletsView = [];
+        _itemsView = [];
     }
 
     public override void Update()
@@ -69,6 +82,11 @@ internal class GameTemplateScene : Scene
 
         _shootCooldown = MathF.Max(0f, _shootCooldown - delta);
         _invincibleTimer = MathF.Max(0f, _invincibleTimer - delta);
+
+        // このフレームの最終状態を Draw 用に公開する。
+        _enemiesView = _enemies.ToArray();
+        _bulletsView = _bullets.ToArray();
+        _itemsView = _items.ToArray();
     }
 
     public override void Draw()
@@ -95,6 +113,9 @@ internal class GameTemplateScene : Scene
         _enemies.Clear();
         _bullets.Clear();
         _items.Clear();
+        _enemiesView = [];
+        _bulletsView = [];
+        _itemsView = [];
     }
 
     private void HandleMovement(float delta)
@@ -306,7 +327,7 @@ internal class GameTemplateScene : Scene
 
     private void DrawItems()
     {
-        foreach (var item in _items)
+        foreach (var item in _itemsView)
         {
             float pulse = 1f + MathF.Sin(item.Age * 8f) * 0.2f;
             float radius = item.Radius * pulse;
@@ -324,7 +345,7 @@ internal class GameTemplateScene : Scene
 
     private void DrawEnemies()
     {
-        foreach (var enemy in _enemies)
+        foreach (var enemy in _enemiesView)
         {
             float pulse = 1f + MathF.Sin(enemy.Age * 6f) * 0.1f;
             float radius = enemy.Radius * pulse;
@@ -335,7 +356,7 @@ internal class GameTemplateScene : Scene
 
     private void DrawBullets()
     {
-        foreach (var bullet in _bullets)
+        foreach (var bullet in _bulletsView)
         {
             Drawing.Circle(bullet.Position.X, bullet.Position.Y, BulletRadius, new Color(255, 220, 120));
         }
@@ -360,7 +381,7 @@ internal class GameTemplateScene : Scene
         }
         else
         {
-            Drawing.Text(AstrumCore.Width - 48, AstrumCore.Height - 40, $"Enemies {_enemies.Count}", Color.LightGray, ReferencePoint.BottomRight);
+            Drawing.Text(AstrumCore.Width - 48, AstrumCore.Height - 40, $"Enemies {_enemiesView.Length}", Color.LightGray, ReferencePoint.BottomRight);
         }
     }
 

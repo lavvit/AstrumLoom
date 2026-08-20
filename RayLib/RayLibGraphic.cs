@@ -194,16 +194,27 @@ internal sealed class RayLibGraphics : IGraphics
         }
     }
 
-    /// <summary>Core側のBlendModeをraylibのBlendModeへ変換します。</summary>
+    /// <summary>
+    /// Core側のBlendModeをraylibのBlendModeへ変換します。
+    /// Screen/Reverseはraylibにプリセットが無いため、SetColorBlend側でrlSetBlendFactorsを使い
+    /// OpenGLの合成係数を直接指定してからCustomモードで描画します。
+    /// </summary>
     internal static RayBlend GetBlendMode(BlendMode mode) => mode switch
     {
         BlendMode.None => RayBlend.Alpha,
         BlendMode.Add => RayBlend.Additive,
         BlendMode.Subtract => RayBlend.SubtractColors,
         BlendMode.Multiply => RayBlend.Multiplied,
+        BlendMode.Screen => RayBlend.Custom,
         BlendMode.Reverse => RayBlend.Custom,
         _ => RayBlend.Alpha,
     };
+
+    // OpenGLの合成係数/式の定数（raylibにプリセットの無いBlendModeをrlSetBlendFactorsで組むために使う）
+    private const int GL_ONE = 1;
+    private const int GL_ONE_MINUS_SRC_COLOR = 0x0301;
+    private const int GL_FUNC_ADD = 0x8006;
+    private const int GL_FUNC_SUBTRACT = 0x800A;
 
     // Color helper
     /// <summary>Core側のColorをraylibのColorへ変換します。opacityはアルファ値に乗算されます。</summary>
@@ -218,6 +229,17 @@ internal sealed class RayLibGraphics : IGraphics
     {
         if (blend > BlendMode.None || opacity < 1.0)
         {
+            // Screen: src + dst*(1-src) = src+dst-src*dst
+            // Reverse: src - dst（Subtractの逆方向）
+            switch (blend)
+            {
+                case BlendMode.Screen:
+                    Raylib_cs.Rlgl.SetBlendFactors(GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_FUNC_ADD);
+                    break;
+                case BlendMode.Reverse:
+                    Raylib_cs.Rlgl.SetBlendFactors(GL_ONE, GL_ONE, GL_FUNC_SUBTRACT);
+                    break;
+            }
             BeginBlendMode(GetBlendMode(blend));
         }
         //if (col != Color.White)

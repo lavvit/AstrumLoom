@@ -375,6 +375,18 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
   記録が 1 フレームずれて再生が合わなかった。BeginFrame / EndFrame に分離。
 - ✅ `Core/AstrumCore.cs` `AstrumCore.VSync` セッターが更新スレッドから直接 `Platform.SetVSync` を
   叩いていた（ウィンドウ API はメインスレッド専用）。`RequestToMainThread` 経由に変更。
+- ✅ `DXLib/DxLibInput.cs` `DxLibTextInput.Update()` が `Text.Contains('')` と
+  `Text[..Text.IndexOf('')]` で `Text` プロパティを2回読んでいた。`Text` は毎回
+  `GetKeyInputString` でネイティブの入力バッファを読み直す実装なので、2回の呼び出しの間に
+  タイピングでバッファが変わりうる。1回目は制御文字を含んでいたのに2回目には無くなっていると
+  `IndexOf` が `-1` を返し、`Text[..-1]` が `Substring` に負の長さを渡して
+  `ArgumentOutOfRangeException` で Fatal Error に落ちる。実機でテキスト入力中に発生を確認した。
+  1回だけ読んでローカル変数に固定するよう修正。
+- ✅ `Sandbox/Input.cs`・`Sandbox/GameTemp.cs` 素の `List<T>`/`Queue<T>` を
+  更新スレッド(Update)と描画スレッド(Draw)で共有しており、Draw が列挙中に Update が
+  Clear/Add/RemoveAt すると `ArgumentOutOfRangeException` で落ちていた。`--selftest` は
+  自動でロックステップ+単一スレッドになるためこの種のレースは検出できない。参照ごと差し替える
+  （新しいリストを作ってフィールドへ代入）方式と `ConcurrentQueue<T>` へ変更して解消。
 
 ---
 
@@ -385,6 +397,27 @@ Drawing.DefaultFont（IFont 未設定時のフォールバック、Core/Drawing.
 ### いま実際に壊れるもの（26 件）
 
 未着手です。触る前にここを読んでください。
+
+#### ⬜ [medium] マルチスレッド構成で RequestToMainThread が 1 フレームに 1 件しか処理されない
+
+`Core/Game.cs:89`
+
+**壊れ方**: `UseMultiThreadUpdate=true`（Sandbox の既定）のとき、メインスレッドの描画ループは
+`if (_mainThreadActions.TryDequeue(out var action))` と `if` 1 回ぶんしか掃かない。
+更新スレッドから `AstrumCore.RequestToMainThread` で同一フレームに複数のアクションを積むと、
+2 件目以降は次フレーム以降へずれ込み、積んだ量が多いほど遅延が伸びる。
+更新スレッドは TargetFps=0 だと毎秒数万〜十万回まわるのに対し、描画ループは掃くのが 1 件/フレームなので、
+定常的に積み続けるとキューは際限なく伸びる。
+
+**根拠**: Core/Game.cs:88-96 のメインスレッドループは
+`if (_mainThreadActions.TryDequeue(out var action)) { try { action(); } catch (...) { HandleFatal(...); } }`
+であり `while` ではない。`_mainThreadActions`（Core/Game.cs:292）への Enqueue は
+`RequestToMainThread`（Core/Game.cs:298-304）経由で、呼び出し元がメインスレッドでなければ
+無条件でキューに積むだけ。Sandbox の音の見本帳（`Sandbox/SoundDemo.cs`）はこの経路を避けるため、
+自前の `ConcurrentQueue<Action>` を Draw の中で `while (_soundJobs.TryDequeue(...))` と全部掃く実装にしている。
+
+**直し方の方針**: メインスレッドループの `if` を `while` にして、そのフレームに積まれた分は
+1 フレームで掃き切る（無限ループを避けるため、ループ開始時点のキュー件数だけ処理する形にするとよい）。
 
 #### ⬜ [high] Animation のコンストラクタが必ず NotImplementedException を投げる
 
