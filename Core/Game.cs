@@ -22,7 +22,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 {
     private static readonly Color BackgroundColor = new(10, 10, 11);
     private static readonly Color FatalBackgroundColor = new(12, 4, 6);
-    private static readonly TimeSpan FatalDisplayDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan FatalDisplayDuration = TimeSpan.FromMinutes(1);
     private static DateTime? ThrowErrorTime = null;
 
     private volatile bool _running;
@@ -417,16 +417,52 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         return report.ToString();
     }
 
+    /// <summary>警告テープ風の斜め黒黄ストライプを帯状に描く。ゆっくり流れて目を引く。</summary>
+    private static void DrawHazardStripe(double x, double y, double width, double height)
+    {
+        double t = Environment.TickCount64 / 1000.0;
+        Drawing.Box(x, y, width, height, Color.Black);
+        double stripeW = height * 0.9;
+        double spacing = stripeW * 2;
+        double offset = t * 40 % spacing;
+        for (double sx = x - height - offset; sx < x + width + height; sx += spacing)
+        {
+            Drawing.Polygon(new[]
+            {
+                (sx, y + height), (sx + height, y),
+                (sx + height + stripeW, y), (sx + stripeW, y + height)
+            }, Color.Gold);
+        }
+    }
+
     private void DrawFatalMessage(FatalErrorInfo info, string? copyStatus)
     {
+        double pulse = 0.5 + 0.5 * Math.Sin(Environment.TickCount64 / 220.0);
+
         Drawing.Box(0, 0, AstrumCore.Width, AstrumCore.Height, Color.Black, opacity: 0.75);
-        Drawing.Box(20, 20, AstrumCore.Width - 40, AstrumCore.Height - 40, Color.Red, thickness: 4);
-        Drawing.Box(40, 40, AstrumCore.Width - 80, AstrumCore.Height - 80, Color.DarkRed, opacity: 0.35);
+
+        // 上下に警告テープ
+        DrawHazardStripe(0, 0, AstrumCore.Width, 18);
+        DrawHazardStripe(0, AstrumCore.Height - 18, AstrumCore.Width, 18);
+
+        // 脈打つ赤枠
+        int borderThickness = 3 + (int)(pulse * 3);
+        Drawing.Box(20, 24, AstrumCore.Width - 40, AstrumCore.Height - 48, Color.Red, thickness: borderThickness, opacity: 0.6 + pulse * 0.4);
+        Drawing.Box(40, 44, AstrumCore.Width - 80, AstrumCore.Height - 88, Color.DarkRed, opacity: 0.3);
+
         double x = 60;
         double y = 60;
         int fontSize = Drawing.FontSize();
 
-        Drawing.Text(x, y, "アプリケーション内でエラーが発生しました。 Fatal Error has occurred.", Color.Red);
+        // 警告三角アイコン（！）
+        double triSize = fontSize * 1.6;
+        double triCx = x + triSize * 0.5;
+        double triCy = y + triSize * 0.55;
+        Drawing.Triangle(triCx, triCy - triSize * 0.55, triCx - triSize * 0.55, triCy + triSize * 0.45, triCx + triSize * 0.55, triCy + triSize * 0.45,
+            Color.Gold, opacity: 0.5 + pulse * 0.5);
+        Drawing.Text(triCx - fontSize * 0.15, triCy - fontSize * 0.4, "!", Color.Black);
+
+        Drawing.Text(x + triSize + 16, y, "アプリケーション内でエラーが発生しました。 Fatal Error has occurred.", Color.Red);
         y += fontSize * 2 + 10;
         Drawing.Text(x, y, $"発生時刻 Time: {info.Timestamp:yyyy-MM-dd HH:mm:ss}", Color.Gray);
         y += fontSize + 6;
@@ -467,7 +503,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         double ms = (endAt - DateTime.UtcNow).TotalMilliseconds;
         double progress = Easing.Ease(-ms / FatalDisplayDuration.TotalMilliseconds, EEasing.Sine, EInOut.InOut);
         Drawing.Box(x, y, w * progress, 16, Color.DeepPink);
-        Drawing.Text(x, y - fontSize - 6, "自動的に閉じます... (Enterで今すぐ閉じる)", Color.DeepPink);
+        Drawing.Text(x, y - fontSize - 6, $"{Math.Ceiling((FatalDisplayDuration.TotalMilliseconds + ms) / 1000)}秒後に自動的に閉じます... (Enterで今すぐ閉じる)", Color.DeepPink);
     }
 }
 

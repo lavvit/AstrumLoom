@@ -139,15 +139,32 @@ public class Log
         if (loglist.Count == 0) return;
 
         int size = Drawing.FontSize();
-        int width = Drawing.TextSize(string.Join("\n", loglist).Trim()).width;
+        string[] prefixes = [.. loglist.Select(l => l.Level switch
+        {
+            LogLevel.Warning => "⚠ ",
+            LogLevel.Error => "✕ ",
+            _ => ""
+        })];
+        int width = Drawing.TextSize(string.Join("\n", loglist.Select((l, i) => prefixes[i] + l)).Trim()).width;
         int height = size * logCount(loglist);
         Drawing.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
+
+        double pulse = 0.6 + 0.4 * Math.Sin(Environment.TickCount64 / 180.0);
         int h = 0;
         for (int i = 0; i < loglist.Count; i++)
         {
             var log = loglist[i];
-            Drawing.Text(x, y + h * size, log, log.Color);
-            h += log.Message.Split('\n').Length;
+            int lines = log.Message.Split('\n').Length;
+
+            // Warning/Error は背景を敷いて目立たせる。Error はさらに脈打たせる。
+            if (log.Level == LogLevel.Warning || log.Level == LogLevel.Error)
+            {
+                double bgOpacity = log.Level == LogLevel.Error ? 0.25 + 0.25 * pulse : 0.25;
+                Drawing.Box(x - 4, y + h * size - 2, width + 8, size * lines, log.Color, opacity: bgOpacity);
+            }
+
+            Drawing.Text(x, y + h * size, prefixes[i] + log, log.Color);
+            h += lines;
         }
     }
 

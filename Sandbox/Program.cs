@@ -56,6 +56,18 @@ internal sealed class SimpleTestGame : Scene
     {
         if (KeyInput.Ctrl && Key.Esc.Push()) AstrumCore.End();
 
+        if (KeyInput.Ctrl && Key.Insert.Push())
+        {
+            // 意図エラーを出すテスト。
+            throw new Exception("意図的に出したエラーです。");
+        }
+        if (KeyInput.Ctrl && Key.Delete.Push())
+        {
+            // Log.Write で出るエラーのテスト。ログに出るだけでゲームは止まらない。
+            Log.Error("意図的に出したエラーです。");
+            Log.Warning("意図的に出した警告です。");
+        }
+
         // 数字キーでシーンを切り替える。子シーン側は数字キーを使っていない。
         for (int i = 0; i < Menu.Length; i++)
         {
