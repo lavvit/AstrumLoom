@@ -6,4 +6,5 @@
   <Project Path="Exo/AstrumLoom.Exo.csproj" />
   <Project Path="RayLib/AstrumLoom.RayLib.csproj" Id="ae3bc02f-7f49-452b-9d6d-0e7f89b83473" />
   <Project Path="Sandbox/Sandbox.csproj" Id="f318636a-4b8e-4814-9cf4-ba90dc17fd67" />
+  <Project Path="Audio/AstrumLoom.Audio.csproj" />
 </Solution>

@@ -16,14 +16,11 @@
 
   <ItemGroup>
     <!--
-      GameUtil はバックエンドを全部知っている「起動層」。
-      ゲーム側はこのプロジェクトだけを参照すれば、DxLib / Raylib のどちらでも動かせる。
+      Audio はコードだけで音を合成して鳴らすモジュール。ISound はファイルパス起点なので、
+      合成した PCM を WAV へ焼いてから Core の Sound に渡す。バックエンド（DxLib/RayLib）には
+      一切依存しないので、参照するのは Core だけでよい。
     -->
     <ProjectReference Include="..\Core\AstrumLoom.csproj" />
-    <ProjectReference Include="..\DXLib\AstrumLoom.DXLib.csproj" />
-    <ProjectReference Include="..\RayLib\AstrumLoom.RayLib.csproj" />
-    <ProjectReference Include="..\Extend\AstrumLoom.Extend.csproj" />
-    <ProjectReference Include="..\Audio\AstrumLoom.Audio.csproj" />
   </ItemGroup>
 
 </Project>
