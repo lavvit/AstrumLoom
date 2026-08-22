@@ -38,6 +38,11 @@ public sealed class LaunchOptions
     public string? RecordPath { get; set; }
     /// <summary>入力を再生するファイルパス。</summary>
     public string? ReplayPath { get; set; }
+    /// <summary>
+    /// ロックステップのループを実時間の待ちから解放して、CPU が許す限り速く走らせる。
+    /// null なら既定（--selftest のときだけ ON）。--turbo / --no-turbo で明示できる。
+    /// </summary>
+    public bool? Turbo { get; set; }
     /// <summary>tuning ファイルのパス。既定は tuning.txt。</summary>
     public string? TuningPath { get; set; }
     /// <summary>スクリーンショットやログの出力先ディレクトリ。</summary>
@@ -113,6 +118,8 @@ public static class Startup
           --quit-after <N>           N 論理フレーム後に自動終了
           --quit-after-sec <秒>      指定秒後に自動終了
           --selftest                 登録済みテスト計画を自動走行して PASS/FAIL を出す
+          --turbo / --no-turbo       ロックステップを実時間の待ち無しで走らせる
+                                      (既定: --selftest のときだけ ON)
           --record <ファイル>        入力を記録する
           --replay <ファイル>        記録した入力を再生する
           --tuning <ファイル>        tuning ファイルのパス (既定 tuning.txt)
@@ -195,7 +202,7 @@ public static class Startup
         or "fps" or "vsync" or "no-vsync" or "mt" or "multithread"
         or "no-mt" or "single-thread" or "fixed" or "no-fixed" or "hz" or "seed"
         or "shot-every" or "quit-after" or "quit-after-sec" or "quit-after-seconds"
-        or "selftest" or "self-test" or "record" or "replay" or "tuning"
+        or "selftest" or "self-test" or "turbo" or "no-turbo" or "record" or "replay" or "tuning"
         or "out" or "outdir" or "overlay" or "no-overlay"
         or "no-log-overlay" or "log-overlay" or "no-hotkeys" or "hotkeys" => true,
         _ => false,
@@ -276,6 +283,8 @@ public static class Startup
                     o.QuitAfterSeconds = ParseDouble(o, name, Value()) ?? 0;
                     break;
                 case "selftest" or "self-test": o.SelfTest = true; break;
+                case "turbo": o.Turbo = true; break;
+                case "no-turbo": o.Turbo = false; break;
                 case "record": o.RecordPath = Value(); break;
                 case "replay": o.ReplayPath = Value(); break;
                 case "tuning": o.TuningPath = Value(); break;
@@ -369,6 +378,22 @@ public static class Startup
             }
             // 実時間に依存したキャッチアップが入ると再生がずれる。1 ループ 1 ステップに固定する。
             config.LockStep = true;
+
+            // ロックステップは「1 ループ = 1 論理フレーム」なので、ループの目標 FPS が
+            // そのままゲームの進む速さになる。60 のままだと自動テストが実時間 1 倍速で流れ、
+            // 数十秒ぶんの検証に本当に数十秒かかる。人が見ていない走行では上限を外す。
+            // --record は人が手で遊びながら記録するので、既定では外さない。
+            bool turbo = o.Turbo ?? o.SelfTest;
+            if (turbo)
+            {
+                if (!o.TargetFps.HasValue && config.TargetFps > 0)
+                {
+                    Log.Debug("ターボ: ループの FPS 上限を外しました (--no-turbo で等速)。");
+                    config.TargetFps = 0;
+                }
+                // 垂直同期が生きていると、上限を外してもバックエンドが待ってしまう。
+                if (!o.VSync.HasValue) config.VSync = false;
+            }
         }
 
         return config;
