@@ -47,6 +47,8 @@ public sealed class LaunchOptions
     public bool? Overlay { get; set; }
     public bool? LogOverlay { get; set; }
     public bool? DebugHotkeys { get; set; }
+    /// <summary>--hotkeys &lt;direct|modifier|menu|off&gt; で指定したモード。--no-hotkeys は Off として <see cref="DebugHotkeys"/> に入る。</summary>
+    public DebugHotkeyMode? HotkeyMode { get; set; }
 
     // --- ゲーム固有 ---
     /// <summary>
@@ -117,7 +119,11 @@ public static class Startup
           --out <ディレクトリ>       スクショ・ログの出力先 (既定 debugout)
           --overlay / --no-overlay   デバッグオーバーレイの初期状態
           --no-log-overlay           画面左上のログ表示を消す（スクショを綺麗に撮る用）
-          --no-hotkeys               F1〜F5 のデバッグホットキーを無効化
+          --no-hotkeys               F1〜F6 のデバッグホットキーを無効化
+          --hotkeys <direct|modifier|menu|off>
+                                      デバッグホットキーの受け付け方
+                                      (direct: F1〜F6 単独 / modifier: 修飾キー併用時のみ /
+                                       menu: メニュー経由のみ (既定 Ctrl+F1) / off: 全て無効)
           -h, --help                 このヘルプを表示
 
         --selftest / --record / --replay を指定すると、再現性のため
@@ -283,8 +289,19 @@ public static class Startup
                 case "no-overlay": o.Overlay = false; break;
                 case "no-log-overlay": o.LogOverlay = false; break;
                 case "log-overlay": o.LogOverlay = true; break;
-                case "no-hotkeys": o.DebugHotkeys = false; break;
-                case "hotkeys": o.DebugHotkeys = true; break;
+                case "no-hotkeys": o.DebugHotkeys = false; o.HotkeyMode = DebugHotkeyMode.Off; break;
+                case "hotkeys":
+                    {
+                        string? v = Value();
+                        if (v == null) break;
+                        if (TryParseHotkeyMode(v, out var m))
+                        {
+                            o.HotkeyMode = m;
+                            o.DebugHotkeys = m != DebugHotkeyMode.Off;
+                        }
+                        else o.Errors.Add($"--hotkeys の値 '{v}' は不明です。direct/modifier/menu/off を指定してください。");
+                        break;
+                    }
 
                 default:
                     // 登録済みのゲーム固有オプションならここで受ける。
@@ -334,6 +351,7 @@ public static class Startup
         if (o.Seed.HasValue) config.Seed = o.Seed.Value;
         if (o.Overlay.HasValue) config.ShowFpsOverlay = o.Overlay.Value;
         if (o.DebugHotkeys.HasValue) config.EnableDebugHotkeys = o.DebugHotkeys.Value;
+        if (o.HotkeyMode.HasValue) config.DebugHotkeyMode = o.HotkeyMode.Value;
         if (o.LogOverlay.HasValue) Log.DrawOnScreen = o.LogOverlay.Value;
 
         // 再現性が要る場合は、迷わず決定論寄りの設定に倒す。
@@ -359,6 +377,19 @@ public static class Startup
     /// <summary>次のトークンがオプションの値ではなくフラグらしいか（負数は値として許容する）を判定する。</summary>
     private static bool IsFlagLike(string s)
         => s.Length > 1 && s[0] == '-' && !char.IsDigit(s[1]) && s[1] != '.';
+
+    /// <summary>--hotkeys の値を <see cref="DebugHotkeyMode"/> に変換します。</summary>
+    public static bool TryParseHotkeyMode(string text, out DebugHotkeyMode mode)
+    {
+        switch (text.Trim().ToLowerInvariant())
+        {
+            case "direct": mode = DebugHotkeyMode.Direct; return true;
+            case "modifier" or "mod": mode = DebugHotkeyMode.Modifier; return true;
+            case "menu" or "menuonly" or "menu-only": mode = DebugHotkeyMode.MenuOnly; return true;
+            case "off" or "none" or "disable" or "disabled": mode = DebugHotkeyMode.Off; return true;
+            default: mode = DebugHotkeyMode.Direct; return false;
+        }
+    }
 
     public static bool TryParseBackend(string text, out GraphicsBackendKind kind)
     {

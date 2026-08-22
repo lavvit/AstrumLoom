@@ -53,8 +53,15 @@ public sealed class GameConfig
     // --- Debug / Logging ---
     public bool EnableLogging { get; set; } = true;
     public bool ShowFpsOverlay { get; set; } = false;
-    /// <summary>F1〜F5 のデバッグホットキーを有効にするか。</summary>
+    /// <summary>F1〜F6 のデバッグホットキーを有効にするか。false なら <see cref="DebugHotkeyMode"/> に関わらず全て無効。</summary>
     public bool EnableDebugHotkeys { get; set; } = true;
+    /// <summary>
+    /// デバッグホットキーの受け付け方。ゲーム側が F1〜F6 を使いたいときは
+    /// <see cref="AstrumLoom.DebugHotkeyMode.Modifier"/> や <see cref="AstrumLoom.DebugHotkeyMode.MenuOnly"/> に変更してください。
+    /// </summary>
+    public DebugHotkeyMode DebugHotkeyMode { get; set; } = DebugHotkeyMode.Direct;
+    /// <summary><see cref="DebugHotkeyMode"/> が Modifier のときや、デバッグメニューの開閉に使う修飾キー。</summary>
+    public DebugModifier DebugHotkeyModifier { get; set; } = DebugModifier.Ctrl;
     /// <summary>スクリーンショット・ログ・記録の出力先ディレクトリ。</summary>
     public string DebugOutputDir { get; set; } = "debugout";
 

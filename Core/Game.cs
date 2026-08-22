@@ -286,6 +286,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             // ★ ここでオーバーレイ（F1 で切り替わる）
             if (DebugControl.ShowOverlay)
                 Overlay.Current.Draw();
+            // デバッグメニューはオーバーレイ非表示でも、開いていれば描画する。
+            if (DebugMenu.IsOpen)
+                DebugMenu.Draw();
             Log.Draw();
 
             ExtendAction(end: true);

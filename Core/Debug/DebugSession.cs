@@ -38,6 +38,8 @@ public static class DebugSession
         Snapshot.Directory = OutputDir;
 
         DebugControl.Enabled = config.EnableDebugHotkeys;
+        DebugControl.Mode = config.DebugHotkeyMode;
+        DebugControl.Modifier = config.DebugHotkeyModifier;
         DebugControl.ShowOverlay = config.ShowFpsOverlay;
         DebugControl.Reset();
 

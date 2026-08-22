@@ -26,6 +26,29 @@ AstrumLoom で作ったゲームは、何もしなくても以下のホットキ
 無効にしたいときは `GameConfig.EnableDebugHotkeys = false` か `--no-hotkeys` です。
 割り当てを変えたいときは `DebugControl.KeyPause` などに別の `Key` を入れてください。
 
+### F1〜F6 がゲーム側と衝突するとき
+
+ゲーム本体が F1〜F6 を使いたい場合は `GameConfig.DebugHotkeyMode`（または `--hotkeys`）で
+ホットキーの受け付け方を切り替えられます。
+
+| モード | 動作 |
+| --- | --- |
+| `Direct`（既定） | 従来どおり F1〜F6 を単独押しで受け付ける |
+| `Modifier` | F1〜F6 は修飾キー（既定 Ctrl。`GameConfig.DebugHotkeyModifier`）併用時のみ受け付ける。ゲーム側は素の F キーをそのまま使える |
+| `MenuOnly` | 個別ホットキーは無効。デバッグメニュー経由でのみ操作する |
+| `Off` | ホットキー・メニューとも全て無効（`EnableDebugHotkeys = false` と同義） |
+
+`Modifier` / `MenuOnly` / `Direct` のいずれでも、**Modifier + `DebugControl.KeyMenu`（既定 Ctrl+F11）**
+でデバッグメニューを開閉できます。メニューは ↑↓ で選択、Enter/Space で決定、Esc で閉じます。
+既定項目はオーバーレイ表示切替・スクリーンショット・スロー切替・一時停止/再開・コマ送り・
+チューニング再読込・閉じるです。ゲーム側から `DebugMenu.Add("項目名", () => ...)` で項目を追加できます。
+
+```csharp
+config.DebugHotkeyMode = DebugHotkeyMode.Modifier; // F1〜F6 は Ctrl 併用時のみ
+```
+
+コマンドラインからは `--hotkeys <direct|modifier|menu|off>` で指定します。
+
 ---
 
 ## コマンドライン引数
@@ -67,7 +90,8 @@ AstrumLoom で作ったゲームは、何もしなくても以下のホットキ
 | `--out <ディレクトリ>` | スクショ・ログの出力先（既定 `debugout`） |
 | `--overlay` / `--no-overlay` | デバッグオーバーレイの初期状態 |
 | `--no-log-overlay` | 画面左上のログ表示を消す（スクショを綺麗に撮る用） |
-| `--no-hotkeys` | F1〜F6 を無効化 |
+| `--no-hotkeys` | F1〜F6 を無効化（`--hotkeys off` と同じ） |
+| `--hotkeys <direct\|modifier\|menu\|off>` | デバッグホットキーの受け付け方（既定 `direct`） |
 
 ### ゲームごとの引数を足す
 

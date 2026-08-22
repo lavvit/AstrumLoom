@@ -321,6 +321,9 @@ internal sealed class PlayScene : Scene
 | `F5` | コマ送り |
 | `F6` | `tuning.txt` の再読み込み |
 
+ゲーム側が F1〜F6 を使いたい場合は `GameConfig.DebugHotkeyMode`（`--hotkeys`）で
+修飾キー併用やメニュー経由に切り替えられます。詳しくは [docs/DEBUG.md](docs/DEBUG.md) を参照してください。
+
 ```powershell
 .\tools\playtest.ps1 -Project Hoshiori -SelfTest    # テスト計画を自動走行して PASS/FAIL
 .\tools\playtest.ps1 -Project Hoshiori              # 10 秒走らせてスクショとログを収集
