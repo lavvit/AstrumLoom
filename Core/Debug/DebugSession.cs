@@ -53,6 +53,12 @@ public static class DebugSession
             Log.Warning("--selftest が指定されましたが、テスト計画が 1 件も登録されていません。");
         }
 
+        // セルフテストは大量のログを吐くため、画面描画（毎フレームの文字列整形・Box/Text 描画）が
+        // 重くなりやすい。記録（Console/Trace/ファイル保存）はそのまま残し、画面表示だけ止める。
+        // --log-overlay で明示指定された場合はそちらを優先する。
+        if (Options.SelfTest && !Options.LogOverlay.HasValue)
+            Log.DrawOnScreen = false;
+
         if (Automated)
         {
             Directory.CreateDirectory(OutputDir);

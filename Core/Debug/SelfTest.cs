@@ -164,8 +164,9 @@ public static class SelfTest
     {
         var r = new SelfTestResult(label, passed, detail, AstrumCore.FrameCount);
         _results.Add(r);
-        // Log.Write が Console にも出すので、ここで直接書くと二重になる。
-        Log.Write(r.ToString(), passed ? LogLevel.Info : LogLevel.Error);
+        // Log.SelfTest は Console/ファイルには即出すが、画面表示は完了時にまとめて出す
+        // （実行中に表示すると毎フレームの描画コストがかさむ上、キャプチャの邪魔にもなる）。
+        Log.SelfTest(r.ToString());
     }
 
     /// <summary>ゲーム更新のあとに 1 フレーム分だけ計画を進めます。</summary>
@@ -217,6 +218,10 @@ public static class SelfTest
         if (_finished) return;
         _finished = true;
         VirtualInput.ReleaseAll();
+
+        // 実行中は画面描画を止めていたぶん、完了時にまとめて表示する。
+        // --log-overlay で明示的に off されている場合はそれを尊重する。
+        if (DebugSession.Options.LogOverlay != false) Log.DrawOnScreen = true;
 
         string summary = Failed == 0
             ? $"セルフテスト成功: {Passed} 件すべて PASS"

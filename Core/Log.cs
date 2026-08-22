@@ -53,6 +53,8 @@ public class Log
     public static void Error(Exception ex, string message = "") => Write(message +
         $"{(!string.IsNullOrEmpty(message) ? "\n" : "")}{ex.GetType()}: {ex.Message}\n{ex.StackTrace}", LogLevel.Error, true);
     public static void Debug(string message, bool timestamp = false) => Write(message, LogLevel.Debug, timestamp);
+    /// <summary>セルフテストの結果行を記録します。画面には出さず貯めておき、完了時にまとめて表示します。</summary>
+    public static void SelfTest(string message, bool timestamp = false) => Write(message, LogLevel.SelfTest, timestamp);
     public static void EmptyLine() => Write("");
 
     public static void Clear()
@@ -122,7 +124,8 @@ public class Log
         lock (_sync)
         {
             loglist = LogMessages
-                .Where(l => (now - l.Timestamp).TotalSeconds < ScreenSeconds)
+                // セルフテストの結果は貯めておいて完了時にまとめて表示するので、経過秒数での間引きは対象外にする。
+                .Where(l => l.Level == LogLevel.SelfTest || (now - l.Timestamp).TotalSeconds < ScreenSeconds)
 #if !DEBUG
                 .Where(l => l.Level != LogLevel.Debug)
 #endif
@@ -193,6 +196,7 @@ public class LogEntry(string message, LogLevel level)
         LogLevel.Warning => Color.Yellow,
         LogLevel.Error => Color.Red,
         LogLevel.Debug => Color.Silver,
+        LogLevel.SelfTest => Color.Lime,
         _ => Color.White,
     };
 }
@@ -202,5 +206,6 @@ public enum LogLevel
     Info,
     Warning,
     Error,
-    Debug
+    Debug,
+    SelfTest
 }
