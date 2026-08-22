@@ -16,6 +16,7 @@ internal sealed class SimpleTestGame : Scene
         ("Input の見本帳（入力コックピット）", () => new InputDemoScene()),
         ("描画負荷", () => new LoadCheckScene()),
         ("ゲームの雛形", () => new GameTemplateScene()),
+        ("aup2 再生確認", () => new AnimeDemoScene()),
     ];
 
     public override void Enable()

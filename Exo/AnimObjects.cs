@@ -1,10 +1,10 @@
-﻿using PointVector = AstrumLoom.LayoutUtil.Point;
+using PointVector = AstrumLoom.LayoutUtil.Point;
 using SizeVector = AstrumLoom.LayoutUtil.Size;
 
-namespace AstrumLoom.Extend;
+namespace AstrumLoom.Exo;
 
 #region Base Classes
-internal class Opacity
+public class Opacity
 {
     /// <summary>
     /// Start透明度
@@ -18,7 +18,7 @@ internal class Opacity
 
     public UfEasing Easing { get; set; } = UfEasing.Linear;
 }
-internal class Position
+public class Position
 {
     /// <summary>
     /// Start座標
@@ -31,7 +31,7 @@ internal class Position
     public PointVector EndPosition { get; set; }
     public UfEasing Easing { get; set; } = UfEasing.Linear;
 }
-internal class Rotation
+public class Rotation
 {
     /// <summary>
     /// Start回転角度
@@ -44,7 +44,7 @@ internal class Rotation
     public float EndRotation { get; set; }
     public UfEasing Easing { get; set; } = UfEasing.Linear;
 }
-internal class Scale
+public class Scale
 {
     /// <summary>
     /// Start拡大率
@@ -130,7 +130,7 @@ public class Object
 /// <summary>
 /// グループ制御オブジェクト
 /// </summary>
-internal class GroupObject : Object
+public class GroupObject : Object
 {
     /// <summary>
     /// 元となる <see cref="Object"/> からフレーム・レイヤー情報を引き継いで生成します。
@@ -171,7 +171,7 @@ internal class GroupObject : Object
 /// <summary>
 /// 画像オブジェクト
 /// </summary>
-internal class ImageObject : Object
+public class ImageObject : Object
 {
     /// <summary>
     /// 元となる <see cref="Object"/> からフレーム・レイヤー情報を引き継いで生成します。
@@ -210,9 +210,9 @@ internal class ImageObject : Object
     public Opacity Opacity { get; set; } = new Opacity();
 
     /// <summary>
-    /// ブレンドモード
+    /// ブレンドモード（合成モード）
     /// </summary>
-    public int BlendMode { get; set; }
+    public BlendMode BlendMode { get; set; } = BlendMode.None;
 
     /// <summary>
     /// グループ制御のリスト
@@ -226,15 +226,24 @@ internal class ImageObject : Object
 
     /// <summary>
     /// 指定座標・スケールを基準に、Transfrom の内容を反映して画像を描画します。
+    /// 合成モードは描画後に必ず None へ戻し、後続の描画に漏れないようにする。
     /// </summary>
     public void Draw(float x, float y, float scale)
     {
         if (Texture == null) return;
-        Texture.Point = ReferencePoint.Center;
-        Texture.XYScale = (Transfrom.Scale.Width * scale, Transfrom.Scale.Height * scale);
-        Texture.Angle = Transfrom.Rotation;
-        Texture.Opacity = Transfrom.Opacity;
-        Texture.Draw(x + Transfrom.Position.X * scale, y + Transfrom.Position.Y * scale);
+        try
+        {
+            Texture.Point = ReferencePoint.Center;
+            Texture.XYScale = (Transfrom.Scale.Width * scale, Transfrom.Scale.Height * scale);
+            Texture.Angle = Transfrom.Rotation;
+            Texture.Opacity = Transfrom.Opacity;
+            Texture.BlendMode = BlendMode;
+            Texture.Draw(x + Transfrom.Position.X * scale, y + Transfrom.Position.Y * scale);
+        }
+        finally
+        {
+            Texture.BlendMode = AstrumLoom.BlendMode.None;
+        }
     }
 
     /// <summary>浅いコピーを作成します（Texture などの参照は共有されます）。</summary>
@@ -244,7 +253,7 @@ internal class ImageObject : Object
 /// <summary>
 /// サウンド再生オブジェクト
 /// </summary>
-internal class SoundObject : Object
+public class SoundObject : Object
 {
     public SoundObject(Object Object)
     {
@@ -271,6 +280,11 @@ internal class SoundObject : Object
     public float EndVolume { get; set; } = 1.0f;
 
     /// <summary>
+    /// 左右バランス（-1.0 左 〜 1.0 右）
+    /// </summary>
+    public float Pan { get; set; } = 0.0f;
+
+    /// <summary>
     /// ループ再生するか
     /// </summary>
     public bool Loop { get; set; } = false;
@@ -287,7 +301,7 @@ internal class SoundObject : Object
     {
         if (Sound == null) return;
         Sound.Volume = StartVolume;
-        Sound.Loop = Loop;
+        Sound.Pan = Pan;
         Sound.Play();
         IsPlaying = true;
     }
@@ -331,6 +345,7 @@ internal class SoundObject : Object
 
         // 適用
         Sound.Volume = Math.Clamp(vol, 0f, 1f);
+        Sound.Pan = Pan;
 
         // 必要なら再生開始
         if (!IsPlaying)
@@ -381,7 +396,7 @@ internal class OpacityFilter : Filter
 /// <summary>
 /// 反転フィルター
 /// </summary>
-public class ReverseFilter : Filter
+internal class ReverseFilter : Filter
 {
     /// <summary>X方向に反転するか</summary>
     public bool ReverseX { get; set; }
@@ -442,7 +457,7 @@ internal class SoundFilter : Filter
 /// <summary>
 /// UfEasing の列挙値を実際の補間係数へ変換するユーティリティ。
 /// </summary>
-public class AnimationEasing
+internal class AnimationEasing
 {
     /// <summary>
     /// 進行度 <paramref name="t"/>（0〜1）を、指定イージングで補間した値に変換します。

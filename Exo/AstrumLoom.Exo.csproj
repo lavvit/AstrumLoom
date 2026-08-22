@@ -15,20 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="bass.dll" />
-    <EmbeddedResource Include="bass.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FFMpegCore" Version="5.4.0" />
-    <PackageReference Include="ManagedBass" Version="4.0.2" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Core\AstrumLoom.csproj" />
-    <ProjectReference Include="..\Exo\AstrumLoom.Exo.csproj" />
   </ItemGroup>
 
 </Project>

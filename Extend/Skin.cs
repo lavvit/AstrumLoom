@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 
+using AstrumLoom.Exo;
+
 using static AstrumLoom.AstrumCore;
 
 using FHandle = AstrumLoom.FontHandle;
@@ -17,7 +19,7 @@ public class Skin
     public static Dictionary<string, Sound> Sounds { get; set; } = [];
     public static Dictionary<string, Number> Numbers { get; set; } = [];
     public static Dictionary<string, IFont> Fonts { get; set; } = [];
-    public static Dictionary<string, Exo> ExoDatas { get; set; } = [];
+    public static Dictionary<string, ExoAnimation> ExoDatas { get; set; } = [];
 
     public static TextConf Configs { get; set; } = new();
 
@@ -507,7 +509,7 @@ public class Skin
                     Sounds[name] = new Sound(file);
             }
         }
-        else if (ext == ".exo")
+        else if (ext is ".exo" or ".aup2")
         {
             // 既存のExoDatasおよびSkinQue内のkeyをチェック
             if (ExoDatas.ContainsKey(name) || SkinQue.Any(q => q.key == "exo" + name))
@@ -527,7 +529,16 @@ public class Skin
                 if (inque)
                     SkinQue.Enqueue(("exo" + name, file));
                 else
-                    ExoDatas[name] = new Exo(file, true);
+                {
+                    try
+                    {
+                        ExoDatas[name] = new(file, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error($"Skin: Exo読み込み失敗 {file}: {ex.Message}");
+                    }
+                }
             }
         }
     }
@@ -712,8 +723,8 @@ public class Skin
     }
     #endregion
     #region Exo
-    public static Exo GetExo(string name) => Exo(name) ?? new("");
-    public static Exo? Exo(string name) => ExoDatas.TryGetValue(name.ToLower(), out var value) && value.Enable ? value : null;
+    public static ExoAnimation GetExo(string name) => Exo(name) ?? new("");
+    public static ExoAnimation? Exo(string name) => ExoDatas.TryGetValue(name.ToLower(), out var value) && value.Enable ? value : null;
     #endregion
     #endregion
     #region Config

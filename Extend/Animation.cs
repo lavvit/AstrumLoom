@@ -1,4 +1,6 @@
-﻿namespace AstrumLoom.Extend;
+﻿using AstrumLoom.Exo;
+
+namespace AstrumLoom.Extend;
 
 /// <summary>
 /// 独自形式のアニメーションプロジェクト（<see cref="AnimeProject"/>）を IMovie として扱うためのラッパー。

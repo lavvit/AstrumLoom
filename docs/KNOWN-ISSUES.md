@@ -575,23 +575,23 @@ ManagedBass.xml の該当定義: `<member name="F:ManagedBass.ChannelAttribute.P
 
 #### ✅ [medium] Rate=0のときStart()のInterval計算が(int)キャストのオーバーフローで巨大な負値になり、アニメーションが実質フリーズする
 
-`Extend/ExoAnimation.cs:605`
+`Anime/Exo.cs`（旧 `Extend/ExoAnimation.cs:605`。Exo/AnimObjectsはAnimeプロジェクトへ移設済み）
 
-**壊れ方**: Interval=-2147483648がCounterに渡ると、Tick()(Core/Time.cs 99-150行目)は `Interval >= 0` がfalseのため125行目の逆方向分岐に入り、ループ条件は `diffTime >= -Interval` すなわち `diffTime >= 2147483648`(マイクロ秒、約35.8分)になる。通常のフレーム間隔(数ミリ秒〜数十ミリ秒)ではこの条件を満たすことはまず無く、Valueが実質的に変化しないためアニメーションが止まって見える。なお現状のコードでは、Extend/Skin.cs 570-577行目の `ExoDatas[name].Start()` 呼び出しはコメントアウトされており(`name = name.ToLower();/* ... */`)、リポジトリ全体を検索してもExo.Start()を外部から呼ぶ箇所は現状見つからなかった。そのため今すぐ踏まれる経路ではないが、Start()自体は壊れたまま残る公開APIである。
+**壊れ方**: Interval=-2147483648がCounterに渡ると、Tick()(Core/Time.cs 99-150行目)は `Interval >= 0` がfalseのため125行目の逆方向分岐に入り、ループ条件は `diffTime >= -Interval` すなわち `diffTime >= 2147483648`(マイクロ秒、約35.8分)になる。通常のフレーム間隔(数ミリ秒〜数十ミリ秒)ではこの条件を満たすことはまず無く、Valueが実質的に変化しないためアニメーションが止まって見える。
 
-**根拠**: 605行目: `counter = new Counter(1, Length, (int)(1000.0 * (1000.0 / Rate)), IsLoop);`。Rateは11行目 `private int Rate { get; set; }` で未設定時デフォルト0。Rate=0のとき `1000.0 / Rate` はdouble演算のため例外にならず `double.PositiveInfinity` になり、`1000.0 * Infinity` もInfinityのまま。.NETの仕様上、doubleのInfinityを(int)キャストすると `int.MinValue`(-2147483648)になる。Core/Time.cs 30-32行目の `NormalizeInterval` は `interval == 0 ? 1 : interval` というガードのみで、0そのものではなくオーバーフロー由来の巨大な負値(-2147483648)には反応しない。
+**根拠**: 旧605行目: `counter = new Counter(1, Length, (int)(1000.0 * (1000.0 / Rate)), IsLoop);`。Rateは未設定時デフォルト0。Rate=0のとき `1000.0 / Rate` はdouble演算のため例外にならず `double.PositiveInfinity` になり、`1000.0 * Infinity` もInfinityのまま。.NETの仕様上、doubleのInfinityを(int)キャストすると `int.MinValue`(-2147483648)になる。Core/Time.cs 30-32行目の `NormalizeInterval` は `interval == 0 ? 1 : interval` というガードのみで、0そのものではなくオーバーフロー由来の巨大な負値(-2147483648)には反応しない。
 
-**直し方の方針**: Start()でRateを使う前に `int rate = Rate > 0 ? Rate : 30;` のようにフォールバックする。あわせてCounter.NormalizeInterval側も `interval <= 0`(0だけでなく負値・非有限値も含む)を弾くようにしておくと、同種の計算ミスに対しても防御になる。
+**解消済み**: `Anime/Exo.cs` の `Start()` で `int rate = Rate > 0 ? Rate : 30;` によりフォールバックしている（Extend/Anime分離時点で既に対処済みのコードをそのまま移設）。あわせて今回の移設で `Time`/`EndTime` が `counter.Value * Rate`（フレーム→秒の換算として誤り）になっていたバグも見つかり、`/ Rate`（Rate=0時は0を返すガード付き）に修正した。
 
 #### ✅ [medium] file= 再利用時に textureFileNames と imageObjects のインデックスがずれ、誤ったテクスチャを参照する
 
-`Extend/ExoAnimation.cs:331`
+`Anime/Loaders/ExoLoader.cs`（旧 `Extend/ExoAnimation.cs:331`。Extend/Anime分離でパース処理はExoLoader/Aup2Loaderへ移設済み）
 
 **壊れ方**: レイヤーAが file=a.png の後に中間点(file=なし)を1つ持ち、続けて別レイヤーBが file=b.png(新規)を読み込み、さらに後続のレイヤーCが file=b.png を再利用したケース: imageObjects=[A(a.png), 中間点(a.pngをコピー), B(b.png), C(未設定)], textureFileNames=["a.png","b.png"] となる。Cの file=b.png 処理時 `textureFileNames.IndexOf("b.png")` は1を返すが `imageObjects[1]` は中間点オブジェクト(a.pngのテクスチャ)でありBではない。結果、Cにはb.pngではなくa.pngのテクスチャが割り当てられる。例外は出ないが誤った画像が表示される。
 
-**根拠**: 329-331行目: `imageObject.Texture = !textureFileNames.Contains(fileName) ? new Texture(Path.GetDirectoryName(FilePath) + @"\" + fileName) : imageObjects[textureFileNames.IndexOf(fileName)].Texture;` と338行目 `textureFileNames.Add(fileName);` は file= 行が出現するたびに無条件で実行される。一方 imageObjects への追加は102-109行目の `_name=画像ファイル` 検出時に行われ、file= 行の有無とは無関係。169-178行目のコメント『// file が未指定の場合は中間点なので同じレイヤーの最後のオブジェクトをコピーする』と、その下の `if (imageObject.Texture == null) { var sameLayerObjects = imageObjects.Where(obj => obj.Layer == imageObject.Layer && obj.Texture != null).ToList(); ... imageObject.Texture = lastObject.Texture; }` が示す通り、中間点(キーフレーム)の ImageObject は file= 行を持たずに imageObjects に追加される実装になっている。よって imageObjects.Count は textureFileNames.Count より先行して増えることがあり、両リストのインデックスは1対1で対応しない。
+**根拠**: 旧329-331行目: `imageObject.Texture = !textureFileNames.Contains(fileName) ? new Texture(Path.GetDirectoryName(FilePath) + @"\" + fileName) : imageObjects[textureFileNames.IndexOf(fileName)].Texture;` と338行目 `textureFileNames.Add(fileName);` は file= 行が出現するたびに無条件で実行される。一方 imageObjects への追加は `_name=画像ファイル` 検出時に行われ、file= 行の有無とは無関係。中間点(キーフレーム)の ImageObject は file= 行を持たずに imageObjects に追加される実装になっているため、imageObjects.Count は textureFileNames.Count より先行して増えることがあり、両リストのインデックスは1対1で対応しない。
 
-**直し方の方針**: インデックスの暗黙対応に頼らず、file= 行を処理する際に Dictionary<string, Texture>(またはDictionary<string, ImageObject>)でファイル名からテクスチャを直接引けるようにし、imageObjects と textureFileNames が常に並行して伸びるという前提そのものを外す。
+**解消済み**: `Anime/Loaders/ExoLoader.cs`（および新規の `Anime/Loaders/Aup2Loader.cs`）では `Dictionary<string, Texture> textureByFileName` でファイル名からTextureを直接引く方式に変更済み（Extend/Anime分離時点で既に対処済みのコードをそのまま移設）。imageObjectsとの暗黙のインデックス対応には一切依存しない。
 
 #### ✅ [medium] Skin.DefaultFont の指定が計算だけされて捨てられている
 
@@ -781,13 +781,13 @@ _played を true にするのは Play()(227行目 `_played = true;`)と PlayStre
 
 #### ✅ [medium] リサイズ/拡大率フィルターのX=・Y=処理が「拡大率=が最初に来る」前提でFilters.Last()を無防備に呼ぶ
 
-`Extend/ExoAnimation.cs:445`
+`Anime/Loaders/ExoLoader.cs`（旧 `Extend/ExoAnimation.cs:445`。パース処理はExoLoaderへ移設済み）
 
-**壊れ方**: この判定は『実際の.exoファイルで、リサイズ/拡大率フィルターの行が本当に 拡大率=→X=→Y= の順で出力されるか』に依存する。リポジトリ内にサンプル.exoファイルやテストフィクスチャは存在せず(Glob検索で*.exoは0件)、Web検索でも当該フィルターのキー出力順を裏付ける一次情報は見つけられなかった。同ファイル内の他フィルター(反転=上下反転→左右反転の2行、回転=Zの1行、透明度=透明度の1行)は全て『最初に出現したキーでインスタンス化』という一貫した設計になっており、開発者が実ファイルを見た上でこの順にした可能性もあるため、断定できない。もし実際の順序がX=,Y=が拡大率=より先であれば、このフィルターを含む.exoを読み込むたびにExoコンストラクタが例外を投げ、Extend/Skin.cs:495の `new Exo(file, true)` を通じてスキン読み込み全体が失敗する(未確認の推測を含むためpartly-real)。
+**壊れ方**: この判定は『実際の.exoファイルで、リサイズ/拡大率フィルターの行が本当に 拡大率=→X=→Y= の順で出力されるか』に依存する。もし実際の順序がX=,Y=が拡大率=より先であれば、このフィルターを含む.exoを読み込むたびに例外を投げる。
 
-**根拠**: 414-476行目(FilterType.Scaleブロック): 拡大率=行(417-436行目)だけが `ScaleFilter scaleFilter = new(); currentObject.Filters.Add(scaleFilter);` でインスタンスを生成しており、X=(437-454行目)とY=(455-475行目)のハンドラは `var FilterObject = (ScaleFilter)currentObject.Filters.Last();` として既存インスタンスの取得のみを行い、生成もnull/空チェックも一切行っていない。Extend/AnimObjects.cs 122行目で `public List<Filter> Filters { get; set; } = [];` と空リスト初期化のみなので、事前に要素は入らない。したがって、このフィルター区間内でX=またはY=行が拡大率=より先に来た場合、Filtersが空なら Last() は InvalidOperationException を、他種別のフィルターしか無ければ無効キャストで InvalidCastException を投げる。
+**根拠**: 旧414-476行目(FilterType.Scaleブロック): 拡大率=行だけが `ScaleFilter scaleFilter = new(); currentObject.Filters.Add(scaleFilter);` でインスタンスを生成しており、X=とY=のハンドラは `var FilterObject = (ScaleFilter)currentObject.Filters.Last();` として既存インスタンスの取得のみを行い、生成もnull/空チェックも一切行っていなかった。
 
-**直し方の方針**: 行の出現順に依存しない実装にする。`currentObject.Filters.OfType<ScaleFilter>().LastOrDefault()` を使い、nullなら新規生成してAddする形にすれば、3つのキーのどれが最初に来ても安全に動く。
+**解消済み**: `Anime/Loaders/ExoLoader.cs` では X=/Y= のハンドラを `currentObject.Filters.OfType<ScaleFilter>().LastOrDefault()` に変更し、nullなら新規生成してAddする形にしている（Extend/Anime分離時点で既に対処済みのコードをそのまま移設）。3つのキーのどれが最初に来ても安全に動く。
 
 #### ✅ [medium] ファイナライザからのDispose呼び出しが非スレッドセーフな static Dictionary(Skin.Textures)を直接書き換える
 
