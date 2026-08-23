@@ -1,4 +1,4 @@
-# AstrumLoom
+﻿# AstrumLoom
 
 **AstrumLoom** は、C# / .NET 向けに開発しているマルチメディア・ゲームライブラリです。
 
@@ -215,6 +215,7 @@ AstrumLoom は、おおまかに次の領域で構成されています。
 | `DXLib` | DxLib バックエンド | Core |
 | `RayLib` | Raylib バックエンド | Core |
 | `Extend` | Skin / Animation / Movie などの上位機能 | Core |
+| `Audio` | コードだけで効果音と BGM を合成する（素材ファイル不要）。[docs/AUDIO.md](docs/AUDIO.md) | Core |
 | `Game` (`AstrumLoom.GameUtil`) | 起動層。`GameApp.Run` | Core + 全バックエンド |
 | `Sandbox` | 機能確認用のデモ | GameUtil |
 
@@ -245,7 +246,7 @@ Hoshiori\
 ```
 
 ゲーム側が参照するのは `AstrumLoom.GameUtil` の 1 つだけです。
-これが Core / DXLib / RayLib / Extend をまとめて連れてくるので、
+これが Core / DXLib / RayLib / Extend / Audio をまとめて連れてくるので、
 **ゲームのコードにバックエンドの型名が出てきません**。
 
 詳しい手順は [docs/WORKFLOW.md](docs/WORKFLOW.md) にあります。

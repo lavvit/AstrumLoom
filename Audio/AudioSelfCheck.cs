@@ -37,10 +37,21 @@ public static class AudioSelfCheck
 
     // --- 1. 全プリセット: 同一検出 / NaN・Inf件数 / 無音でない / クリップしていない --------------------
 
+    /// <summary>
+    /// プリセット間の実効値のばらつき下限。中央値の 1/8 未満なら「他の音に埋もれて聞こえない」とみなして赤くする。
+    ///
+    /// 根拠（机上で確認・実行はしていない）: 例えば Shot の実効値が 0.15 で中央値が 0.12 だとすると、
+    /// このプリセットの Volume だけを 0.05 に落とすと実効値はおおむね比例して 0.15 * (0.05/0.8) ≒ 0.009 まで下がる。
+    /// 中央値 0.12 の 1/8 は 0.015 なので 0.009 < 0.015 となり、この検算は確実に赤くなる。
+    /// 実際に踏んだ Whoosh のバグ（実効値 0.0186、他は概ね 0.1〜0.3 台）もこの閾値で確実に引っかかる大きさだった。
+    /// </summary>
+    private const double LevelOutlierRatio = 1.0 / 8.0;
+
     private static bool CheckPresetsDistinctAndSane(StringBuilder sb)
     {
         bool ok = true;
         var byHash = new Dictionary<ulong, List<SfxId>>();
+        var rmsById = new Dictionary<SfxId, double>();
 
         foreach (var id in SfxBank.All)
         {
@@ -65,6 +76,7 @@ public static class AudioSelfCheck
                 ok = false;
                 sb.AppendLine($"[プリセット {id}] 実効値 {rms:0.000000} が閾値未満（無音とみなせる）。");
             }
+            rmsById[id] = rms;
 
             double peak = Peak(clean);
             if (peak > ClipTolerance)
@@ -84,6 +96,23 @@ public static class AudioSelfCheck
             if (ids.Count <= 1) continue;
             ok = false;
             sb.AppendLine($"[プリセット重複] {string.Join(", ", ids)} が完全に同一の波形になっています。配線し忘れの疑いがあります。");
+        }
+
+        // プリセット間のレベル差が極端でないか（中央値の 1/8 未満なら「他の音に埋もれて聞こえない」）。
+        if (rmsById.Count > 0)
+        {
+            var sorted = rmsById.Values.OrderBy(v => v).ToArray();
+            double median = sorted[sorted.Length / 2];
+            if (sorted.Length % 2 == 0 && sorted.Length > 1)
+                median = (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2.0;
+
+            double floor = median * LevelOutlierRatio;
+            foreach (var (id, rms) in rmsById)
+            {
+                if (rms >= floor) continue;
+                ok = false;
+                sb.AppendLine($"[プリセット {id}] 実効値 {rms:0.000000} が全プリセット中央値 {median:0.000000} の 1/8（{floor:0.000000}）未満です。他の音に埋もれて聞こえません。");
+            }
         }
 
         return ok;

@@ -264,6 +264,11 @@ public static class SfxBank
             Volume = 0.8,
         },
 
+        // PinkNoise は NoiseState.Pink() 内で経験則の *0.11 正規化が入っており、さらに BandPass で
+        // 帯域を絞るため、他のプリセットと同じ Volume では実効値が一桁近く小さくなる
+        // （実測: ピーク 0.089 / 実効値 0.0186、他のプリセットは概ね 0.1〜0.3 台）。
+        // ここは EdgeWeave()（縁を使った織り）で鳴る音なので、他プリセットと聞こえの大きさを揃えるために
+        // Volume を大きく上げてある（tanh のソフトクリップで飽和しても不自然な硬いクリップにはならない）。
         SfxId.Whoosh => new SfxDesc
         {
             FreqStart = 200,
@@ -274,7 +279,7 @@ public static class SfxBank
             FilterCutoffStart = 300,
             FilterCutoffEnd = 3200,
             FilterResonance = 0.4,
-            Volume = 0.7,
+            Volume = 4.5,
         },
 
         SfxId.Bounce => new SfxDesc
