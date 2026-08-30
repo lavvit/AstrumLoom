@@ -32,6 +32,31 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         Path = path;
         Load();
     }
+    // メモリ上のエンコード済み画像バイト列（SkiaSharp等で焼いたPNG等）から読み込む場合に使う。
+    // 既にメモリにあるのでバックグラウンドでのファイル読み込みは不要。デコード自体は
+    // メインスレッド専用（LoadTx）なので、他スレッドから来た場合は Host.cs の _deferred に乗って
+    // 次にメインスレッドから来たときへ回る（RenderTexture生成と同じ扱い）。
+    private byte[]? _memoryBytes;
+    private string? _memoryExt;
+    /// <summary>メモリ上のエンコード済み画像バイト列（PNG等）からテクスチャを作る。</summary>
+    public RayLibTexture(byte[] data, string ext)
+    {
+        _memoryBytes = data;
+        _memoryExt = ext;
+        Load();
+    }
+
+    // 生ピクセル経路。PNGのエンコード/デコードを両方すっ飛ばすので、_memoryBytes 経路より速い。
+    private byte[]? _rawPixels;
+    private int _rawWidth, _rawHeight;
+    /// <summary>生のRGBA32ピクセル列（width*height*4バイト）からテクスチャを作る。</summary>
+    public RayLibTexture(int width, int height, byte[] rgbaPixels)
+    {
+        _rawPixels = rgbaPixels;
+        _rawWidth = width;
+        _rawHeight = height;
+        Load();
+    }
     ~RayLibTexture() { Dispose(); }
 
     public void Dispose()
@@ -105,10 +130,21 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     private bool LoadTx()
     {
         bool file = FileCheck(Path);
-        if (_renderInfo == null && !file)
+        if (_renderInfo == null && !file && _memoryBytes == null && _rawPixels == null)
             return false;
 
-        if (_renderInfo != null)
+        if (_rawPixels != null)
+        {
+            // GenImageColorで箱だけ作ってGPUに上げ、その直後に中身を丸ごと差し替える。
+            // エンコード/デコードが無いぶん、_memoryBytes（PNG経由）より速い。
+            var blank = Raylib.GenImageColor(_rawWidth, _rawHeight, new Raylib_cs.Color(0, 0, 0, 0));
+            Native = Raylib.LoadTextureFromImage(blank);
+            Raylib.UnloadImage(blank);
+            if (Native.Id != 0)
+                Raylib.UpdateTexture(Native, _rawPixels);
+            _rawPixels = null;
+        }
+        else if (_renderInfo != null)
         {
             int width = (int)_renderInfo.Value.size.Width;
             int height = (int)_renderInfo.Value.size.Height;
@@ -124,6 +160,16 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
             // RenderTexture を所有する RayLibTexture として返す
             _renderTex = renderTex;
             Native = renderTex.Texture;
+        }
+        else if (_memoryBytes != null)
+        {
+            // 既にメモリにあるエンコード済みバイト列（PNG等）をそのままデコードする。
+            // ファイル読み込み経路（Pump の _pendingBytes）と同じ raylib API を使うだけで、
+            // ディスクI/Oが無い分こちらの方が単純。
+            var img = Raylib.LoadImageFromMemory(_memoryExt ?? ".png", _memoryBytes);
+            Native = Raylib.LoadTextureFromImage(img);
+            Raylib.UnloadImage(img);
+            _memoryBytes = null; // GPUへ上げ終わったら保持不要
         }
         else
         {

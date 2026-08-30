@@ -8,43 +8,36 @@ namespace AstrumLoom.DXLib;
 internal sealed class DxLibInput : IInput
 {
     private readonly byte[] _now = new byte[256];
-    private readonly byte[] _prev = new byte[256];
-    // 各キーの状態遷移（1=押下開始, 2=保持, -1=離鍵, 0=非押下）
-    private int[] _state = new int[256];
+    // 押下エッジを取りこぼさないための共通バッファ。Buffer()（メインスレッド）と
+    // Update()（更新スレッド）が別の回数で回っても押下/解放が消えないようにする。
+    private readonly KeyEdgeBuffer _buffer = new(256);
 
     public void Buffer()
     {
-        // 1フレーム前の状態を保存
-        Array.Copy(_now, _prev, _now.Length);
-
-        // 現在のキー状態を取得
+        // 現在のキー状態を取得して取り込む
         GetHitKeyStateAll(_now);
+        for (int i = 0; i < _now.Length; i++)
+            _buffer.Sample(i, _now[i] != 0);
     }
-    /// <summary>Bufferで取得した生の押下状態から_stateを1(押下開始)/2(保持)/-1(離鍵)/0(非押下)の状態遷移に変換する。</summary>
-    public void Update()
-    {
-        for (int i = 0; i < _state.Length; i++)
-        {
-            _state[i] = _now[i] != 0 ? (_state[i] < 1 ? 1 : 2) : (_state[i] > 0 ? -1 : 0);
-        }
-    }
+    /// <summary>Bufferで取り込んだ生の押下状態から_stateを1(押下開始)/2(保持)/-1(離鍵)/0(非押下)の状態遷移に変換する。</summary>
+    public void Update() => _buffer.Commit();
 
     public bool GetKey(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _state[code] > 0;
+        return code >= 0 && _buffer.GetKey(code);
     }
 
     public bool GetKeyDown(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _state[code] == 1;
+        return code >= 0 && _buffer.GetKeyDown(code);
     }
 
     public bool GetKeyUp(Key key)
     {
         int code = ToDxKeyCode(key);
-        return code >= 0 && _state[code] < 0;
+        return code >= 0 && _buffer.GetKeyUp(code);
     }
 
     /// <summary>Core共通のKey列挙値をDxLibのKEY_INPUT_*定数へ変換する。未対応キーは-1を返す。</summary>

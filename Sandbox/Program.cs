@@ -17,6 +17,8 @@ internal sealed class SimpleTestGame : Scene
         ("描画負荷", () => new LoadCheckScene()),
         ("ゲームの雛形", () => new GameTemplateScene()),
         ("aup2 再生確認", () => new AnimeDemoScene()),
+        ("SkiaSharp 焼き込み実験", () => new SkiaDemoScene()),
+        ("装飾文字コスト比較（AstrumLoom vs Skiaキャッシュ）", () => new SkiaTextCompareDemoScene()),
     ];
 
     public override void Enable()
@@ -140,7 +142,7 @@ internal static class Program
         };
 
         // ゲーム固有の引数。登録しておくと「不明な引数」にならず、--help にも並ぶ。
-        Startup.Register("scene", true, "起動時に開くシーン番号（1〜6）");
+        Startup.Register("scene", true, $"起動時に開くシーン番号（1〜{SimpleTestGame.Count}）");
         int scene = (int)Startup.Parse(args).Number("scene", 1);
         SimpleTestGame.StartScene = Math.Clamp(scene - 1, 0, SimpleTestGame.Count - 1);
 
