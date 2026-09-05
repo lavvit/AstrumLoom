@@ -491,6 +491,9 @@ internal sealed class TextureDemoScene : Scene
     public bool BakedReady => _baked is { Enable: true };
 
     public int CurrentFrame => _frame;
+
+    /// <summary>コマ送りを自動で進めているか。セルフテストから Space が効いたかを見るために公開する。</summary>
+    public bool AutoFrame => _autoFrame;
     public int AnchorIndex => _anchor;
     public bool FlipX => _flipX;
 }

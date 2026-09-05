@@ -24,6 +24,20 @@ public interface IGamePlatform : IDisposable
 
     ITexture LoadTexture(string path);
     ITexture CreateTexture(int width, int height, Action callback);
+    /// <summary>
+    /// メモリ上のエンコード済み画像バイト列（PNG等）からテクスチャを作る。
+    /// SkiaSharp等、外部の描画モジュールでオフスクリーンに焼いた絵をそのまま取り込むための入口。
+    /// 既定実装は未対応（NotSupportedException）。対応するバックエンドだけオーバーライドする。
+    /// </summary>
+    ITexture LoadTextureFromMemory(byte[] data, string ext)
+        => throw new NotSupportedException($"{BackendKind} は LoadTextureFromMemory に対応していません。");
+    /// <summary>
+    /// 生のRGBA32ピクセル列（幅×高さ×4バイト、エンコード無し）から直接テクスチャを作る。
+    /// PNG等のエンコード/デコードを介さない分、LoadTextureFromMemory より高速。
+    /// 既定実装は未対応（NotSupportedException）。対応するバックエンドだけオーバーライドする。
+    /// </summary>
+    ITexture LoadTextureFromPixels(int width, int height, byte[] rgba)
+        => throw new NotSupportedException($"{BackendKind} は LoadTextureFromPixels に対応していません。");
     ISound LoadSound(string path, bool streaming);
     IMovie LoadMovie(string path);
 

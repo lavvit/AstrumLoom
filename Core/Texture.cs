@@ -32,6 +32,14 @@ public class Texture : IDisposable
     public Texture(string path)
         => _texture = AstrumCore.Platform?.LoadTexture(path);
 
+    /// <summary>メモリ上のエンコード済み画像バイト列（例: SkiaSharpでオフスクリーンに焼いてPNGエンコードした結果）からテクスチャを作る。</summary>
+    public Texture(byte[] data, string ext = ".png")
+        => _texture = AstrumCore.Platform?.LoadTextureFromMemory(data, ext);
+
+    /// <summary>生のRGBA32ピクセル列（width*height*4バイト）から直接テクスチャを作る。エンコード/デコードを介さない分、byte[]+ext版より速い。</summary>
+    public Texture(int width, int height, byte[] rgbaPixels)
+        => _texture = AstrumCore.Platform?.LoadTextureFromPixels(width, height, rgbaPixels);
+
     public ITexture Interface => _texture!;
 
     public void Draw(double x = 0, double y = 0)

@@ -165,12 +165,29 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
     public void Update(IGame game)
     {
         platform.UTime.BeginFrame();
+        AstrumCore.UpdateLoopCount++;
         try
         {
             Sleep.Update();
 
+            // 論理フレームの来ない反復では、入力を一切進めずに帰る。
+            //
+            // 固定ステップ（FixedUpdate=true）だと、この反復が論理フレームを 1 つも
+            // 走らせないことが普通にある。更新スレッドは論理レートを律速にせず全力で回るので、
+            // その差は実測で 60Hz に対しておよそ 30000 回/秒――500 反復に 1 回しか
+            // game.Update() が走らない。
+            // 押下エッジは「押した瞬間」の 1 反復しか立たないため、ここで進めてしまうと
+            // その 1 反復はほぼ確実に game.Update() の走らない反復に当たり、
+            // ゲームからはキーが一度も押されなかったことになる。
+            // （TaikoFine v10 でタイトルの Enter が効かなかったのはこれ。）
+            //
+            // 可変 dt とロックステップは 1 反復 1 論理フレームなので、従来どおり毎回進める。
+            if (!IsLogicStepDue())
+                return;
+
             // 生入力を先に進めておく。こうするとデバッグホットキーは
             // 一時停止中でも、入力再生中でも効く。
+            AstrumCore.InputAdvanceCount++;
             _inputBridge?.PreUpdate();
             DebugControl.PollHotkeys();
 
@@ -192,6 +209,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             if (run) InputCapture.EndFrame(frame);
 
             if (run) RunLogicSteps(game, platform.UTime.DeltaTime);
+            // スローで間引いた分の時間は捨てる。溜めておくと、間引きが明けた瞬間に
+            // キャッチアップが一気に走ってスローにならない。
+            else DropDueStep();
         }
         catch (Exception ex)
         {
@@ -206,6 +226,41 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
         if (_fatalTriggered)
             return;
+    }
+
+    /// <summary>固定ステップの時間の積み上げ。<see cref="IsLogicStepDue"/> が進め、<see cref="RunLogicSteps"/> が消費します。</summary>
+    private float FixedDt => (float)(1.0 / Math.Max(1e-6, config.FixedUpdateHz));
+
+    /// <summary>
+    /// この反復で論理フレームを走らせるかどうか。false なら入力を一切進めずに反復を捨てます。
+    /// 実時間の積み上げもここで行います（1 反復につき 1 回だけ積むため）。
+    /// </summary>
+    private bool IsLogicStepDue()
+    {
+        // 可変 dt とロックステップは 1 反復 1 論理フレーム。間引く余地が無い。
+        if (!config.FixedUpdate || config.LockStep) return true;
+
+        // 一時停止中は論理フレームが来ないが、解除のホットキーを拾うために回し続ける。
+        // 時間は積まない。積むと解除した瞬間にキャッチアップが走る。
+        if (DebugControl.Paused) return true;
+
+        float fixedDt = FixedDt;
+        _accumulator += platform.UTime.DeltaTime;
+
+        // ブレークポイントや初回フレームで巨大な dt が来ても、一気に走らせない。
+        float maxAccum = fixedDt * Math.Max(1, config.MaxCatchUpSteps);
+        if (_accumulator > maxAccum) _accumulator = maxAccum;
+
+        return _accumulator >= fixedDt;
+    }
+
+    /// <summary>来ていた論理フレームを走らせずに捨てます（スローでの間引き）。</summary>
+    private void DropDueStep()
+    {
+        if (!config.FixedUpdate || config.LockStep) return;
+
+        float fixedDt = FixedDt;
+        if (_accumulator >= fixedDt) _accumulator -= fixedDt;
     }
 
     /// <summary>
@@ -229,12 +284,8 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             return;
         }
 
-        _accumulator += wallDelta;
-
-        // ブレークポイントや初回フレームで巨大な dt が来ても、一気に走らせない。
-        float maxAccum = fixedDt * Math.Max(1, config.MaxCatchUpSteps);
-        if (_accumulator > maxAccum) _accumulator = maxAccum;
-
+        // 実時間の積み上げと上限の頭打ちは IsLogicStepDue で済ませてある。
+        // ここで足すと 1 反復につき 2 回積むことになる。
         int steps = 0;
         while (_accumulator >= fixedDt && steps < Math.Max(1, config.MaxCatchUpSteps))
         {

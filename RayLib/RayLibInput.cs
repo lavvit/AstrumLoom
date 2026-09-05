@@ -15,19 +15,18 @@ internal sealed class RayLibInput : IInput
 {
     // Key の全要素配列（固定）
     private readonly Key[] _keys;
-    // 各キーの現在/前フレーム押下状態
-    private readonly bool[] _now;
-    private readonly bool[] _prev;
-    // 各キーの状態遷移（1=押下開始, 2=保持, -1=離鍵, 0=非押下）
-    private int[] _state;
+    // Key → _keys 上の位置。GetBufferedState が毎回 Array.IndexOf で線形探索しないための表。
+    private readonly Dictionary<Key, int> _index;
+    // 押下エッジを取りこぼさないための共通バッファ。Buffer()（メインスレッド）と
+    // Update()（更新スレッド）が別の回数で回っても押下/解放が消えないようにする。
+    private readonly KeyEdgeBuffer _buffer;
 
     public RayLibInput()
     {
         _keys = Enum.GetValues<Key>();
-        int len = _keys.Length;
-        _now = new bool[len];
-        _prev = new bool[len];
-        _state = new int[len];
+        _index = new Dictionary<Key, int>(_keys.Length);
+        for (int i = 0; i < _keys.Length; i++) _index[_keys[i]] = i;
+        _buffer = new KeyEdgeBuffer(_keys.Length);
     }
 
     // raylibのネイティブなキー入力ポンプ（PollInputEvents、EndDrawing経由）はメインスレッドでしか
@@ -39,16 +38,11 @@ internal sealed class RayLibInput : IInput
     // 毎フレーム一度呼び出して内部バッファを更新する
     public void Buffer()
     {
-        // 1フレーム前の状態を保存
-        Array.Copy(_now, _prev, _now.Length);
-
-        // 現在のキー状態を取得
+        // 現在のキー状態を取得して取り込む
         for (int i = 0; i < _keys.Length; i++)
         {
-            var k = _keys[i];
-            var rk = ToRayKey(k);
-            bool isDown = rk != KeyboardKey.Null && IsKeyDown(rk);
-            _now[i] = isDown;
+            var rk = ToRayKey(_keys[i]);
+            _buffer.Sample(i, rk != KeyboardKey.Null && IsKeyDown(rk));
         }
 
         // 文字入力キューをポンプ（メインスレッドでのみ安全に呼べるGetCharPressed）
@@ -62,21 +56,12 @@ internal sealed class RayLibInput : IInput
 
     /// <summary>Buffer()でポンプ済みの文字入力を1件取り出す。RayLibTextInputが更新スレッドから呼ぶ想定。</summary>
     public bool PopChar(out char c) => _charQueue.TryDequeue(out c);
-    /// <summary>Buffer()で取り込んだ現在/前フレームの押下状態から、各キーの遷移状態(1/2/-1/0)を確定します。</summary>
-    public void Update()
-    {
-        for (int i = 0; i < _state.Length; i++)
-        {
-            _state[i] = _now[i] ? (_state[i] < 1 ? 1 : 2) : (_state[i] > 0 ? -1 : 0);
-        }
-    }
+    /// <summary>Buffer()で取り込んだ押下状態から、各キーの遷移状態(1/2/-1/0)を確定します。</summary>
+    public void Update() => _buffer.Commit();
 
     // バッファベースでキーの遷移状態を取得する（外部向けヘルパー）
     public int GetBufferedState(Key key)
-    {
-        int idx = Array.IndexOf(_keys, key);
-        return idx >= 0 ? _state[idx] : 0;
-    }
+        => _index.TryGetValue(key, out int idx) ? _buffer.GetState(idx) : 0;
 
     /// <summary>指定キーが押されている（押した瞬間・押しっぱなし含む）かどうか。</summary>
     public bool GetKey(Key key)

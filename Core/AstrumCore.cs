@@ -33,6 +33,19 @@ public class AstrumCore
     public static IGraphics? Graphic => Platform?.Graphics;
 
     public static GameConfig WindowConfig { get; private set; } = null!;
+
+    /// <summary>
+    /// 更新ループを回した回数。論理フレーム数（<see cref="FrameCount"/>）とは別物で、
+    /// 固定ステップだと「論理フレームの来ない反復」があるぶんこちらのほうが多くなります。
+    /// 入力を進めてよい反復かどうかの検証に使います。
+    /// </summary>
+    public static long UpdateLoopCount { get; internal set; }
+
+    /// <summary>
+    /// 生入力を 1 フレーム進めた回数。押下エッジは 1 回の前進につき 1 反復しか立たないので、
+    /// これが論理フレーム数を上回ると、上回ったぶんのエッジは誰にも見られずに捨てられている。
+    /// </summary>
+    public static long InputAdvanceCount { get; internal set; }
     public static int Width => WindowConfig.Width;
     public static int Height => WindowConfig.Height;
     public static int WindowWidth => (int)Platform.Graphics.Size.Width;

@@ -21,6 +21,8 @@ public sealed class LaunchOptions
     public bool? MultiThread { get; set; }
     public bool? FixedUpdate { get; set; }
     public double? FixedUpdateHz { get; set; }
+    /// <summary>--no-lockstep。決定論モードでもロックステップに倒さない（実時間キャッチアップの検証用）。</summary>
+    public bool? LockStep { get; set; }
 
     // --- 決定論 ---
     public int? Seed { get; set; }
@@ -110,6 +112,8 @@ public static class Startup
           --mt / --no-mt             更新を別スレッドで回すか
           --fixed / --no-fixed       固定ステップ更新
           --hz <数>                  固定ステップの更新周波数 (既定 60)
+          --no-lockstep              決定論モードでもロックステップに倒さない
+                                     (実時間キャッチアップ経路の検証用)
           --seed <数>                乱数シード
 
         デバッグ・自動化
@@ -201,6 +205,7 @@ public static class Startup
         or "fullscreen" or "windowed" or "no-fullscreen"
         or "fps" or "vsync" or "no-vsync" or "mt" or "multithread"
         or "no-mt" or "single-thread" or "fixed" or "no-fixed" or "hz" or "seed"
+        or "lockstep" or "no-lockstep"
         or "shot-every" or "quit-after" or "quit-after-sec" or "quit-after-seconds"
         or "selftest" or "self-test" or "turbo" or "no-turbo" or "record" or "replay" or "tuning"
         or "out" or "outdir" or "overlay" or "no-overlay"
@@ -271,6 +276,8 @@ public static class Startup
                 case "fixed": o.FixedUpdate = true; break;
                 case "no-fixed": o.FixedUpdate = false; break;
                 case "hz": o.FixedUpdateHz = ParseDouble(o, name, Value()); break;
+                case "lockstep": o.LockStep = true; break;
+                case "no-lockstep": o.LockStep = false; break;
                 case "seed": o.Seed = ParseInt(o, name, Value()); break;
 
                 case "shot-every":
@@ -377,7 +384,12 @@ public static class Startup
                 config.FixedUpdate = true;
             }
             // 実時間に依存したキャッチアップが入ると再生がずれる。1 ループ 1 ステップに固定する。
-            config.LockStep = true;
+            // --no-lockstep を明示したときだけ外す。ロックステップだと「1 反復 = 1 論理フレーム」に
+            // なるので、実時間キャッチアップ側の経路（反復のほうが論理フレームより桁違いに多い状態）を
+            // セルフテストから一度も踏めない。実際そこにキー入力が丸ごと落ちるバグが埋まっていた。
+            // 外すと画面の見た目は実時間依存になるので、スクリーンショット比較には使わないこと。
+            if (o.LockStep != false)
+                config.LockStep = true;
 
             // ロックステップは「1 ループ = 1 論理フレーム」なので、ループの目標 FPS が
             // そのままゲームの進む速さになる。60 のままだと自動テストが実時間 1 倍速で流れ、

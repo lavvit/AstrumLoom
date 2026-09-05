@@ -103,6 +103,12 @@ public sealed class RayLibPlatform : IGamePlatform
     private bool _ready => IsWindowReady();
     public ITexture LoadTexture(string path) =>
         new RayLibTexture(path);
+    /// <summary>メモリ上のエンコード済み画像バイト列（SkiaSharp等の焼き出し結果）からテクスチャを作る。</summary>
+    public ITexture LoadTextureFromMemory(byte[] data, string ext) =>
+        new RayLibTexture(data, ext);
+    /// <summary>生のRGBA32ピクセル列から直接テクスチャを作る（PNG等のエンコード/デコード無し）。</summary>
+    public ITexture LoadTextureFromPixels(int width, int height, byte[] rgba) =>
+        new RayLibTexture(width, height, rgba);
     public ISound LoadSound(string path, bool streaming = false) =>
         new RayLibSound(path, streaming);
     public IMovie LoadMovie(string path) =>
@@ -123,24 +129,35 @@ public sealed class RayLibPlatform : IGamePlatform
     /// マルチスレッド更新構成のときだけUTime側にも同じ目標FPSを反映する（シングルスレッドだと同一ループ内で
     /// Update/Drawが直列に待ってしまい実効FPSが半分になるため）。
     /// </summary>
+    /// <remarks>
+    /// あえて ConfigFlags.VSyncHint（GLFW の SwapInterval(1)）は使わない。検証の結果、これは
+    /// UTime/Time の二重待ちとは別に、GLFW の SwapInterval(1) 自体がドライバ次第でモニタの
+    /// リフレッシュレートの半分でしかスワップを返さないことがあると判明したため（Intel Arc +
+    /// Windows のウィンドウモードで実機確認: raylib_cs だけの最小構成でも monitorFps=60 の環境で
+    /// 実測 32.8 FPS。SetTargetFPS(0) にしてAstrumLoom側の待機も外し、GLFWのvsync待ちだけに
+    /// した状態でも変わらず半分だった＝AstrumLoomのコードではなくGLFW/ドライバ側の挙動）。
+    /// 同じ環境で VSyncHint を使わず SetTargetFPS だけでフレーム待機させると正しく約60FPSになる
+    /// ことも確認済み。ここでは「見た目のティアリング抑止」より「指定FPSに実効フレームレートが
+    /// 一致すること」を優先し、raylib のネイティブvsyncには頼らず、AstrumLoom側のTime/UTime
+    /// （HiResDelayによるソフトウェアフレームリミッタ）だけでモニタのリフレッシュレートに合わせる。
+    /// </remarks>
     public void SetVSync(bool enabled)
     {
         if (!_ready || VSync == enabled) return;
         Log.Debug("VSync切替: " + enabled);
         VSync = enabled;
-        // 途中切替は SetWindowState / ClearWindowState を使う。
         if (enabled)
         {
-            SetWindowState(ConfigFlags.VSyncHint); // スワップ間引き（プラットフォーム依存）
             int monitorFps = GetMonitorRefreshRate(GetCurrentMonitor());
             int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
-            SetTargetFPS(targetFps);
+            // raylib 自身のフレーム待ちは使わず（Time/UTime とのペーシング二重化を避けるため）、
+            // AstrumLoom 側の HiResDelay だけでモニタのリフレッシュレートに揃える。
+            SetTargetFPS(0);
             Time.TargetFps = targetFps;
             if (_multiThreadUpdate) UTime.TargetFps = targetFps;
         }
         else
         {
-            ClearWindowState(ConfigFlags.VSyncHint);
             SetTargetFPS(_targetFps);
             Time.TargetFps = _targetFps;
             if (_multiThreadUpdate) UTime.TargetFps = _targetFps;

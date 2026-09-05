@@ -26,6 +26,15 @@
 
   <ItemGroup>
     <!--
+      技術検証用: SkiaDemo だけがこれを使う。AstrumLoom.Core/RayLib 側は一切 SkiaSharp を
+      知らない（LoadTextureFromMemory は生の byte[] しか受け取らない）ので、この依存は
+      Sandbox から出ていかない。
+    -->
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       デモシーンの素材。tools\make-sandbox-assets.ps1 で手続き生成できるので、
       消えても作り直せる。出力先（..\Debug\Assets）へそのままコピーする。
     -->
