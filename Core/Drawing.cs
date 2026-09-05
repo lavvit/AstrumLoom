@@ -197,8 +197,9 @@ public class Drawing
     public static void DefaultText(double x, double y, object text,
         Color? color = null,
         ReferencePoint point = ReferencePoint.TopLeft,
-        BlendMode blend = BlendMode.None, double opacity = 1)
-        => Graphics.Text(x, y, text.ToString() ?? "", 16,
+        BlendMode blend = BlendMode.None, double opacity = 1,
+        int size = 16)
+        => Graphics.Text(x, y, text.ToString() ?? "", size,
             new DrawOptions
             {
                 Color = color,

@@ -44,6 +44,7 @@ public class Log
             LogMessages.Add(logEntry);
             if (LogMessages.Count > MaxStoredCount)
                 LogMessages.RemoveRange(0, LogMessages.Count - MaxStoredCount);
+            _version++;
         }
     }
     public static void Write(string message, bool timestamp) => Write(message, LogLevel.Info, timestamp);
@@ -59,7 +60,7 @@ public class Log
 
     public static void Clear()
     {
-        lock (_sync) LogMessages.Clear();
+        lock (_sync) { LogMessages.Clear(); _version++; }
     }
 
     public static void Save(string filePath)
@@ -114,11 +115,90 @@ public class Log
     /// <summary>画面に出しておく秒数。</summary>
     public static double ScreenSeconds = 10;
 
+    /// <summary>
+    /// 画面表示に使うフォント。null なら描画バックエンドの組み込みフォント（RayLib なら GetFontDefault）で描く。
+    /// ゲーム側の <see cref="Drawing.DefaultFont"/> とは切り離してあるので、装飾付きの重いフォントを
+    /// 既定に据えていてもログの描画コストはそれに引きずられない。
+    /// なお組み込みフォントは ASCII しか持たないので、日本語ログを読みたいときはここに日本語フォントを入れる。
+    /// </summary>
+    public static IFont? Font { get; set; }
+
+    /// <summary><see cref="Font"/> が null のときに使う組み込みフォントのサイズ。</summary>
+    public static int FontSize { get; set; } = 16;
+
+    // ---- 表示用キャッシュ ----------------------------------------------------
+    // Draw は毎フレーム呼ばれるが、ログの中身は滅多に変わらない。毎回 LINQ で絞り込み、
+    // 文字列を連結して計測し直すと、それだけでフレーム時間を食う（特に装飾フォントの Measure）。
+    // ログの更新（_version）と表示設定が変わったとき、あとは経過秒での間引きのために
+    // 一定間隔でだけ組み直し、それ以外のフレームは組み上がった行をそのまま描く。
+    private readonly record struct DrawLine(string Text, Color Color, LogLevel Level, int Lines);
+
+    private static long _version;
+    private static List<DrawLine> _lines = [];
+    private static int _cachedWidth;
+    private static int _cachedHeight;
+    private static int _cachedLineHeight;
+    private static long _cachedVersion = -1;
+    private static long _cachedAt = long.MinValue;
+    private static (bool info, int max, double seconds, IFont? font, int size) _cachedSetting;
+
+    /// <summary>キャッシュを組み直す間隔（ミリ秒）。経過秒数での消去はこの粒度で反映される。</summary>
+    public static int RebuildIntervalMs = 200;
+
+    private static (int width, int height) MeasureText(string text)
+        => Font != null ? Font.Measure(text) : Drawing.DefaultTextSize(text, FontSize);
+
+    private static void DrawLineText(double x, double y, string text, Color color)
+    {
+        if (Font != null) Font.Draw(x, y, text, color);
+        else Drawing.DefaultText(x, y, text, color, size: FontSize);
+    }
+
     public static void Draw()
     {
         if (!DrawOnScreen) return;
 
+        long tick = Environment.TickCount64;
+        var setting = (IncludeInfo, MaxLogCount, ScreenSeconds, Font, FontSize);
+        if (_cachedVersion != Volatile.Read(ref _version)
+            || !_cachedSetting.Equals(setting)
+            || tick - _cachedAt >= RebuildIntervalMs)
+        {
+            Rebuild(setting);
+            _cachedAt = tick;
+        }
+
+        if (_lines.Count == 0) return;
+
         int x = 10, y = 10;
+        int size = _cachedLineHeight;
+        Drawing.Box(0, 0, x + _cachedWidth + 10, y + _cachedHeight + 10, Color.Black, opacity: 0.5);
+
+        double pulse = 0.6 + 0.4 * Math.Sin(tick / 180.0);
+        int h = 0;
+        foreach (var line in _lines)
+        {
+            // Warning/Error は背景を敷いて目立たせる。Error はさらに脈打たせる。
+            if (line.Level == LogLevel.Warning || line.Level == LogLevel.Error)
+            {
+                double bgOpacity = line.Level == LogLevel.Error ? 0.25 + 0.25 * pulse : 0.25;
+                Drawing.Box(x - 4, y + h * size - 2, _cachedWidth + 8, size * line.Lines,
+                    line.Level == LogLevel.Error ? Color.Red : Color.Yellow, opacity: bgOpacity);
+            }
+
+            DrawLineText(x, y + h * size, line.Text, line.Color);
+            h += line.Lines;
+        }
+    }
+
+    /// <summary>表示する行と、背景帯のサイズを組み直してキャッシュする。</summary>
+    private static void Rebuild((bool info, int max, double seconds, IFont? font, int size) setting)
+    {
+        _cachedVersion = Volatile.Read(ref _version);
+        _cachedSetting = setting;
+        _lines.Clear();
+        _cachedWidth = _cachedHeight = 0;
+
         var now = DateTime.Now;
         List<LogEntry> loglist;
         lock (_sync)
@@ -135,43 +215,31 @@ public class Log
 
         // MaxLogCount が設定されていれば、最新の MaxLogCount 件のみに絞る
         if (MaxLogCount > 0 && loglist.Count > MaxLogCount)
-        {
-            int skip = Math.Max(0, loglist.Count - MaxLogCount);
-            loglist = [.. loglist.Skip(skip)];
-        }
+            loglist.RemoveRange(0, loglist.Count - MaxLogCount);
         if (loglist.Count == 0) return;
 
-        int size = Drawing.FontSize();
-        string[] prefixes = [.. loglist.Select(l => l.Level switch
-        {
-            LogLevel.Warning => " ! ",
-            LogLevel.Error =>   "!! ",
-            _ => ""
-        })];
-        int width = Drawing.TextSize(string.Join("\n", loglist.Select((l, i) => prefixes[i] + l)).Trim()).width;
-        int height = size * logCount(loglist);
-        Drawing.Box(0, 0, x + width + 10, y + height + 10, Color.Black, opacity: 0.5);
+        _cachedLineHeight = Math.Max(8, MeasureText("Ag").height);
 
-        double pulse = 0.6 + 0.4 * Math.Sin(Environment.TickCount64 / 180.0);
-        int h = 0;
-        for (int i = 0; i < loglist.Count; i++)
+        int total = 0;
+        foreach (var log in loglist)
         {
-            var log = loglist[i];
-            int lines = log.Message.Split('\n').Length;
-
-            // Warning/Error は背景を敷いて目立たせる。Error はさらに脈打たせる。
-            if (log.Level == LogLevel.Warning || log.Level == LogLevel.Error)
+            string prefix = log.Level switch
             {
-                double bgOpacity = log.Level == LogLevel.Error ? 0.25 + 0.25 * pulse : 0.25;
-                Drawing.Box(x - 4, y + h * size - 2, width + 8, size * lines, log.Color, opacity: bgOpacity);
-            }
+                LogLevel.Warning => " ! ",
+                LogLevel.Error => "!! ",
+                _ => ""
+            };
+            string text = prefix + log;
+            int lines = 1;
+            for (int i = 0; i < log.Message.Length; i++)
+                if (log.Message[i] == '\n') lines++;
 
-            Drawing.Text(x, y + h * size, prefixes[i] + log, log.Color);
-            h += lines;
+            _lines.Add(new DrawLine(text, log.Color, log.Level, lines));
+            _cachedWidth = Math.Max(_cachedWidth, MeasureText(text).width);
+            total += lines;
         }
+        _cachedHeight = _cachedLineHeight * total;
     }
-
-    private static int logCount(List<LogEntry> logs) => logs.Sum(l => l.Message.Split('\n').Length);
 }
 
 /// <summary>1件分のログ情報。表示用/保存用の文字列整形と、レベルに応じた表示色を持つ。</summary>
