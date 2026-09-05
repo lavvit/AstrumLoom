@@ -1,4 +1,5 @@
 ﻿using AstrumLoom;
+using AstrumLoom.Audio;
 
 namespace Sandbox;
 
@@ -20,6 +21,8 @@ internal sealed class SimpleTestGame : Scene
         ("動画の見本帳（映写室）", () => new MovieDemoScene()),
         ("SkiaSharp 焼き込み実験", () => new SkiaDemoScene()),
         ("装飾文字コスト比較（AstrumLoom vs Skiaキャッシュ）", () => new SkiaTextCompareDemoScene()),
+        // 11 番目以降は数字キーが足りないので、メニューバーのクリック（または --scene）で選ぶ。
+        ("Audio の見本帳（音の工房）", () => new AudioGameScene()),
     ];
 
     public override void Enable()
@@ -409,6 +412,43 @@ internal static class Program
             () => !AstrumCore.MultiThreading || Environment.CurrentManagedThreadId != AstrumCore.MainThreadId,
             "--selftest 単体では単一スレッドに倒れるので、この項目は --mt のときだけ意味を持ちます。");
 
+        // ---- Audio（合成音モジュール）の見本帳 -----------------------------------
+        // 11 番目なので数字キーが割り当てられていない。メニューバーのクリックと同じ経路（Select）で開く。
+        SelfTest.Do("Audio の見本帳へ", () => Root?.Select(SimpleTestGame.Count - 1));
+        SelfTest.Wait(20);
+        SelfTest.Check("Audio の見本帳へ切り替わった", () => Root?.Child is AudioGameScene);
+
+        SelfTest.Wait(120);
+        SelfTest.Check("BGM の合成と再生を要求した", () => Aud?.BgmStarted == true,
+            "BgmScore の組み立てか AudioCache への書き出しで失敗している可能性があります。");
+        SelfTest.Shot("audio");
+
+        // 合成そのものの検算。バックエンドにも Sound にも依らないので、音声デバイスが無くても通る。
+        // Enable から裏で走らせているので、終わるまで待ってから見る。
+        SelfTest.Wait(600);
+        SelfTest.Check("AudioSelfCheck が終わっている", () => Aud?.SelfCheckOk != null,
+            "AudioSelfCheck.Verify が返ってきていません。");
+        SelfTest.Check("合成結果の検算に合格した", () => Aud?.SelfCheckOk != false,
+            "落ちた項目の内訳は Log.txt の AudioSelfCheck: 行と、画面右の AudioSelfCheck カードに出ます。");
+
+        SelfTest.Do("撃つ（Space を押す）", () => VirtualInput.Press(Key.Space));
+        SelfTest.Wait(TapFrames);
+        SelfTest.Do("Space を離す", () => VirtualInput.Release(Key.Space));
+        SelfTest.Wait(TapFrames);
+        SelfTest.Check("発射音の要求が届いた",
+            () => Aud?.LastSfx is SfxId.Shot or SfxId.Laser or SfxId.Charge,
+            "Space の押下が届いていないか、HandleShooting が音を出していません。");
+        // ブロックの自動湧き（Whoosh）は実時間で進むので、セルフテストの速さでは 1 度も来ない。
+        // だから「音を鳴らそうとしたか」は、必ず届く打鍵の結果として数える。
+        SelfTest.Check("効果音の要求が積まれている", () => Aud?.SfxRequests > 0);
+
+        SelfTest.Do("ミュートに切り替える", () => VirtualInput.Press(Key.M));
+        SelfTest.Wait(TapFrames);
+        SelfTest.Do("M を離す", () => VirtualInput.Release(Key.M));
+        SelfTest.Wait(TapFrames);
+        SelfTest.Check("Muted が立った（ここから先は無音）", () => Audio.Muted);
+        SelfTest.Do("ミュートを戻す（後片付け）", () => Audio.Muted = false);
+
         // ---- 後片付けまで見る -------------------------------------------------
         SelfTest.Do("1 番のシーンへ戻す", () => VirtualInput.Press(Key.Key_1));
         SelfTest.Wait(TapFrames);
@@ -443,4 +483,5 @@ internal static class Program
     private static ShapesDemoScene? Shapes => Root?.Child as ShapesDemoScene;
     private static InputDemoScene? Inp => Root?.Child as InputDemoScene;
     private static MovieDemoScene? Mov => Root?.Child as MovieDemoScene;
+    private static AudioGameScene? Aud => Root?.Child as AudioGameScene;
 }
