@@ -34,6 +34,9 @@ public readonly struct InputFrame
 public static class VirtualInput
 {
     private static readonly HashSet<Key> _held = [];
+    // 前回の取り込み以降に一度でも押されたキー。押して離すまでが 1 回の取り込みの中に
+    // 収まっても押下エッジを落とさないための持ち越し。
+    private static readonly HashSet<Key> _pressedSinceCopy = [];
 
     /// <summary>合成入力を使っているか。</summary>
     public static bool Active { get; private set; }
@@ -42,7 +45,7 @@ public static class VirtualInput
     public static void Press(Key key)
     {
         if (key == Key.None) return;
-        lock (_held) { _held.Add(key); Active = true; }
+        lock (_held) { _held.Add(key); _pressedSinceCopy.Add(key); Active = true; }
     }
     /// <summary>合成入力のキーを解放します。</summary>
     public static void Release(Key key)
@@ -58,6 +61,7 @@ public static class VirtualInput
         lock (_held)
         {
             _held.Clear();
+            _pressedSinceCopy.Clear();
             Active = false;
         }
     }
@@ -72,6 +76,14 @@ public static class VirtualInput
         lock (_held)
         {
             foreach (var k in _held) target.Add(k);
+
+            // 押下集合の取り込みは 1 反復に 1 回だが、論理フレームはキャッチアップで
+            // 1 反復に複数走ることがある（INVARIANTS「キャッチアップで複数ステップ走る場合、
+            // それらは同じ入力を共有します」）。押して離すまでがその中に収まると、
+            // 取り込みから見れば何も起きていないことになり、Push も Left も出ない。
+            // 一度でも押されたキーはこの 1 回だけ押下として混ぜ、次の取り込みで離鍵にする。
+            foreach (var k in _pressedSinceCopy) target.Add(k);
+            _pressedSinceCopy.Clear();
         }
     }
 }

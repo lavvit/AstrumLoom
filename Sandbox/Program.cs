@@ -177,29 +177,33 @@ internal static class Program
         // 表示中のコマが操作で動くことを確かめる。
         // Press の効果は次フレームの入力確定からなので、必ず Wait を挟む。
         SelfTest.Do("自動送りを止める", () => VirtualInput.Press(Key.Space));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("Space を離す", () => VirtualInput.Release(Key.Space));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
+        // ここを確かめずに進むと、Space が届かず自動送りが動いたままでも
+        // 「→ でコマが 1 つ進んだ」が実時間しだいで通ったり落ちたりして原因が分からなくなる。
+        SelfTest.Check("Space で自動送りが止まった", () => Tex?.AutoFrame == false,
+            "Space の押下が届いていません。");
         SelfTest.Do("今のコマを覚える", () => _frameBefore = Tex?.CurrentFrame ?? -1);
         SelfTest.Do("→ を押す", () => VirtualInput.Press(Key.Right));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("→ を離す", () => VirtualInput.Release(Key.Right));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         // 手続き的に動く値なので「0 かどうか」ではなく「操作の前後で変わったか」を見る。
         SelfTest.Check("→ で切り出すコマが 1 つ進んだ",
             () => Tex != null && Tex.CurrentFrame == (_frameBefore + 1) % 8);
 
         SelfTest.Do("基準点を 1 つ進める", () => VirtualInput.Press(Key.A));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("A を離す", () => VirtualInput.Release(Key.A));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("ReferencePoint が切り替わった", () => Tex?.AnchorIndex == 1);
 
         // ---- Sound の見本帳 ---------------------------------------------------
         SelfTest.Do("2 番のシーンへ", () => VirtualInput.Press(Key.Key_2));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("2 を離す", () => VirtualInput.Release(Key.Key_2));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("Sound の見本帳へ切り替わった", () => Root?.Child is SoundDemoScene);
 
         SelfTest.Wait(60);
@@ -220,35 +224,35 @@ internal static class Program
             () => Snd != null && Snd.BgmProgress > _progressBefore);
 
         SelfTest.Do("霧笛を鳴らす", () => VirtualInput.Press(Key.Space));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("Space を離す", () => VirtualInput.Release(Key.Space));
-        SelfTest.Wait(4);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("霧笛の要求が届いた", () => Snd?.HornCount >= 1);
 
         // ---- 図形の見本帳 -------------------------------------------------------
         SelfTest.Do("3 番のシーンへ", () => VirtualInput.Press(Key.Key_3));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("3 を離す", () => VirtualInput.Release(Key.Key_3));
         SelfTest.Wait(20);
         SelfTest.Check("図形の見本帳へ切り替わった", () => Root?.Child is ShapesDemoScene);
         SelfTest.Check("デフォルトで回転している", () => Shapes?.Spinning == true);
 
         SelfTest.Do("Space で回転を止める", () => VirtualInput.Press(Key.Space));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("Space を離す", () => VirtualInput.Release(Key.Space));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("回転が止まった", () => Shapes?.Spinning == false);
 
         SelfTest.Do("T で枠の太さを切り替える", () => VirtualInput.Press(Key.T));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("T を離す", () => VirtualInput.Release(Key.T));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("Thickness が切り替わった", () => Shapes?.ThicknessIndex == 2);
         SelfTest.Shot("shapes");
 
         // ---- Input の見本帳 -------------------------------------------------------
         SelfTest.Do("4 番のシーンへ", () => VirtualInput.Press(Key.Key_4));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("4 を離す", () => VirtualInput.Release(Key.Key_4));
         SelfTest.Wait(20);
         SelfTest.Check("Input の見本帳へ切り替わった", () => Root?.Child is InputDemoScene);
@@ -257,15 +261,15 @@ internal static class Program
         // （Core/Input.cs の Typing ゲート）。だから通常キーのログ確認は
         // テキスト入力を始める前に済ませる。
         SelfTest.Do("Z キーを押す", () => VirtualInput.Press(Key.Z));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("Z キーを離す", () => VirtualInput.Release(Key.Z));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("キー入力がイベントログへ流れた", () => Inp != null && Inp.LogCount > 0);
 
         SelfTest.Do("T でテキスト入力を開始する", () => VirtualInput.Press(Key.T));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("T を離す", () => VirtualInput.Release(Key.T));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("テキスト入力が始まった", () => Inp?.TextActive == true);
         SelfTest.Shot("input");
 
@@ -278,12 +282,45 @@ internal static class Program
         // Esc は Typing 中に Push が false を返すゲートのせいで機能しない（このカードの注釈の通り）。
         // 唯一の脱出口である KeyInput.Cancel() で閉じる。
         SelfTest.Do("テキスト入力を閉じる（後片付け）", () => KeyInput.Cancel());
-        SelfTest.Wait(4);
+        SelfTest.Wait(TapFrames);
         SelfTest.Check("Typing が終わった", () => !KeyInput.Typing);
+
+        // ---- 入力バッファの取りこぼし ---------------------------------------------
+        // 描画（Buffer）と更新（Update）が別スレッド・別の回数で回ると、
+        // 1 回の Update の間に押下と解放が両方入った打鍵が丸ごと消えることがあった。
+        // 合成入力（VirtualInput）は InputBridge が押下集合からエッジを作るのでこの経路を
+        // 通らない＝見本帳を --mt で走らせても再現しない。だから土台を直接叩いて確かめる。
+        SelfTest.Check("描画が更新より速くても押下エッジが落ちない",
+            InputEdgeTests.DrawFasterThanUpdate,
+            "Buffer() が押下と解放の両方を書いたあとの Update() で Push/Left が消えています。");
+        SelfTest.Check("更新が描画より速くても押下が再発火しない",
+            InputEdgeTests.UpdateFasterThanDraw);
+        SelfTest.Check("1:1 で回る単一スレッド構成の遷移が従来どおり",
+            InputEdgeTests.LockStepUnchanged,
+            "ここが崩れると --replay がずれます。");
+        SelfTest.Check("1 回の更新の間に 2 回叩いても 2 回とも届く",
+            InputEdgeTests.DoubleTapInOneWindow);
+        SelfTest.Check("溜め込んだ押下エッジに上限がある",
+            InputEdgeTests.PendingIsCapped);
+        SelfTest.Check("取り込みと確定を別スレッドで回しても打鍵数が合う",
+            () => InputEdgeTests.ConcurrentNoLoss());
+
+        // 押下エッジは生入力を 1 回進めるごとに 1 反復しか立たない。だから
+        // 「生入力を進めた回数」が「論理フレーム数」を上回ったぶんは、game.Update() の
+        // 走らない反復で消費されて誰にも見られずに捨てられている。
+        // 固定ステップ + 実時間キャッチアップだと更新ループは論理レートの数百倍で回るので、
+        // 反復ごとに進めていた頃はここが数百倍に開き、キー入力が丸ごと落ちていた。
+        SelfTest.Check("生入力を論理フレームより多く進めていない",
+            () => AstrumCore.InputAdvanceCount <= AstrumCore.FrameCount + 60,
+            "論理フレームの来ない反復で入力を進めています。押下エッジがそこで捨てられます。");
+
+        SelfTest.Check("--mt を付けたときは更新スレッドが生きている",
+            () => !AstrumCore.MultiThreading || Environment.CurrentManagedThreadId != AstrumCore.MainThreadId,
+            "--selftest 単体では単一スレッドに倒れるので、この項目は --mt のときだけ意味を持ちます。");
 
         // ---- 後片付けまで見る -------------------------------------------------
         SelfTest.Do("1 番のシーンへ戻す", () => VirtualInput.Press(Key.Key_1));
-        SelfTest.Wait(2);
+        SelfTest.Wait(TapFrames);
         SelfTest.Do("1 を離す", () => VirtualInput.Release(Key.Key_1));
         SelfTest.Wait(20);
         SelfTest.Check("Texture の見本帳へ戻った", () => Root?.Child is TextureDemoScene);
@@ -291,6 +328,18 @@ internal static class Program
         SelfTest.Shot("final");
         SelfTest.Check("致命的エラーが出ていない", () => !AstrumCore.HasFatalError);
     }
+
+    /// <summary>
+    /// 合成入力を押してから／離してから待つフレーム数。
+    ///
+    /// ロックステップ（--selftest の既定）なら 1 反復 = 1 論理フレームなので 2 で足ります。
+    /// ですが実時間キャッチアップ（--no-lockstep）だと 1 反復で最大
+    /// <see cref="GameConfig.MaxCatchUpSteps"/> 個の論理フレームがまとめて走り、
+    /// それらは同じ入力を共有します（docs\INVARIANTS.md の「1 ループの中の順番」）。
+    /// つまり押してから離すまでが 1 反復に収まると、押下エッジが観測されるのは
+    /// そのバーストが明けたあとです。既定の 5 ステップぶんを跨げる長さにしておきます。
+    /// </summary>
+    private const int TapFrames = 6;
 
     private static int _frameBefore = -1;
     private static double _progressBefore = -1;
