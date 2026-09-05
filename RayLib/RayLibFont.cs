@@ -24,12 +24,25 @@ internal sealed class RayLibFont : IFont
     private int _edgeThickness = 0;
     private int _spacing = 0;
     /// <summary>
+    /// 実際に raylib へ渡すピクセルサイズ。FontSpec.Size は「em の高さ（＝GDI/DxLib のフォントサイズ）」の意味だが、
+    /// raylib(stb_truetype) の baseSize は「ascent-descent がその値になる高さ」なので、そのまま渡すと DxLib より
+    /// 小さく描かれる。フォントの縦メトリクスから換算した値をここに持ち、焼き込み・計測・描画すべてで使う。
+    /// </summary>
+    private int _pixelSize;
+    /// <summary>
+    /// 1行あたりの送り高さ。DxLib 側は GDI の tmHeight（＝OS/2 の usWinAscent+usWinDescent）で行を送るので、
+    /// こちらも同じ換算で持っておき、改行送りと Measure の高さに使う。em の高さより一回り大きい。
+    /// </summary>
+    private int _lineHeight;
+    /// <summary>
     /// フォント指定からファイルを解決してグリフアトラスを焼きます。
     /// パス解決や読み込みに失敗した場合は、その旨をログに残したうえで raylib の内蔵フォントにフォールバックします。
     /// </summary>
     public RayLibFont(FontSpec spec)
     {
         Spec = spec;
+        _pixelSize = spec.Size;
+        _lineHeight = spec.Size;
 
         string path = GetFont(spec.NameOrPath, spec);
         if (string.IsNullOrEmpty(path))
@@ -75,7 +88,9 @@ internal sealed class RayLibFont : IFont
                     hint = ".ttf"; // 単体sfntに組み直したのでTTFとして渡す
                 }
 
-                _font = Raylib.LoadFontFromMemory(hint, bytes, spec.Size, cps, cps.Length);
+                _pixelSize = EmHeightToPixelSize(bytes, spec.Size);
+                _lineHeight = EmHeightToLineHeight(bytes, spec.Size, _pixelSize);
+                _font = Raylib.LoadFontFromMemory(hint, bytes, _pixelSize, cps, cps.Length);
                 Raylib.SetTextureFilter(_font.Texture, TextureFilter.Bilinear);
 
                 if (_font.Texture.Id <= 0)
@@ -211,6 +226,96 @@ internal sealed class RayLibFont : IFont
         return outBytes;
     }
 
+    // FontSpec.Size（em の高さ = GDI の lfHeight 相当。DxLib バックエンドはこの意味で使う）を、
+    // raylib へ渡す baseSize に換算する。
+    //
+    // raylib の LoadFont* は内部で stbtt_ScaleForPixelHeight(baseSize) を呼ぶ。これは
+    // 「hhea の ascent-descent が baseSize ピクセルになる」倍率で、em の高さではない。
+    // 日本語フォントは ascent-descent が em の 1.3〜1.5 倍あるのが普通なので、Size をそのまま
+    // 渡すと DxLib より 3 割ほど小さい文字になる。ここで (ascent-descent)/unitsPerEm を掛け戻すと、
+    // em の高さがちょうど Size ピクセルになり、両バックエンドで同じ大きさに揃う。
+    //
+    // メトリクスを読めないフォント（壊れている・CFF で hhea が無い等）は Size をそのまま返す。
+    // 見た目は今までどおり小さいままだが、豆腐や 0 サイズにはならない。
+    private static int EmHeightToPixelSize(byte[] sfnt, int emSize)
+    {
+        if (emSize <= 0) return 1;
+
+        int unitsPerEm = ReadUnitsPerEm(sfnt);
+        if (unitsPerEm <= 0) return emSize;
+
+        if (!TryReadHheaVMetrics(sfnt, out int ascent, out int descent)) return emSize;
+
+        int span = ascent - descent; // descent は負の値
+        if (span <= 0) return emSize;
+
+        int px = (int)Math.Round(emSize * (double)span / unitsPerEm);
+        return px > 0 ? px : emSize;
+    }
+
+    // 1行の送り高さ。GDI(DxLib) の tmHeight は TrueType では usWinAscent+usWinDescent なので、
+    // それを em サイズ基準でピクセルに直す。OS/2 を読めないときは em の高さ（baseSize）で代用する。
+    private static int EmHeightToLineHeight(byte[] sfnt, int emSize, int fallback)
+    {
+        if (emSize <= 0) return fallback;
+
+        int unitsPerEm = ReadUnitsPerEm(sfnt);
+        if (unitsPerEm <= 0) return fallback;
+
+        long os2 = FindTable(sfnt, "OS/2");
+        // OS/2: ... usWinAscent(2) usWinDescent(2) が先頭から 74/76 バイト目（version 0 でも存在する）
+        if (os2 < 0 || os2 + 78 > sfnt.Length) return fallback;
+
+        int winAscent = ReadU16(sfnt, (int)os2 + 74);
+        int winDescent = ReadU16(sfnt, (int)os2 + 76);
+        int span = winAscent + winDescent;
+        if (span <= 0) return fallback;
+
+        int px = (int)Math.Round(emSize * (double)span / unitsPerEm);
+        return px > 0 ? px : fallback;
+    }
+
+    // sfnt のテーブルディレクトリから指定タグのテーブル位置を引く。見つからなければ -1。
+    private static long FindTable(byte[] d, string tag)
+    {
+        if (d.Length < 12) return -1;
+        uint want = ((uint)tag[0] << 24) | ((uint)tag[1] << 16) | ((uint)tag[2] << 8) | tag[3];
+        int numTables = ReadU16(d, 4);
+        for (int i = 0; i < numTables; i++)
+        {
+            long p = 12 + i * 16L;
+            if (p + 16 > d.Length) return -1;
+            if (ReadU32(d, (int)p) == want) return ReadU32(d, (int)(p + 8));
+        }
+        return -1;
+    }
+
+    private static int ReadUnitsPerEm(byte[] d)
+    {
+        long head = FindTable(d, "head");
+        // head: version(4) fontRevision(4) checkSumAdjustment(4) magicNumber(4) flags(2) unitsPerEm(2)
+        if (head < 0 || head + 20 > d.Length) return 0;
+        return ReadU16(d, (int)head + 18);
+    }
+
+    private static bool TryReadHheaVMetrics(byte[] d, out int ascent, out int descent)
+    {
+        ascent = descent = 0;
+        long hhea = FindTable(d, "hhea");
+        // hhea: version(4) ascender(2, int16) descender(2, int16) lineGap(2)
+        if (hhea < 0 || hhea + 8 > d.Length) return false;
+        ascent = ReadS16(d, (int)hhea + 4);
+        descent = ReadS16(d, (int)hhea + 6);
+        return true;
+    }
+
+    private static int ReadS16(byte[] b, int o) => (short)((b[o] << 8) | b[o + 1]);
+
+    // DrawTextEx / MeasureTextEx の改行送りは raylib のグローバル設定（既定 15px 固定）で、
+    // フォントサイズに追従しない。DxLib 側は行高＝フォントの高さで送っているので、
+    // 描画・計測の直前に毎回そろえておく。
+    private void ApplyLineSpacing() => Raylib.SetTextLineSpacing(_lineHeight);
+
     private static uint ReadU32(byte[] b, int o) => (uint)((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]);
     private static int ReadU16(byte[] b, int o) => (b[o] << 8) | b[o + 1];
     private static void WriteU32(byte[] b, int o, uint v)
@@ -225,9 +330,16 @@ internal sealed class RayLibFont : IFont
     /// <summary>指定テキストをこのフォントで描画したときの幅・高さを計測します。</summary>
     public (int width, int height) Measure(string text)
     {
-        var size = MeasureTextEx(_font, text, Spec.Size, 0);
-        if (size.X + size.Y == 0) size = new(MeasureText(text, Spec.Size), Spec.Size);
-        return ((int)size.X, (int)size.Y);
+        ApplyLineSpacing();
+        var size = MeasureTextEx(_font, text, _pixelSize, _spacing);
+        float width = size.X;
+        if (width <= 0) width = MeasureText(text, _pixelSize);
+
+        // 高さは MeasureTextEx の戻り（1行目だけ baseSize、以降は行送り）ではなく行数×行高で出す。
+        // DxLib の GetDrawStringSizeToHandle が「行数×tmHeight」を返すのに合わせるため。
+        int lines = 1;
+        foreach (char ch in text) if (ch == '\n') lines++;
+        return ((int)width, lines * _lineHeight);
     }
     private const float sin45 = 0.70710678f;
     private static readonly Vector2[] EdgeDirs =
@@ -289,8 +401,9 @@ internal sealed class RayLibFont : IFont
     {
         var p = new Vector2((float)pos.X, (float)pos.Y);
         var c = ToRayColor(color, color.A / 255.0 * opacity);
+        ApplyLineSpacing();
         DrawTextEx(_font, s, p,
-                   Spec.Size, spacing, c);
+                   _pixelSize, _spacing + spacing, c);
     }
 
     /// <summary>ふちだけを単独で描画します（Draw()内から本体描画の前に呼ばれるほか、DrawGrad/DrawTextureからも共用されます）。</summary>

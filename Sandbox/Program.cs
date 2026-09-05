@@ -70,13 +70,21 @@ internal sealed class SimpleTestGame : Scene
         }
 
         // 数字キーでシーンを切り替える。子シーン側は数字キーを使っていない。
-        for (int i = 0; i < Menu.Length; i++)
+        // 10 番目は 0 キー。11 番目から先はキーが足りないので、メニューバーのクリックで選ぶ。
+        for (int i = 0; i < Menu.Length && i < 10; i++)
         {
-            if ((Key.Key_1 + i).Push() && i != _index)
+            if (MenuKey(i).Push() && i != _index)
             {
                 Select(i);
                 return; // 差し替えた直後のフレームで新シーンの Update を回さない
             }
+        }
+
+        int hit = MenuHitTest(Mouse.X, Mouse.Y);
+        if (hit >= 0 && hit != _index && Mouse.Push(MouseButton.Left))
+        {
+            Select(hit);
+            return;
         }
 
         _scene?.Update();
@@ -95,22 +103,55 @@ internal sealed class SimpleTestGame : Scene
         Mouse.Draw(20);
     }
 
+    /// <summary>シーン番号に割り当てた数字キー。1〜9 のあと 10 番目は 0 キー。</summary>
+    private static Key MenuKey(int index) => index == 9 ? Key.Key_0 : Key.Key_1 + index;
+
+    /// <summary>メニューバーの並び。段数・列数・1 段の高さ・上端をまとめて返す。</summary>
+    private static (int Rows, int Cols, double RowH, double Top) MenuLayout()
+    {
+        // 1 行に詰めすぎると日本語のラベルが潰れるので、多いときは段を増やす。
+        const int MaxPerRow = 6;
+        int rows = (Menu.Length + MaxPerRow - 1) / MaxPerRow;
+        int cols = (Menu.Length + rows - 1) / rows;
+        double rowH = 26;
+        return (rows, cols, rowH, AstrumCore.Height - rowH * rows);
+    }
+
+    /// <summary>座標がメニューバーのどの項目の上かを返す。どれでもなければ -1。</summary>
+    private static int MenuHitTest(double x, double y)
+    {
+        var (rows, cols, rowH, top) = MenuLayout();
+        if (y < top || y >= top + rowH * rows) return -1;
+        double slot = AstrumCore.Width / (double)cols;
+        int col = (int)(x / slot);
+        int row = (int)((y - top) / rowH);
+        if (col < 0 || col >= cols || row < 0 || row >= rows) return -1;
+        int index = row * cols + col;
+        return index < Menu.Length ? index : -1;
+    }
+
     /// <summary>画面下端に、どの数字キーで何が出るかを常に出しておく。</summary>
     private void DrawMenuBar()
     {
-        double h = 26;
-        double y = AstrumCore.Height - h;
-        Drawing.Box(0, y, AstrumCore.Width, h, new Color(0, 0, 0, 170));
+        var (rows, cols, rowH, top) = MenuLayout();
+        Drawing.Box(0, top, AstrumCore.Width, rowH * rows, new Color(0, 0, 0, 170));
+
+        int hover = MenuHitTest(Mouse.X, Mouse.Y);
 
         // 幅は等分で決める。Drawing.DefaultTextSize の実測を足していく方式だと、
         // 日本語の実描画幅と合わずに項目同士が重なってしまう。
-        double slot = AstrumCore.Width / (double)Menu.Length;
+        double slot = AstrumCore.Width / (double)cols;
         for (int i = 0; i < Menu.Length; i++)
         {
             bool now = i == _index;
-            double sx = slot * i;
-            if (now) Drawing.Box(sx + 2, y + 2, slot - 4, h - 4, new Color(70, 110, 180, 200));
-            DemoUi.NoteFont.Draw(sx + slot / 2, y + 5, $"[{i + 1}] {Menu[i].Label}",
+            double sx = slot * (i % cols);
+            double y = top + rowH * (i / cols);
+            if (now) Drawing.Box(sx + 2, y + 2, slot - 4, rowH - 4, new Color(70, 110, 180, 200));
+            else if (i == hover) Drawing.Box(sx + 2, y + 2, slot - 4, rowH - 4, new Color(70, 110, 180, 90));
+
+            // 11 番目から先は数字キーが無いので、番号の代わりにクリックで選ぶ印を出す。
+            string head = i < 10 ? $"[{(i + 1) % 10}]" : "[*]";
+            DemoUi.NoteFont.Draw(sx + slot / 2, y + 5, $"{head} {Menu[i].Label}",
                 now ? Color.White : new Color(170, 186, 214), ReferencePoint.TopCenter);
         }
     }

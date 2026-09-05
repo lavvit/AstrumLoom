@@ -198,8 +198,8 @@ internal sealed class MovieDemoScene : Scene
         if (_main is { Enable: true })
         {
             // 動画の実サイズに関係なくステージへ収める。
-            double scale = Math.Min(StageW / Math.Max(1, _main.Width), StageH / Math.Max(1, _main.Height));
-            _main.Draw(x + StageW / 2, y + StageH / 2, new DrawOptions
+            double scale = Math.Min(StageW / Math.Max(1, _main?.Width ?? 1), StageH / Math.Max(1, _main?.Height ?? 1));
+            _main?.Draw(x + StageW / 2, y + StageH / 2, new DrawOptions
             {
                 Point = ReferencePoint.Center,
                 Scale = (scale, scale),
@@ -242,7 +242,7 @@ internal sealed class MovieDemoScene : Scene
     private static void DrawProgressBar(double x, double y, double w, Movie movie)
     {
         Drawing.Box(x, y, w, 8, new Color(28, 34, 56));
-        double p = Math.Clamp(movie.Progress, 0, 1);
+        double p = Math.Clamp(movie?.Progress ?? 0, 0, 1);
         Drawing.Box(x, y, w * p, 8, new Color(96, 170, 240));
         Drawing.Box(x + w * p - 2, y - 3, 4, 14, new Color(220, 236, 255));
     }

@@ -116,15 +116,68 @@ public class Log
     public static double ScreenSeconds = 10;
 
     /// <summary>
-    /// 画面表示に使うフォント。null なら描画バックエンドの組み込みフォント（RayLib なら GetFontDefault）で描く。
-    /// ゲーム側の <see cref="Drawing.DefaultFont"/> とは切り離してあるので、装飾付きの重いフォントを
-    /// 既定に据えていてもログの描画コストはそれに引きずられない。
-    /// なお組み込みフォントは ASCII しか持たないので、日本語ログを読みたいときはここに日本語フォントを入れる。
+    /// 画面表示に使うフォント。ゲーム側の <see cref="Drawing.DefaultFont"/> とは切り離してあるので、
+    /// 装飾付きの重いフォントを既定に据えていてもログの描画コストはそれに引きずられない。
+    /// 明示的にセットしなければ、<see cref="UseSystemFont"/> に従って OS のシステムフォント
+    /// （Windows なら Yu Gothic）を素の設定で焼いたものを使う。<see cref="ResetFont"/> で自動選択に戻せる。
     /// </summary>
-    public static IFont? Font { get; set; }
+    public static IFont? Font
+    {
+        get => _fontAssigned ? _font : SystemFont();
+        set { _font = value; _fontAssigned = true; }
+    }
 
-    /// <summary><see cref="Font"/> が null のときに使う組み込みフォントのサイズ。</summary>
+    /// <summary><see cref="Font"/> の明示指定を捨てて、システムフォントの自動選択に戻す。</summary>
+    public static void ResetFont()
+    {
+        _font = null;
+        _fontAssigned = false;
+    }
+
+    /// <summary>
+    /// <see cref="Font"/> 未指定のときに OS のシステムフォントを使うか。false にすると描画バックエンドの
+    /// 組み込みフォント（RayLib なら GetFontDefault）で描く。組み込みフォントは ASCII しか持たないので
+    /// 日本語ログは読めなくなるが、フォントを1枚も焼かずに済む。
+    /// </summary>
+    public static bool UseSystemFont { get; set; } = true;
+
+    /// <summary>ログ表示のフォントサイズ。システムフォント/組み込みフォントのどちらにも効く。</summary>
     public static int FontSize { get; set; } = 16;
+
+    private static IFont? _font;
+    private static bool _fontAssigned;
+    private static IFont? _systemFont;
+    private static int _systemFontSize;
+    private static bool _systemFontFailed;
+
+    /// <summary>
+    /// システムフォントを遅延生成して返す。Boot 前などグラフィックス未初期化なら null（＝組み込みフォント）で凌ぎ、
+    /// 次のフレームで作り直しを試みる。生成に失敗した場合は諦めて、以降は組み込みフォントで描く。
+    /// </summary>
+    private static IFont? SystemFont()
+    {
+        if (!UseSystemFont || _systemFontFailed) return null;
+        if (_systemFont != null && _systemFontSize == FontSize) return _systemFont;
+
+        // サイズ変更時は焼き直し。古いアトラスは持っていても無駄なので捨てる。
+        _systemFont?.Dispose();
+        _systemFont = null;
+
+        // Boot 前はグラフィックスが無く Create が null を返す。ここで失敗扱いにすると
+        // 初期化後もずっと組み込みフォントのままになってしまうので、フラグは立てない。
+        var font = FontHandle.Create(new FontSpec(FontHandle.SystemFont, FontSize));
+        if (font == null) return null;
+
+        if (!font.Enable)
+        {
+            font.Dispose();
+            _systemFontFailed = true;
+            return null;
+        }
+
+        _systemFontSize = FontSize;
+        return _systemFont = font;
+    }
 
     // ---- 表示用キャッシュ ----------------------------------------------------
     // Draw は毎フレーム呼ばれるが、ログの中身は滅多に変わらない。毎回 LINQ で絞り込み、
@@ -146,11 +199,15 @@ public class Log
     public static int RebuildIntervalMs = 200;
 
     private static (int width, int height) MeasureText(string text)
-        => Font != null ? Font.Measure(text) : Drawing.DefaultTextSize(text, FontSize);
+    {
+        var font = Font;
+        return font != null ? font.Measure(text) : Drawing.DefaultTextSize(text, FontSize);
+    }
 
     private static void DrawLineText(double x, double y, string text, Color color)
     {
-        if (Font != null) Font.Draw(x, y, text, color);
+        var font = Font;
+        if (font != null) font.Draw(x, y, text, color);
         else Drawing.DefaultText(x, y, text, color, size: FontSize);
     }
 
