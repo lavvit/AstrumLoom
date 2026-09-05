@@ -88,7 +88,15 @@ internal sealed class TextureDemoScene : Scene
         _nebula?.Dispose();
         _ring?.Dispose();
         _baked?.Dispose();
-        _atlasBig = _atlasStrip = _compassAnchor = _compassSpin = _nebula = _ring = _baked = null;
+
+        // ここで各フィールドを null に戻してはいけない。
+        // Disable() は Scene.Change 経由で更新スレッドから呼ばれる一方、Draw() は
+        // 描画スレッドで走る。カードの描画は「_atlasBig is { Enable: true } を確認 →
+        // その後 _atlasBig.Width などを参照」という 2 段構えなので、確認と参照の隙間で
+        // フィールドが null 化されると NullReferenceException で落ちる（Phase: Draw）。
+        // Texture ラッパーは Dispose 済みでも全メソッドが null 安全に振る舞い、
+        // Enable が false を返すのでカードは「読み込み中...」表示になる。
+        // 再入時は Enable() が 6 枚すべてを作り直し、_bakeRequested = true で _baked も焼き直す。
     }
 
     public override void Update()

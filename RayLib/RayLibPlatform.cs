@@ -30,10 +30,14 @@ public sealed class RayLibPlatform : IGamePlatform
         // ウィンドウのリサイズ可否は ConfigFlags.ResizableWindow に対応させる。
         // 以前は !Resizable のときに UndecoratedWindow（装飾なし＝タイトルバー等が消える）を
         // 誤って立てており、Resizable=false が「装飾が消える」という意図しない挙動になっていた。
+        // 起動直後は白い空ウィンドウが数百ms映るだけなので、隠したまま作り、
+        // 最初のフレームを描き終えた時点（RayLibGraphics.EndFrame）で表示する。
+        var flags = ConfigFlags.HiddenWindow;
         if (config.Resizable)
         {
-            SetConfigFlags(ConfigFlags.ResizableWindow);
+            flags |= ConfigFlags.ResizableWindow;
         }
+        SetConfigFlags(flags);
         InitWindow(config.Width, config.Height, config.Title);
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく

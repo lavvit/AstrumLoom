@@ -17,6 +17,7 @@ internal sealed class SimpleTestGame : Scene
         ("描画負荷", () => new LoadCheckScene()),
         ("ゲームの雛形", () => new GameTemplateScene()),
         ("aup2 再生確認", () => new AnimeDemoScene()),
+        ("動画の見本帳（映写室）", () => new MovieDemoScene()),
     ];
 
     public override void Enable()
@@ -140,7 +141,7 @@ internal static class Program
         };
 
         // ゲーム固有の引数。登録しておくと「不明な引数」にならず、--help にも並ぶ。
-        Startup.Register("scene", true, "起動時に開くシーン番号（1〜6）");
+        Startup.Register("scene", true, $"起動時に開くシーン番号（1〜{SimpleTestGame.Count}）");
         int scene = (int)Startup.Parse(args).Number("scene", 1);
         SimpleTestGame.StartScene = Math.Clamp(scene - 1, 0, SimpleTestGame.Count - 1);
 
@@ -279,6 +280,55 @@ internal static class Program
         SelfTest.Wait(4);
         SelfTest.Check("Typing が終わった", () => !KeyInput.Typing);
 
+
+        // ---- 動画の見本帳 -----------------------------------------------------
+        // Raylib は ffmpeg で逐次デコードする（docs\MOVIE.md）。ffmpeg が入っていない環境や
+        // 素材が無い環境でも「落ちずに IsFailed になる」ことが要件なので、読めた場合と
+        // 読めなかった場合で確認内容を分ける。
+        SelfTest.Do("8 番のシーンへ", () => VirtualInput.Press(Key.Key_8));
+        SelfTest.Wait(2);
+        SelfTest.Do("8 を離す", () => VirtualInput.Release(Key.Key_8));
+        SelfTest.Wait(20);
+        SelfTest.Check("動画の見本帳へ切り替わった", () => Root?.Child is MovieDemoScene);
+
+        // ffprobe → 音声抽出 → デコーダ起動、と外部プロセスを 3 回踏む。初回起動は
+        // ffmpeg.exe 自体のロードで数秒かかることがあるので、たっぷり待つ。
+        SelfTest.Wait(600);
+        SelfTest.Check("動画の読み込みが決着した（成功でも失敗でも固まらない）",
+            () => Mov != null && (Mov.MainReady || Mov.MainFailed));
+        SelfTest.Check("致命的エラーになっていない", () => !AstrumCore.HasFatalError);
+
+        SelfTest.Check("動画のサイズが取れている（640x360）",
+            () => Mov == null || !Mov.MainReady || (Mov.MainWidth == 640 && Mov.MainHeight == 360),
+            "Assets\\movie_clock.mp4 が壊れている可能性があります。tools\\make-sandbox-assets.ps1 -Force で作り直してください。");
+        SelfTest.Check("尺が取れている（6 秒前後）",
+            () => Mov == null || !Mov.MainReady || Mov.MainLength is > 5000 and < 7000);
+        SelfTest.Check("再生が始まっている",
+            () => Mov == null || !Mov.MainReady || Mov.MainPlaying,
+            "PlayStream/Play が Draw から呼ばれていない可能性があります。");
+        SelfTest.Shot("movie");
+
+        SelfTest.Do("再生位置を覚える", () => _movieTimeBefore = Mov?.MainTime ?? -1);
+        SelfTest.Wait(60);
+        SelfTest.Check("再生位置が進んでいる",
+            () => Mov == null || !Mov.MainReady || Mov.MainTime > _movieTimeBefore);
+        SelfTest.Check("音の無い動画でも時計が進んでいる",
+            () => Mov == null || !Mov.SilentReady || Mov.SilentTime > 0);
+
+        // シークは ffmpeg を開き直すので、反映されるまでフレームを与える。
+        SelfTest.Do("半ばへシークする", () => Mov?.SeekTo(0.5));
+        SelfTest.Wait(90);
+        SelfTest.Check("シークで再生位置が飛んだ",
+            () => Mov == null || !Mov.MainReady || Mov.MainProgress > 0.35);
+        SelfTest.Shot("movie-seek");
+
+        // 6 秒の動画を 0.5 から流し切ると、ループなら先頭側へ戻ってくる。
+        SelfTest.Do("終端をまたぐまで待つ", () => _movieProgressBefore = Mov?.MainProgress ?? -1);
+        SelfTest.Wait(300);
+        SelfTest.Check("ループで先頭へ戻った（または再生が続いている）",
+            () => Mov == null || !Mov.MainReady
+                || Mov.MainProgress < _movieProgressBefore || Mov.MainPlaying);
+
         // ---- 後片付けまで見る -------------------------------------------------
         SelfTest.Do("1 番のシーンへ戻す", () => VirtualInput.Press(Key.Key_1));
         SelfTest.Wait(2);
@@ -292,10 +342,13 @@ internal static class Program
 
     private static int _frameBefore = -1;
     private static double _progressBefore = -1;
+    private static double _movieTimeBefore = -1;
+    private static double _movieProgressBefore = -1;
 
     private static SimpleTestGame? Root => Scene.NowScene as SimpleTestGame;
     private static TextureDemoScene? Tex => Root?.Child as TextureDemoScene;
     private static SoundDemoScene? Snd => Root?.Child as SoundDemoScene;
     private static ShapesDemoScene? Shapes => Root?.Child as ShapesDemoScene;
     private static InputDemoScene? Inp => Root?.Child as InputDemoScene;
+    private static MovieDemoScene? Mov => Root?.Child as MovieDemoScene;
 }

@@ -42,7 +42,16 @@ internal sealed class RayLibGraphics : IGraphics
         ClearBackground(rc);
     }
 
-    public void EndFrame() => EndDrawing();
+    public void EndFrame()
+    {
+        EndDrawing();
+        // 中身のある絵が1枚出来てから初めてウィンドウを見せる（起動時の白飛び防止）。
+        // 初期化時に HiddenWindow で作っているので、ここで一度だけ解除される。
+        if (IsWindowState(Raylib_cs.ConfigFlags.HiddenWindow))
+        {
+            ClearWindowState(Raylib_cs.ConfigFlags.HiddenWindow);
+        }
+    }
 
     /// <summary>画面全体を指定色・不透明度で覆います（フェード演出などに使用）。</summary>
     public void Blackout(double opacity = 1.0, Color? color = null)

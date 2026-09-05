@@ -479,14 +479,13 @@ Dispose
 
 ## 🎬 Video
 
-FFmpeg を利用した動画再生機能を予定しています。
-
-想定形式：
+`Movie` は「音つきのテクスチャ」として扱えます。`Texture` と同じ `Draw`、`Sound` と同じ
+`Play` / `Time` / `Volume` / `Loop` がそのまま使えます。
 
 ```text
 MP4
  ↓
-FFmpeg
+FFmpeg（Raylib は子プロセスで逐次デコード / DxLib は動画ハンドル）
  ↓
 Video Frame
  ↓
@@ -495,7 +494,16 @@ AstrumLoom Texture
 Rendering
 ```
 
-ゲーム内ムービーや背景動画などで利用できる仕組みを目指しています。
+```csharp
+var movie = new Movie("Assets/opening.mp4") { Loop = true };
+movie.Pump();                 // 毎フレーム
+movie.PlayStream();
+movie.Draw(640, 360);
+```
+
+Raylib バックエンドでは ffmpeg の実行ファイルが必要です（`winget install Gyan.FFmpeg`）。
+無ければ再生が失敗扱いになるだけで、ゲームは落ちません。詳細は
+[docs/MOVIE.md](docs/MOVIE.md) を参照してください。
 
 ---
 
