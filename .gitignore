@@ -18,3 +18,4 @@ debugout/
 tuning.txt
 /tools
 /tests/ThreadProbe
+/tests/ThreadingChecks

@@ -21,7 +21,9 @@ public sealed class DxLibPlatform : IGamePlatform
     public IMouse Mouse { get; }
     public IController Controller { get; }
 
-    public bool ShouldClose { get; private set; }
+    private volatile bool _shouldClose;
+    public bool ShouldClose { get => _shouldClose; private set => _shouldClose = value; }
+    public nint WindowHandle => GetMainWindowHandle();
 
     public bool VSync { get; private set; }
 
@@ -44,7 +46,6 @@ public sealed class DxLibPlatform : IGamePlatform
         // 一切到達しなくなる。config.VSync の反映はコンストラクタ末尾の SetVSync(config.VSync)
         // に任せる。
         _targetFps = config.TargetFps;
-        _multiThreadUpdate = config.UseMultiThreadUpdate;
 
         SetDragFileValidFlag(1);
         SetMultiThreadFlag(1); // マルチスレッド
@@ -129,10 +130,6 @@ public sealed class DxLibPlatform : IGamePlatform
     }
 
     private readonly int _targetFps;
-    // シングルスレッド構成では 1 ループの中で UTime.EndFrame → Time.EndFrame が連続で呼ばれるため、
-    // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
-    // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
-    private readonly bool _multiThreadUpdate;
     /// <summary>
     /// VSyncのON/OFFをDxLibへ反映する。ONにする際はモニタのリフレッシュレートを取得し、
     /// config.TargetFpsとの小さい方をTargetFpsとして採用する（TargetFpsが0＝無制限ならモニタFPSに合わせる）。

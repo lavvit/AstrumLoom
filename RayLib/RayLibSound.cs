@@ -176,6 +176,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
     // （以前は書き込むだけで一度も読まれておらず、CS0414相当の死んだフィールドだった）。
     private bool _streaming = false;
     private double _time;
+    private long _lastUpdateTicks = System.Diagnostics.Stopwatch.GetTimestamp();
     private float _volume = 1.0f;
     private float _pan = 0.0f;
     private float _speed = 1.0f;
@@ -185,6 +186,9 @@ public class RayLibSound : AsyncLoadableBase, ISound
     /// </summary>
     public void Update()
     {
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        double elapsedMs = System.Diagnostics.Stopwatch.GetElapsedTime(_lastUpdateTicks, now).TotalMilliseconds;
+        _lastUpdateTicks = now;
         Pump();
         if (!Enable) return;
         if (_played)
@@ -221,7 +225,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
                 bool playing = IsSoundPlaying(Sfx);
                 if (playing)
                 {
-                    _time += GetFrameTime() * 1000.0;
+                    _time += elapsedMs * _speed;
                     if (Length > 0 && _time > Length) _time = Length;
                 }
                 else
@@ -308,6 +312,7 @@ public class RayLibSound : AsyncLoadableBase, ISound
     /// <summary>再生位置を先頭に戻して再生を開始します。ストリーム/単発のどちらを使うかは読み込み方式に応じて自動選択されます。</summary>
     public void Play()
     {
+        _lastUpdateTicks = System.Diagnostics.Stopwatch.GetTimestamp();
         if (!Enable) return;
         _time = 0;
         if (_streamloaded)

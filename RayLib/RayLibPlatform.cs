@@ -22,7 +22,9 @@ public sealed class RayLibPlatform : IGamePlatform
     public IMouse Mouse { get; }
     public IController Controller { get; }
 
-    public bool ShouldClose { get; private set; }
+    private volatile bool _shouldClose;
+    public bool ShouldClose { get => _shouldClose; private set => _shouldClose = value; }
+    public unsafe nint WindowHandle => OperatingSystem.IsWindows() ? (nint)GetWindowHandle() : 0;
 
     /// <summary>raylibウィンドウ/オーディオデバイスを初期化し、各サブシステムを構築します。</summary>
     public RayLibPlatform(GameConfig config)
@@ -42,20 +44,14 @@ public sealed class RayLibPlatform : IGamePlatform
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
         _targetFps = config.TargetFps;
-        SetTargetFPS(_targetFps);
+        SetTargetFPS(0);
         SetExitKey(0); // ESC キーで終了しないようにする
         if (!IsAudioDeviceReady())
         {
             InitAudioDevice();
         }
 
-        _multiThreadUpdate = config.UseMultiThreadUpdate;
-
-        // TargetFps は Host.cs（GameHost コンストラクタ）が Time/UTime それぞれに
-        // 正しい値（シングルスレッドなら UTime は 0＝無制限）を設定し直すので、ここでは
-        // DxLibPlatform と同じく無設定（既定 0f）のまま渡す。以前はここで両方に _targetFps を
-        // 入れていたため、シングルスレッド時に Update と Draw が毎ループそれぞれ待ち、
-        // 実効FPSが半分になるバグがあった。
+        // Hostが描画と更新それぞれの上限を設定する。
         Time = new SimpleTime();
         UTime = new SimpleTime();
         Graphics = new RayLibGraphics();
@@ -73,6 +69,8 @@ public sealed class RayLibPlatform : IGamePlatform
     {
         if (ShouldClose) return;
 
+        PollInputEvents();
+
         if (WindowShouldClose())
         {
             ShouldClose = true;
@@ -85,7 +83,7 @@ public sealed class RayLibPlatform : IGamePlatform
 
     public void Close() => ShouldClose = true;
     public bool IsActive => IsWindowFocused();
-    public double? SystemFPS => GetFPS();
+    public double? SystemFPS => Time.CurrentFps;
 
     private bool _disposed;
     public void Dispose()
@@ -120,14 +118,8 @@ public sealed class RayLibPlatform : IGamePlatform
 
     private bool VSync;
     private readonly int _targetFps;
-    // シングルスレッド構成では 1 ループの中で UTime.EndFrame → Time.EndFrame が連続で呼ばれるため、
-    // UTime にも目標FPSを持たせると 1 ループで 2 回待って実効FPSが半分に落ちる。
-    // ここ（VSync 切替時）でも Host.cs の初期設定と同じ判断基準を保つ。
-    private readonly bool _multiThreadUpdate;
     /// <summary>
-    /// VSyncのON/OFFを切り替える。有効化時はモニタのリフレッシュレートとTargetFpsの小さい方を採用し、
-    /// マルチスレッド更新構成のときだけUTime側にも同じ目標FPSを反映する（シングルスレッドだと同一ループ内で
-    /// Update/Drawが直列に待ってしまい実効FPSが半分になるため）。
+    /// 描画のソフトウェア上限を切り替える。更新レートは変更しない。
     /// </summary>
     /// <remarks>
     /// あえて ConfigFlags.VSyncHint（GLFW の SwapInterval(1)）は使わない。検証の結果、これは
@@ -138,8 +130,8 @@ public sealed class RayLibPlatform : IGamePlatform
     /// した状態でも変わらず半分だった＝AstrumLoomのコードではなくGLFW/ドライバ側の挙動）。
     /// 同じ環境で VSyncHint を使わず SetTargetFPS だけでフレーム待機させると正しく約60FPSになる
     /// ことも確認済み。ここでは「見た目のティアリング抑止」より「指定FPSに実効フレームレートが
-    /// 一致すること」を優先し、raylib のネイティブvsyncには頼らず、AstrumLoom側のTime/UTime
-    /// （HiResDelayによるソフトウェアフレームリミッタ）だけでモニタのリフレッシュレートに合わせる。
+    /// 一致すること」を優先し、raylib のネイティブvsyncには頼らず、AstrumLoom側のTime
+    /// （描画用のソフトウェアフレームリミッタ）だけでモニタのリフレッシュレートに合わせる。
     /// </remarks>
     public void SetVSync(bool enabled)
     {
@@ -150,7 +142,7 @@ public sealed class RayLibPlatform : IGamePlatform
         {
             int monitorFps = GetMonitorRefreshRate(GetCurrentMonitor());
             int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
-            // raylib 自身のフレーム待ちは使わず（Time/UTime とのペーシング二重化を避けるため）、
+            // raylib 自身のフレーム待ちは使わず（Time とのペーシング二重化を避けるため）、
             // AstrumLoom 側の HiResDelay だけでモニタのリフレッシュレートに揃える。
             SetTargetFPS(0);
             Time.TargetFps = targetFps;
@@ -158,7 +150,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
         else
         {
-            SetTargetFPS(_targetFps);
+            SetTargetFPS(0);
             Time.TargetFps = _targetFps;
             // 更新レートはVSyncから独立。
         }

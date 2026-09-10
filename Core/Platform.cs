@@ -17,6 +17,8 @@ public interface IGamePlatform : IDisposable
     IController Controller { get; }
 
     bool ShouldClose { get; }
+    /// <summary>WindowsのHWND。他のOS・未対応バックエンドは0。</summary>
+    nint WindowHandle => 0;
 
     void PollEvents();
 

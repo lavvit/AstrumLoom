@@ -44,7 +44,10 @@ internal sealed class RayLibGraphics : IGraphics
 
     public void EndFrame()
     {
-        EndDrawing();
+        // イベント処理はPlatform.PollEventsへ分離。EndDrawing内のモーダルループから
+        // 描画を再入させず、Windowsの移動中も完成したフレームだけを表示する。
+        Raylib_cs.Rlgl.DrawRenderBatchActive();
+        SwapScreenBuffer();
         // 中身のある絵が1枚出来てから初めてウィンドウを見せる（起動時の白飛び防止）。
         // 初期化時に HiddenWindow で作っているので、ここで一度だけ解除される。
         if (IsWindowState(Raylib_cs.ConfigFlags.HiddenWindow))

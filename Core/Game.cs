@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Text;
 
 namespace AstrumLoom;
@@ -29,6 +28,10 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
     private Thread? _updateThread;
     private readonly object _gameLock = new();
     private volatile bool _fatalTriggered;
+    private bool _drawing;
+    private bool _polling;
+    private bool _modalRendering;
+    private int _fatalClaimed;
 
     /// <summary>固定ステップ更新の未消化時間（秒）。</summary>
     private float _accumulator;
@@ -63,7 +66,22 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         }
 
         Sleep.WakeUp();
-        Loop();
+        using var modal = WindowsModalRenderer.Attach(platform.WindowHandle, () =>
+        {
+            if (_polling && !_drawing && !_modalRendering && !_fatalTriggered && !platform.ShouldClose)
+            {
+                _modalRendering = true;
+                try
+                {
+                    AstrumCore.ProcessPendingDisposals();
+                    PumpMainActions();
+                    DrawFrame(game, throttle: false);
+                }
+                finally { _modalRendering = false; }
+            }
+        }, ex => HandleFatal(ex, "ModalDraw"));
+        try { Loop(); }
+        finally { AstrumCore.CancelUpdate(); }
     }
 
     /// <summary>
@@ -81,6 +99,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
                 AstrumCore.InitDrop();
                 MainUpdate(game);
                 Update(game);
+                PumpMainActions();
                 Draw(game);
             }
         }
@@ -96,46 +115,30 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             };
             _updateThread.Start();
 
-            // メインスレッドは描画ループだけ
-            while (!platform.ShouldClose && _running && !_fatalTriggered)
+            try
             {
-                // 処理開始時にメインスレッドでの破棄要求を処理
-                AstrumCore.ProcessPendingDisposals();
-                // ドロップの採取はウィンドウ API なのでメインスレッドで行い、
-                // 更新スレッドはキューから受け取るだけにする（BaseProgram.Update）。
-                AstrumCore.PumpDropFiles();
-                MainUpdate(game);
-                // 1件だけ掃く if だと、更新スレッドが1フレームに複数積んだ分が
-                // 次フレーム以降にずれ込み続けてキューが際限なく伸びる。
-                // このフレームに積まれた分は while で掃き切る。
-                // ただし action() の中から新たに積まれた分まで同じフレームで
-                // 掃き続けると無限ループになりうるので、ループ開始時点の件数だけ処理する。
-                int pending = _mainThreadActions.Count;
-                for (int i = 0; i < pending && _mainThreadActions.TryDequeue(out var action); i++)
+                while (!platform.ShouldClose && _running && !_fatalTriggered)
                 {
-                    try { action(); }
-                    catch (Exception ex)
-                    {
-                        HandleFatal(ex, "MainThreadAction");
-                        break;
-                    }
+                    AstrumCore.ProcessPendingDisposals();
+                    AstrumCore.PumpDropFiles();
+                    MainUpdate(game);
+                    PumpMainActions();
+                    if (!platform.ShouldClose && !_fatalTriggered) Draw(game);
                 }
-
-                // Drop 初期化は「Update 側で」やりたいなら UpdateLoop に移してもOK
-                Draw(game);
             }
-
-            // 終了シグナル
-            _running = false;
-
-            // 更新スレッド終了待ち
-            if (_updateThread != null && _updateThread.IsAlive)
+            catch (Exception ex) { HandleFatal(ex, "MainLoop"); }
+            finally
             {
-                try
+                _running = false;
+                AstrumCore.CancelUpdate();
+                // 更新終了前にGPU等を破棄しない。メイン依頼待ちとの相互待機も避ける。
+                while (!_updateThread.Join(1))
                 {
-                    _updateThread.Join();
+                    PumpMainActions();
+                    AstrumCore.ProcessPendingDisposals();
+                    try { platform.PollEvents(); }
+                    catch (Exception ex) { HandleFatal(ex, "ShutdownPoll"); }
                 }
-                catch { /* 終了中の例外は無視でOK */ }
             }
         }
 
@@ -149,7 +152,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
     {
         try
         {
-            while (!platform.ShouldClose && _running && !_fatalTriggered)
+            while (_running && !_fatalTriggered)
             {
                 AstrumCore.InitDrop(); // もともと Loop() の先頭で呼んでたやつ :contentReference[oaicite:5]{index=5}
                 Update(game);
@@ -215,7 +218,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         }
         catch (Exception ex)
         {
-            HandleFatal(ex, "Update");
+            if (ex is not OperationCanceledException canceled ||
+                canceled.CancellationToken != AstrumCore.UpdateCancellation || !AstrumCore.UpdateCancellation.IsCancellationRequested)
+                HandleFatal(ex, "Update");
         }
         finally
         {
@@ -313,12 +318,15 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         DebugSession.OnLogicFrame(deltaTime);
     }
     /// <summary>1フレーム分の描画。BeginFrame/EndFrameで囲み、ゲーム本体・オーバーレイ・ログの順に描く。</summary>
-    public void Draw(IGame game)
+    public void Draw(IGame game) => DrawFrame(game, throttle: true);
+    private void DrawFrame(IGame game, bool throttle)
     {
-        platform.Time.BeginFrame();
+        if (_drawing) return;
+        _drawing = true;
         bool frameBegan = false;
         try
         {
+            platform.Time.BeginFrame();
             ExtendAction(end: false);
 
             platform.Graphics.BeginFrame();
@@ -356,67 +364,88 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             if (frameBegan)
             {
                 try { platform.Graphics.EndFrame(); }
-                catch { }
+                catch (Exception ex) { HandleFatal(ex, "EndFrame"); }
             }
-            platform.Time.EndFrame();
-            AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
-            AstrumCore.CountDrawFrame();
+            try
+            {
+                if (throttle) platform.Time.EndFrame();
+                AstrumCore.DrawFPS.Tick(platform.Time.TotalTime);
+                AstrumCore.CountDrawFrame();
+            }
+            finally { _drawing = false; }
         }
 
         if (_fatalTriggered)
             return;
     }
     /// <summary>ウィンドウ/OSイベントのポーリングのみ行う。マルチスレッド時もメインスレッドから毎ループ呼ばれる。</summary>
-    public void MainUpdate(IGame game) => platform.PollEvents();
-
-    private static ConcurrentQueue<Action> _mainThreadActions = new();
-    /// <summary>メインスレッド専用の処理を依頼する。既にメインスレッドなら即実行、そうでなければキューに積んで次のDrawループで実行される。</summary>
-    internal static void RequestToMainThread(Action action)
+    public void MainUpdate(IGame game)
     {
+        _polling = true;
+        try { platform.PollEvents(); }
+        finally { _polling = false; }
+    }
+
+    private static readonly MainThreadQueue _mainThreadActions = new();
+    private static readonly MainThreadQueue _mainThreadBeginActions = new();
+    private static readonly MainThreadQueue _mainThreadEndActions = new();
+
+    internal static int PendingMainActions => _mainThreadActions.Count;
+    internal static void ResetActions()
+    {
+        _mainThreadActions.Clear();
+        _mainThreadBeginActions.Clear();
+        _mainThreadEndActions.Clear();
+    }
+    internal static bool TryRequestToMainThread(Action action, string? key = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
         if (Environment.CurrentManagedThreadId == AstrumCore.MainThreadId)
         {
             action();
-            return;
+            return true;
         }
-        _mainThreadActions.Enqueue(action);
+        return _mainThreadActions.TryPost(action,
+            Math.Max(1, AstrumCore.WindowConfig?.MainThreadQueueCapacity ?? 4096), key);
     }
-
-    private static ConcurrentQueue<(string key, Action action)> _mainThreadBeginActions = new();
-    private static ConcurrentQueue<(string key, Action action)> _mainThreadEndActions = new();
-    /// <summary>
-    /// 描画フレームの開始前/終了後に1回だけ実行される拡張フックを登録する。
-    /// 同じkeyが既にキューにあれば追加しない（1フレームに複数回積まれるのを防ぐ）。
-    /// </summary>
+    internal static void RequestToMainThread(Action action)
+    {
+        if (!TryRequestToMainThread(action))
+            throw new InvalidOperationException("Main thread queue is full. Use TryRequestToMainThread or keyed latest-state requests.");
+    }
     internal static void AddExtendAction(string key, Action action, bool inEndStart = true)
     {
+        ArgumentNullException.ThrowIfNull(key);
         var queue = inEndStart ? _mainThreadEndActions : _mainThreadBeginActions;
-        if (queue.Any(item => item.key == key))
-            return;
-        queue.Enqueue((key, action));
+        if (!queue.TryPost(action, Math.Max(1, AstrumCore.WindowConfig?.MainThreadQueueCapacity ?? 4096), key, replace: false))
+            throw new InvalidOperationException("Draw hook queue is full.");
     }
-    /// <summary>Draw内で開始前/終了後に登録済みの拡張フックを全て実行する。個々の例外はログに残して継続する。</summary>
+    private void PumpMainActions()
+    {
+        Drain(_mainThreadActions, ex => HandleFatal(ex, "MainThreadAction"));
+    }
     private static void ExtendAction(bool end)
     {
-        var queue = end ? _mainThreadEndActions : _mainThreadBeginActions;
-        while (queue.TryDequeue(out var item))
+        Drain(end ? _mainThreadEndActions : _mainThreadBeginActions,
+            ex => Log.Error($"ExtendAction error: {ex}"));
+    }
+    private static void Drain(MainThreadQueue queue, Action<Exception> onError)
+    {
+        var config = AstrumCore.WindowConfig;
+        int count = Math.Min(queue.Count, Math.Max(1, config.MainThreadActionsPerFrame));
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        for (int i = 0; i < count && queue.TryTake(out var action); i++)
         {
-            try
-            {
-                item.action();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"ExtendAction error ({item.key}): {ex}");
-            }
+            try { action(); }
+            catch (Exception ex) { onError(ex); break; }
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds >=
+                Math.Max(0.1, config.MainThreadActionBudgetMs)) break;
         }
     }
-
     /// <summary>致命的エラーを記録してループを止める。複数スレッドから同時に呼ばれても最初の1件だけを採用する。</summary>
     private void HandleFatal(Exception ex, string phase)
     {
-        if (_fatalTriggered)
-            return;
-
+        if (Interlocked.CompareExchange(ref _fatalClaimed, 1, 0) != 0) return;
         _fatalTriggered = true;
         _running = false;
         AstrumCore.ReportFatalError(phase, ex);

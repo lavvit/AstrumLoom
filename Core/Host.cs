@@ -18,13 +18,7 @@ public sealed class GameHost : IDisposable
         Platform = platform;
         Game = game;
 
-        // 描画スレッドの目標FPSは常に config.TargetFps。
-        // 更新スレッドは、マルチスレッド更新のときだけ独立した目標FPSを持たせる。
-        // シングルスレッドでは 1 ループの中で Update→Draw が連続して呼ばれるので、
-        // UTime 側にも待ちを入れると Time.EndFrame と合わせて 1 ループで 2 回スリープしてしまい、
-        // 実効 FPS が半分に落ちる（RayLib バックエンドで実際に踏んだ）。マルチスレッドでは
-        // 更新スレッドと描画スレッドが別ループで回るので、UTime にも目標FPSを持たせないと
-        // 更新スレッドが無制限に回り続ける（DxLib バックエンドで実際に踏んだ）。
+        // 更新の上限は描画・VSyncから独立。単一スレッドでは描画側だけで待つ。
         Platform.Time.TargetFps = config.TargetFps;
         Platform.UTime.TargetFps = config.UseMultiThreadUpdate ? config.UpdateTargetFps : 0f;
         _runner = new GameRunner(platform, game, config);

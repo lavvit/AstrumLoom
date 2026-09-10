@@ -67,6 +67,8 @@ public class AstrumCore
         MainThreadId = Environment.CurrentManagedThreadId;
         Platform = platform;
         WindowConfig = config;
+        _updateCancellation.Dispose();
+        _updateCancellation = new CancellationTokenSource();
         if (config.Seed.HasValue) Randomize.Seed(config.Seed.Value);
         var game = new BaseProgram();
 
@@ -84,8 +86,9 @@ public class AstrumCore
             try { Scene.NowScene?.Disable(); }
             finally
             {
-                ProcessPendingDisposals();
-                DebugSession.Shutdown();
+                while (!_disposeQueue.IsEmpty) ProcessPendingDisposals();
+                try { DebugSession.Shutdown(); }
+                finally { GameRunner.ResetActions(); }
             }
         }
     }
@@ -301,10 +304,29 @@ public class AstrumCore
     }
     public static bool MultiThreading => WindowConfig.UseMultiThreadUpdate;
     public static bool GameLock = false;
+    private static CancellationTokenSource _updateCancellation = new();
+    /// <summary>更新処理の協調終了用。長いWaitにはこのトークンを渡してください。</summary>
+    public static CancellationToken UpdateCancellation => _updateCancellation.Token;
+    internal static void CancelUpdate()
+    {
+        try { _updateCancellation.Cancel(); }
+        catch (AggregateException ex) { Log.Error(ex, "Update cancellation callback failed"); }
+    }
+    public static int PendingMainThreadActions => GameRunner.PendingMainActions;
+    /// <summary>満杯ならfalse。呼び出し側で再試行または集約してください。</summary>
+    public static bool TryRequestToMainThread(Action action) => GameRunner.TryRequestToMainThread(action);
+    /// <summary>同じキーの未実行依頼を最新のActionへ置換。満杯ならfalse。</summary>
+    public static bool TryRequestLatestToMainThread(string key, Action action)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return GameRunner.TryRequestToMainThread(action, key);
+    }
 
     #region メインスレッド破棄キュー
     // 他スレッドからメインスレッドに依存するリソースの破棄を依頼するためのキュー
     private static readonly System.Collections.Concurrent.ConcurrentQueue<IDisposable> _disposeQueue = new();
+    private static readonly object _disposeGate = new();
+    private static readonly HashSet<IDisposable> _pendingDisposals = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// メインスレッドでの破棄が必要なリソースを登録します。
@@ -313,7 +335,26 @@ public class AstrumCore
     public static void RequestDispose(IDisposable disposable)
     {
         if (disposable == null) return;
-        _disposeQueue.Enqueue(disposable);
+        // ファイナライザーからも呼ばれるため、満杯による例外・破棄の欠落を避ける。
+        // 大量生成するコードはTryRequestDisposeで受付制御する。
+        QueueDisposal(disposable, enforceCapacity: false);
+    }
+
+    /// <summary>破棄を予約。同じインスタンスは集約し、満杯ならfalse（所有権は呼び出し側に残る）。</summary>
+    public static bool TryRequestDispose(IDisposable disposable)
+        => QueueDisposal(disposable, enforceCapacity: true);
+
+    private static bool QueueDisposal(IDisposable disposable, bool enforceCapacity)
+    {
+        ArgumentNullException.ThrowIfNull(disposable);
+        lock (_disposeGate)
+        {
+            if (_pendingDisposals.Contains(disposable)) return true;
+            if (enforceCapacity && _pendingDisposals.Count >= Math.Max(1, WindowConfig?.MainThreadQueueCapacity ?? 4096)) return false;
+            _pendingDisposals.Add(disposable);
+            _disposeQueue.Enqueue(disposable);
+            return true;
+        }
     }
 
     /// <summary>
@@ -324,11 +365,15 @@ public class AstrumCore
         // メインスレッドでのみ処理
         if (Environment.CurrentManagedThreadId != MainThreadId) return;
 
-        while (_disposeQueue.TryDequeue(out var d))
+        int pending = Math.Min(_disposeQueue.Count, Math.Max(1, WindowConfig.MainThreadActionsPerFrame));
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        for (int i = 0; i < pending && _disposeQueue.TryDequeue(out var d); i++)
         {
             try { d.Dispose(); }
             catch { /* 破棄失敗は握りつぶす（ログは各プラットフォーム側で対応）*/ }
-            finally { }
+            finally { lock (_disposeGate) _pendingDisposals.Remove(d); }
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds >=
+                Math.Max(0.1, WindowConfig.MainThreadActionBudgetMs)) break;
         }
     }
     #endregion
