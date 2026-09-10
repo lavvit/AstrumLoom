@@ -20,6 +20,14 @@ public sealed class GameConfig
     public int TargetFps { get; set; } = 60;
     public bool VSync { get; set; } = false;
     public bool UseMultiThreadUpdate { get; set; } = false;
+    /// <summary>更新ループの上限。0は無制限。描画FPS/VSyncから独立。</summary>
+    public int UpdateTargetFps { get; set; } = 0;
+    /// <summary>メイン依頼・各描画フックの最大保留件数。</summary>
+    public int MainThreadQueueCapacity { get; set; } = 4096;
+    /// <summary>各キューを1描画で処理する最大件数。</summary>
+    public int MainThreadActionsPerFrame { get; set; } = 128;
+    /// <summary>各キューの処理時間予算(ms)。実行中のActionは中断できません。</summary>
+    public double MainThreadActionBudgetMs { get; set; } = 2;
     public int SleepDurationMs { get; set; } = 1000 * 60 * 10; // 長時間放置でスリープするまで
 
     /// <summary>

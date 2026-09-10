@@ -127,8 +127,8 @@ internal sealed class RayLibGraphics : IGraphics
     }
 
     /// <summary>
-    /// 3点で三角形を描画します。raylibのDrawTriangleは頂点の巻き順(時計回り)が前提のため、
-    /// 呼び出し側がどんな順で頂点を渡しても正しく描けるよう、重心からの角度でソートしてから描画します。
+    /// 3点で三角形を描画します。符号付き面積でraylibの巻き順に揃えます。
+    /// 塗りと輪郭は排他的です。塗りに線を重ねると半透明図形の継ぎ目が濃くなります。
     /// </summary>
     public void Triangle(double x1, double y1, double x2, double y2, double x3, double y3,
         DrawOptions options)
@@ -141,26 +141,20 @@ internal sealed class RayLibGraphics : IGraphics
         var p2 = new Vector2((float)x2, (float)y2);
         var p3 = new Vector2((float)x3, (float)y3);
 
-        // 重心を計算
-        float cx = (p1.X + p2.X + p3.X) / 3f;
-        float cy = (p1.Y + p2.Y + p3.Y) / 3f;
-
-        // 各点の角度（重心基準）
-        double Angle(Vector2 p) => Math.Atan2((double)p.Y - cy, (double)p.X - cx);
-
-        var pts = new[] { p1, p2, p3 };
-        // 降順にソートすると時計回りになる
-        Array.Sort(pts, (a, b) => Angle(b).CompareTo(Angle(a)));
-
         if (options.Fill)
         {
-            DrawTriangle(pts[0], pts[1], pts[2], col);
+            // Screen Y points down. Raylib's filled triangles require negative cross product.
+            // Avoid per-triangle arrays, delegates and angle sorting in road/mesh rendering.
+            float cross = (p2.X - p1.X) * (p3.Y - p1.Y) - (p2.Y - p1.Y) * (p3.X - p1.X);
+            if (cross > 0) (p2, p3) = (p3, p2);
+            DrawTriangle(p1, p2, p3, col);
         }
-
-        // 枠線は常に描画（おまけ）
-        DrawLineEx(pts[0], pts[1], thickness, col);
-        DrawLineEx(pts[1], pts[2], thickness, col);
-        DrawLineEx(pts[2], pts[0], thickness, col);
+        else
+        {
+            DrawLineEx(p1, p2, thickness, col);
+            DrawLineEx(p2, p3, thickness, col);
+            DrawLineEx(p3, p1, thickness, col);
+        }
     }
 
     /// <summary>

@@ -158,12 +158,12 @@ public sealed class DxLibPlatform : IGamePlatform
             // リフレッシュレートより低いときはその値を優先する。
             int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
             Time.TargetFps = targetFps;
-            if (_multiThreadUpdate) UTime.TargetFps = targetFps;
+            // 更新レートはVSyncから独立。
         }
         else
         {
             Time.TargetFps = _targetFps;
-            if (_multiThreadUpdate) UTime.TargetFps = _targetFps;
+            // 更新レートはVSyncから独立。
         }
     }
     private bool dragDrop = false;

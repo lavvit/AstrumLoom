@@ -154,13 +154,13 @@ public sealed class RayLibPlatform : IGamePlatform
             // AstrumLoom 側の HiResDelay だけでモニタのリフレッシュレートに揃える。
             SetTargetFPS(0);
             Time.TargetFps = targetFps;
-            if (_multiThreadUpdate) UTime.TargetFps = targetFps;
+            // 更新レートはVSyncから独立。
         }
         else
         {
             SetTargetFPS(_targetFps);
             Time.TargetFps = _targetFps;
-            if (_multiThreadUpdate) UTime.TargetFps = _targetFps;
+            // 更新レートはVSyncから独立。
         }
     }
     private bool dragDrop = false;

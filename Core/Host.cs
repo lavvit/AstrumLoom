@@ -26,7 +26,7 @@ public sealed class GameHost : IDisposable
         // 更新スレッドと描画スレッドが別ループで回るので、UTime にも目標FPSを持たせないと
         // 更新スレッドが無制限に回り続ける（DxLib バックエンドで実際に踏んだ）。
         Platform.Time.TargetFps = config.TargetFps;
-        Platform.UTime.TargetFps = config.UseMultiThreadUpdate ? config.TargetFps : 0f;
+        Platform.UTime.TargetFps = config.UseMultiThreadUpdate ? config.UpdateTargetFps : 0f;
         _runner = new GameRunner(platform, game, config);
     }
 

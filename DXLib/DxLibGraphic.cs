@@ -5,6 +5,8 @@ namespace AstrumLoom.DXLib;
 /// <summary>DxLibバックエンドでのIGraphics実装。図形・テキスト描画API群をDxLibのAA付き関数(DrawLineAA等)へ委譲する。</summary>
 internal sealed class DxLibGraphics : IGraphics
 {
+    // Graphics calls run on the drawing thread. Reuse the small native vertex buffer.
+    private readonly VERTEX2D[] _triangleVertices = new VERTEX2D[3];
     public DxLibGraphics() =>
         // ここではとりあえず「Default」の 12px ぐらいを作っておく
         DefaultFont = CreateFont(new FontSpec("", 12));
@@ -116,8 +118,22 @@ internal sealed class DxLibGraphics : IGraphics
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity * (use.A / 255.0), 0.0, 1.0);
         SetDrawBlendMode(GetBlendMode(options.Blend), (int)(255.0 * opacity));
-        DrawTriangleAA((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3,
-                       (uint)c, options.Fill ? TRUE : FALSE, thickness);
+        if (options.Fill)
+        {
+            // AA feathers every edge independently, so adjacent triangles expose a dark
+            // diagonal even when they form one solid polygon. Rasterize the fill as a mesh
+            // with shared-edge coverage, preserving subpixel coordinates. Outlines retain AA.
+            var color = new COLOR_U8 { r = (byte)use.R, g = (byte)use.G, b = (byte)use.B, a = 255 };
+            _triangleVertices[0] = new VERTEX2D { pos = new VECTOR { x = (float)x1, y = (float)y1 }, rhw = 1, dif = color };
+            _triangleVertices[1] = new VERTEX2D { pos = new VECTOR { x = (float)x2, y = (float)y2 }, rhw = 1, dif = color };
+            _triangleVertices[2] = new VERTEX2D { pos = new VECTOR { x = (float)x3, y = (float)y3 }, rhw = 1, dif = color };
+            DrawPrimitive2D(_triangleVertices, 3, DX_PRIMTYPE_TRIANGLELIST, DX_NONE_GRAPH, TRUE);
+        }
+        else
+        {
+            DrawTriangleAA((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3,
+                (uint)c, FALSE, thickness);
+        }
         SetDrawBlendMode((int)BlendMode.None, 255);
     }
 

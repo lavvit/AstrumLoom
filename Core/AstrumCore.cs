@@ -79,7 +79,14 @@ public class AstrumCore
         }
         finally
         {
-            DebugSession.Shutdown();
+            // Run has joined the update thread. Release scene-owned GPU/audio resources on
+            // the main thread while the platform is still alive, including window-close exits.
+            try { Scene.NowScene?.Disable(); }
+            finally
+            {
+                ProcessPendingDisposals();
+                DebugSession.Shutdown();
+            }
         }
     }
 
