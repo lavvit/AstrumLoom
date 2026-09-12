@@ -57,9 +57,10 @@ public sealed class RayLibPlatform : IGamePlatform
         Graphics = new RayLibGraphics();
         var rayInput = new RayLibInput();
         Input = rayInput;
-        // RayLibTextInput はネイティブAPIを直接叩かず、rayInput が Buffer() で確定させた
-        // バッファ済み状態（キー/文字キュー）経由で読むため、同一インスタンスを共有する。
-        TextInput = new(new RayLibTextInput(rayInput), Time);
+        // Windows では IMM32 実装を使う（raylib 自身は日本語入力＝未確定文字列を扱えないため）。
+        // フォールバックの RayLibTextInput はネイティブAPIを直接叩かず、rayInput が Buffer() で
+        // 確定させたバッファ済み状態（キー/文字キュー）経由で読むため、同一インスタンスを共有する。
+        TextInput = TextInputFactory.Create(WindowHandle, new RayLibTextInput(rayInput), Time, config.UseSystemIme);
         Mouse = new RayLibMouse();
         Controller = new RayLibController();
     }

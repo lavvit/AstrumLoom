@@ -497,7 +497,11 @@ public sealed class TextEnter
         // Key.Esc.Push() は !Typing が条件に入っているため、Typing==true の
         // このメソッド内から呼ぶと常に false になり、このESC分岐が到達不能だった。
         // Typing ゲートを通さない KeyInput.RawGetKeyDown で判定する。
-        if (KeyInput.RawGetKeyDown(Key.Esc) && Option.EscapeCancelable)
+        //
+        // ただし HandlesKeysInternally な実装（IMM32版）は ESC を自前で解釈する。
+        // IME の変換中に押す ESC は「変換の取り消し」であって入力欄の破棄ではないため、
+        // ここで一律にキャンセルすると変換をやり直すたびに入力欄ごと閉じてしまう。
+        if (!_impl.HandlesKeysInternally && KeyInput.RawGetKeyDown(Key.Esc) && Option.EscapeCancelable)
         {
             // ESC キーでキャンセル
             _impl.Cancel();
@@ -629,6 +633,13 @@ public interface ITextInput
     KeyInputState KeyState { get; }
     int Cursor { get; }
     TextSelection Selection { get; }
+
+    /// <summary>
+    /// ESC/Enter といった確定・キャンセルのキーを実装側が自前で解釈するかどうか。
+    /// true を返す実装（IMM32版）では TextEnter 側の ESC 判定を行わない。
+    /// IME の変換中の ESC は「変換の取り消し」であり、入力欄の破棄と区別する必要があるため。
+    /// </summary>
+    bool HandlesKeysInternally => false;
 
     void Begin(TextInputOptions options);
     void Cancel();   // ESC など

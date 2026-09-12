@@ -64,7 +64,9 @@ public sealed class DxLibPlatform : IGamePlatform
         UTime = new SimpleTime();
         Graphics = new DxLibGraphics(); // DummyGraphics の代わり
         Input = new DxLibInput();
-        TextInput = new(new DxLibTextInput(), Time);
+        // Windows の IME（IMM32）を直接使う実装を優先する。DxLib の MakeKeyInput 系は
+        // 変換候補の描画が DxLib のフォント設定に引きずられるため、raylib バックエンドと見た目が揃わない。
+        TextInput = TextInputFactory.Create(WindowHandle, new DxLibTextInput(), Time, config.UseSystemIme);
         Mouse = new DxLibMouse();
         Controller = new DxLibController();
 

@@ -58,6 +58,13 @@ public sealed class GameConfig
     // --- System / Input ---
     public bool EnableDragDrop { get; set; } = true;
 
+    /// <summary>
+    /// テキスト入力に Windows の IME（IMM32）を直接使うか。true なら日本語入力が
+    /// バックエンドを問わず同じ見た目・同じ操作で使えます。false、あるいは Windows 以外では
+    /// バックエンド既定の実装（raylib は英数のみ、DxLib は MakeKeyInput）へフォールバックします。
+    /// </summary>
+    public bool UseSystemIme { get; set; } = true;
+
     // --- Debug / Logging ---
     public bool EnableLogging { get; set; } = true;
     public bool ShowFpsOverlay { get; set; } = false;
