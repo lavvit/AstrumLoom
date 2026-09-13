@@ -408,6 +408,7 @@ public static class Startup
             }
         }
 
+        InputCapture.ConfigureSession(config, o);
         return config;
     }
 

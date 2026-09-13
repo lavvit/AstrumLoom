@@ -78,7 +78,8 @@ public class RayLibPad : IJoyPad
     public float[] Trigger { get; } = new float[2];
     public StickState[] Stick { get; } = new StickState[2];
 
-    private bool[] _pressed = [];
+    private bool[] _pressed = new bool[24];
+    private readonly KeyEdgeBuffer _edges = new(24);
     private float[] _axis = new float[6];
     public RayLibPad(int index)
     {
@@ -96,6 +97,7 @@ public class RayLibPad : IJoyPad
         for (int i = 0; i < Button.Length; i++)
         {
             _pressed[i] = IsGamepadButtonDown(Index, GetButton(i));
+            _edges.Sample(i, _pressed[i]);
         }
         for (int i = 0; i < _axis.Length; i++)
         {
@@ -106,12 +108,12 @@ public class RayLibPad : IJoyPad
     /// <summary>Buffer()で取り込んだ生入力から、各ボタンの押下エッジ状態とスティック/トリガー値を確定します。</summary>
     public void Update()
     {
+        _edges.Commit();
         // Update button, trigger, and stick states
         // Button[i] の値: 1=押した瞬間, 2=押しっぱなし, -1=離した瞬間, 0=無入力
         for (int i = 0; i < Button.Length; i++)
         {
-            bool pressed = _pressed[i];
-            Button[i] = pressed ? (Button[i] < 1 ? 1 : 2) : (Button[i] > 0 ? -1 : 0);
+            Button[i] = _edges.GetState(i);
         }
         // Update triggers
         Trigger[0] = (float)Easing.Ease(_axis[4] + 1, 2, 0, 1, EEasing.Sine, EInOut.Out); // Left Trigger
@@ -133,13 +135,13 @@ public class RayLibPad : IJoyPad
     }
 
     /// <summary>指定ボタンが押された瞬間かどうか。</summary>
-    public bool IsPushed(int buttonIndex) => Button[buttonIndex] == 1;
+    public bool IsPushed(int buttonIndex) => !InputStep.EdgesSuppressed && (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] == 1;
     /// <summary>指定ボタンが押されている（押した瞬間・押しっぱなし含む）かどうか。</summary>
-    public bool IsHeld(int buttonIndex) => Button[buttonIndex] > 0;
+    public bool IsHeld(int buttonIndex) => (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] > 0;
     /// <summary>指定ボタンが離された瞬間かどうか。</summary>
-    public bool IsReleased(int buttonIndex) => Button[buttonIndex] < 0;
+    public bool IsReleased(int buttonIndex) => !InputStep.EdgesSuppressed && (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] < 0;
     /// <summary>現在押されているボタンのうち最初に見つかったもののインデックスを返します。無ければ null。</summary>
-    public int? NowPushedButton() => Button.ToList().FindIndex(b => b > 0) is int idx and >= 0 ? idx : null;
+    public int? NowPushedButton() => Array.FindIndex(Button, b => b > 0) is int idx and >= 0 ? idx : null;
 
     /// <summary>左右モーターの強さをパン(左右バランス)から算出し、指定時間だけ振動させます。</summary>
     public void Vibrate(float pan, float strength, float length)

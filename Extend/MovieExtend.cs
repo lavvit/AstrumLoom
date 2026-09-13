@@ -33,7 +33,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
     private double _speed = 1.0;
     private Stopwatch _clock = new();
     private double _clockOffset;
-    private volatile int _asyncState = -1; // -1=failed,0=loading,1=ready
+    private int _asyncState = -1; // -1=failed,0=loading,1=ready
     private bool _disposed;
 
     /// <summary>
@@ -46,7 +46,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         if (!File.Exists(Path))
         {
             Log.Warning($"MovieExtend: file not found: {Path}");
-            _asyncState = -1;
+            Volatile.Write(ref _asyncState, -1);
             return;
         }
 
@@ -57,7 +57,7 @@ internal sealed class MovieExtend : IMovie, IDisposable
         _framesDir = System.IO.Path.Combine(_workDir, "frames");
         Directory.CreateDirectory(_framesDir);
 
-        _asyncState = 0;
+        Volatile.Write(ref _asyncState, 0);
         _prepareTask = PrepareAsync(_cts.Token);
     }
 

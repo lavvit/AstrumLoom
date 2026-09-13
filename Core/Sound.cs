@@ -22,38 +22,42 @@ public interface ISound : IResourse
 /// <summary>サウンドのラッパー。実体（ISound）がnull（未ロード）でも安全な既定値を返し、破棄はメインスレッドへ回す。</summary>
 public class Sound : IDisposable
 {
-    private ISound? _sound { get; set; } = null;
-    private bool _disposed = false;
+    private ISound? _sound;
+    private readonly long _id = Interlocked.Increment(ref _nextId);
+    private static long _nextId;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<long, WeakReference<Sound>> Live = new();
     public Sound() { }
-    public Sound(string path, bool stream = false) => _sound = AstrumCore.Platform.LoadSound(path, stream);
-
+    public Sound(string path, bool stream = false)
+    {
+        _sound = AstrumCore.Platform.LoadSound(path, stream);
+        Live[_id] = new(this);
+    }
     public void Play() => _sound?.Play();
     public void Stop() => _sound?.Stop();
     public void PlayStream() => _sound?.PlayStream();
-
     public void Pump() => _sound?.Pump();
-
-    ~Sound() => Dispose(false);
-
-    public void Dispose()
+    internal static void PumpAll()
     {
-        AstrumCore.RequestDispose(_sound!);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed)
+        foreach (var pair in Live)
         {
-            if (disposing)
-            {
-                _sound?.Dispose();
-            }
-            _sound = null;
-            _disposed = true;
+            if (pair.Value.TryGetTarget(out var sound)) sound.Pump();
+            else Live.TryRemove(pair.Key, out _);
         }
     }
-
+    internal static void DisposeAll()
+    {
+        foreach (var pair in Live)
+            if (pair.Value.TryGetTarget(out var sound)) sound.Dispose();
+        Live.Clear();
+    }
+    ~Sound() => Dispose(false);
+    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
+    protected virtual void Dispose(bool disposing)
+    {
+        Live.TryRemove(_id, out _);
+        var sound = Interlocked.Exchange(ref _sound, null);
+        if (sound != null) AstrumCore.RequestDispose(sound);
+    }
     public string Path => _sound?.Path ?? "";
     public int Length => _sound?.Length ?? 0;
     public bool IsReady => _sound?.IsReady ?? false;

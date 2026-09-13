@@ -14,6 +14,8 @@ public interface IMouse
     double WheelTotal { get; }
 
     void Init(bool visible);
+    /// <summary>メインスレッドで採取する。既存の独自実装との互換用に既定は空。</summary>
+    void Buffer() { }
     void Update();
 
     /// <summary>指定したボタンが押されたかどうかを取得します。</summary>
@@ -79,7 +81,7 @@ public class Mouse
     }
     public static double X => MouseInstance.X;
     public static double Y => MouseInstance.Y;
-    public static double Wheel => MouseInstance.Wheel;
+    public static double Wheel => InputStep.EdgesSuppressed ? 0 : MouseInstance.Wheel;
     public static double WheelTotal => MouseInstance.WheelTotal;
 
     public static bool IsTouchPad
@@ -113,9 +115,9 @@ public class Mouse
         }
     }
 
-    public static bool Push(MouseButton button) => MouseInstance.Push(button);
+    public static bool Push(MouseButton button) => !InputStep.EdgesSuppressed && MouseInstance.Push(button);
     public static bool Hold(MouseButton button) => MouseInstance.Hold(button);
-    public static bool Left(MouseButton button) => MouseInstance.Left(button);
+    public static bool Left(MouseButton button) => !InputStep.EdgesSuppressed && MouseInstance.Left(button);
 
     // 前フレーム座標保持（動きに応じた角度計算用）
     private static double _prevX = double.NaN;

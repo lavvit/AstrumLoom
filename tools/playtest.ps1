@@ -40,7 +40,7 @@ param(
     [string]$Replay = '',
     # ビルドを省略する（キャッシュも見ずに常にスキップ）。
     [switch]$NoBuild,
-    # ソースが変わっていなくても強制的にビルドし直す。
+    # 互換用。通常起動でも毎回 MSBuild に差分判定を依頼する。
     [switch]$ForceBuild,
     # Release 構成で動かす。
     [switch]$Release,
@@ -60,56 +60,15 @@ function Write-Bad($text)  { Write-Host "    $text" -ForegroundColor Red }
 function Write-Info($text) { Write-Host "    $text" -ForegroundColor Gray }
 
 # --- ビルド ------------------------------------------------------------------
-# ソース（プロジェクト自身 + Core/DXLib/RayLib/Extend/Game）の更新時刻とサイズから
-# 軽量な指紋を作り、前回ビルド時から変わっていなければビルドを丸ごと飛ばす。
-# 中身を読まず Get-ChildItem のメタデータだけで済ませるので、大きめのリポジトリでも一瞬で終わる。
-function Get-SourceFingerprint([string]$projectName) {
-    $dirs = @($projectName, 'Core', 'DXLib', 'RayLib', 'Extend', 'Game') |
-        ForEach-Object { Join-Path $root $_ } |
-        Where-Object { Test-Path $_ }
-    $files = foreach ($d in $dirs) {
-        Get-ChildItem $d -Recurse -Include '*.cs', '*.csproj' -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
-    }
-    $lines = $files | Sort-Object FullName | ForEach-Object {
-        "$($_.FullName)|$($_.Length)|$($_.LastWriteTimeUtc.Ticks)"
-    }
-    $text = [string]::Join("`n", $lines)
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text))
-    } finally { $sha.Dispose() }
-    -join ($bytes | ForEach-Object { $_.ToString('x2') })
-}
-
-$cacheDir = Join-Path (Join-Path $root 'playtest') '.buildcache'
-$cacheFile = Join-Path $cacheDir "$Project-$configuration.txt"
-
+# 依存プロジェクトと素材の差分判定は MSBuild に任せる。
 if ($NoBuild) {
     Write-Info 'ビルドを省略します (-NoBuild)。'
 } else {
-    $fingerprint = Get-SourceFingerprint $Project
-    $cached = if (Test-Path $cacheFile) { Get-Content $cacheFile -Raw } else { $null }
-    $exeExists = $false
-    $probeExe = Join-Path (Join-Path (Join-Path $root $Project) $configuration) "$Project.exe"
-    if (Test-Path $probeExe) { $exeExists = $true }
-    if (-not $ForceBuild -and $cached -and ($cached.Trim() -eq $fingerprint) -and $exeExists) {
-        Write-Step "ビルドをスキップ ($configuration): $Project.csproj  (ソース変更なし)"
-    } else {
-        # 名前付きで渡すにはハッシュテーブルでスプラットする（配列だと位置引数になる）。
-        $buildParams = @{ Project = $Project }
-        if ($Release) { $buildParams['Release'] = $true }
-        & (Join-Path $root 'build.ps1') @buildParams
-        if ($LASTEXITCODE -ne 0) { Write-Bad 'ビルドに失敗したので中止します。'; exit 1 }
-        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
-        # ビルド後の実際の指紋を保存する（ビルドが生成物を書き戻す場合があるため、
-        # ビルド前の値を使い回さずここで取り直す）。
-        # 中身は 16 進数字だけなので ASCII で書く（UTF8 だと BOM が付き、次回の Get-Content -Raw
-        # 比較で BOM 込みの文字列と素の指紋が一致しなくなり、キャッシュが永久に外れる）。
-        (Get-SourceFingerprint $Project) | Set-Content $cacheFile -Encoding Ascii -NoNewline
-    }
+    $buildParams = @{ Project = $Project }
+    if ($Release) { $buildParams['Release'] = $true }
+    & (Join-Path $root 'build.ps1') @buildParams
+    if ($LASTEXITCODE -ne 0) { Write-Bad 'ビルドに失敗したので中止します。'; exit 1 }
 }
-
 # --- 実行ファイルを探す ------------------------------------------------------
 $exeName = "$Project.exe"
 
@@ -197,13 +156,13 @@ $timedOut = $false
 if (-not $proc.WaitForExit($timeoutMs)) {
     $timedOut = $true
     Write-Bad "タイムアウト ($([math]::Round($timeoutMs/1000,1)) 秒) — 強制終了します"
-    try { $proc.Kill($true) } catch { }
+    try { $proc.Kill($true) } catch { try { $proc.Kill() } catch { Write-Bad $_.Exception.Message } }
     [void]$proc.WaitForExit(5000)
 }
 $sw.Stop()
 
-$stdout = $outTask.Result
-$stderr = $errTask.Result
+$stdout = if ($outTask.Wait(5000)) { $outTask.Result } else { "stdout capture timed out" }
+$stderr = if ($errTask.Wait(5000)) { $errTask.Result } else { "stderr capture timed out" }
 $exitCode = if ($timedOut) { 124 } else { $proc.ExitCode }
 
 # --- 成果物をまとめる --------------------------------------------------------

@@ -348,34 +348,34 @@ internal static class Program
             () => Mov != null && (Mov.MainReady || Mov.MainFailed));
         SelfTest.Check("致命的エラーになっていない", () => !AstrumCore.HasFatalError);
 
-        SelfTest.Check("動画のサイズが取れている（640x360）",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "動画のサイズが取れている（640x360）",
             () => Mov == null || !Mov.MainReady || (Mov.MainWidth == 640 && Mov.MainHeight == 360),
             "Assets\\movie_clock.mp4 が壊れている可能性があります。tools\\make-sandbox-assets.ps1 -Force で作り直してください。");
-        SelfTest.Check("尺が取れている（6 秒前後）",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "尺が取れている（6 秒前後）",
             () => Mov == null || !Mov.MainReady || Mov.MainLength is > 5000 and < 7000);
-        SelfTest.Check("再生が始まっている",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "再生が始まっている",
             () => Mov == null || !Mov.MainReady || Mov.MainPlaying,
             "PlayStream/Play が Draw から呼ばれていない可能性があります。");
         SelfTest.Shot("movie");
 
         SelfTest.Do("再生位置を覚える", () => _movieTimeBefore = Mov?.MainTime ?? -1);
         SelfTest.Wait(60);
-        SelfTest.Check("再生位置が進んでいる",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "再生位置が進んでいる",
             () => Mov == null || !Mov.MainReady || Mov.MainTime > _movieTimeBefore);
-        SelfTest.Check("音の無い動画でも時計が進んでいる",
+        SelfTest.CheckWhen(() => Mov?.SilentReady == true, "音の無い動画でも時計が進んでいる",
             () => Mov == null || !Mov.SilentReady || Mov.SilentTime > 0);
 
         // シークは ffmpeg を開き直すので、反映されるまでフレームを与える。
         SelfTest.Do("半ばへシークする", () => Mov?.SeekTo(0.5));
         SelfTest.Wait(90);
-        SelfTest.Check("シークで再生位置が飛んだ",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "シークで再生位置が飛んだ",
             () => Mov == null || !Mov.MainReady || Mov.MainProgress > 0.35);
         SelfTest.Shot("movie-seek");
 
         // 6 秒の動画を 0.5 から流し切ると、ループなら先頭側へ戻ってくる。
         SelfTest.Do("終端をまたぐまで待つ", () => _movieProgressBefore = Mov?.MainProgress ?? -1);
         SelfTest.Wait(300);
-        SelfTest.Check("ループで先頭へ戻った（または再生が続いている）",
+        SelfTest.CheckWhen(() => Mov?.MainReady == true, "ループで先頭へ戻った（または再生が続いている）",
             () => Mov == null || !Mov.MainReady
                 || Mov.MainProgress < _movieProgressBefore || Mov.MainPlaying);
 

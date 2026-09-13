@@ -73,11 +73,13 @@ public static class GameApp
             return ExitBadUsage;
         }
 
-        config.Apply(options);
+
 
         IGamePlatform? platform = null;
         try
         {
+            config.Apply(options);
+            if (config.Seed.HasValue) Randomize.Seed(config.Seed.Value);
             platform = CreatePlatform(config);
             AstrumCore.Boot(config, platform, sceneFactory(), options);
         }

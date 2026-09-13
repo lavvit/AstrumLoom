@@ -90,6 +90,7 @@ public sealed class DxLibPlatform : IGamePlatform
         }
         // キー状態の更新
         Input.Buffer();
+        Mouse.Buffer();
         Controller.Buffer();
     }
 
@@ -123,14 +124,18 @@ public sealed class DxLibPlatform : IGamePlatform
         SetBackgroundColor(0, 0, 0);
         ClearDrawScreen();
 
-        // execute the provided draw actions onto the temporary screen
-        callback?.Invoke();
-
-        SetDrawScreen(oldScreen);
-
-        return new DxLibTexture(scr);
+        try
+        {
+            callback?.Invoke();
+            return new DxLibTexture(scr);
+        }
+        catch
+        {
+            DeleteGraph(scr);
+            throw;
+        }
+        finally { SetDrawScreen(oldScreen); }
     }
-
     private readonly int _targetFps;
     /// <summary>
     /// VSyncのON/OFFをDxLibへ反映する。ONにする際はモニタのリフレッシュレートを取得し、

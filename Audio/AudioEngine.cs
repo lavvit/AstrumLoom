@@ -7,13 +7,30 @@ namespace AstrumLoom.Audio;
 /// <summary>
 /// AstrumLoom.Audio の公開 API の顔。static class Audio 経由で効果音と BGM を鳴らす。
 ///
-/// スレッドの作法は Sandbox\SoundDemo.cs と同じ: raylib の音 API はメインスレッド専用で、
-/// 実際に叩けるのは Draw から呼ばれる場所だけ（Update が別スレッドで回ることがあるため）。
-/// なので Play() 等はジョブを ConcurrentQueue に積むだけにして、実際の Sound.Play() は
-/// 毎フレーム Draw の先頭から呼ぶ Audio.Update() の中でまとめて掃く。
+/// 再生要求をキューに積み、メインループが描画の前に処理する。
 /// </summary>
 public static class Audio
 {
+    static Audio()
+    {
+        AstrumCore.MainThreadTick += Update;
+        AstrumCore.ShuttingDown += Shutdown;
+    }
+    public static int MaxQueuedRequests { get; set; } = 4096;
+    public static int MaxJobsPerUpdate { get; set; } = 128;
+    private static int _queued;
+    private static long _rejected;
+    public static long RejectedRequests => Interlocked.Read(ref _rejected);
+    private static void Enqueue(Action action)
+    {
+        if (Interlocked.Increment(ref _queued) > System.Math.Max(1, MaxQueuedRequests))
+        {
+            Interlocked.Decrement(ref _queued);
+            Interlocked.Increment(ref _rejected);
+            return;
+        }
+        _jobs.Enqueue(action);
+    }
     private const int VoicesPerId = 4;
     /// <summary>ロード中でまだ鳴らせない要求を、諦めずに再挑戦し続ける上限秒数。無限に溜めないための保険。</summary>
     private const double PendingTimeoutSeconds = 2.0;
@@ -36,13 +53,13 @@ public static class Audio
     public static double BgmVolume { get; set; } = 1.0;
     public static bool Muted { get; set; } = false;
 
-    private readonly record struct PendingPlay(SfxId Id, double Volume, double Pitch, double Pan, double Waited);
+    private readonly record struct PendingPlay(SfxId Id, double Volume, double Pitch, double Pan, long Started);
 
     /// <summary>指定した効果音を先に合成・ロードしておく。ロード中の取りこぼしを避けたいなら Play() の前に呼ぶ。</summary>
     public static void Prewarm(params SfxId[] ids)
     {
         foreach (var id in ids)
-            _jobs.Enqueue(() => EnsureVoices(id));
+            Enqueue(() => EnsureVoices(id));
     }
 
     /// <summary>SfxBank.All を丸ごと Prewarm する。</summary>
@@ -70,13 +87,16 @@ public static class Audio
 
     /// <summary>効果音を鳴らす。どのスレッドから呼んでもよい（実際の再生は次の Update() へ回る）。</summary>
     public static void Play(SfxId id, double volume = 1, double pitch = 1, double pan = 0)
-        => _jobs.Enqueue(() => RequestPlay(id, volume, pitch, pan));
+        => Enqueue(() => RequestPlay(id, volume, pitch, pan));
 
     private static void RequestPlay(SfxId id, double volume, double pitch, double pan)
     {
         var voices = EnsureVoices(id);
         if (!TryPlayVoice(voices, id, volume, pitch, pan))
-            _pending.Add(new PendingPlay(id, volume, pitch, pan, 0));
+                    {
+            if (_pending.Count >= System.Math.Max(1, MaxQueuedRequests)) Interlocked.Increment(ref _rejected);
+            else _pending.Add(new PendingPlay(id, volume, pitch, pan, System.Diagnostics.Stopwatch.GetTimestamp()));
+        }
     }
 
     /// <summary>いずれかのボイスが鳴らせれば true。全部未ロードなら false（まだ鳴らせない）。</summary>
@@ -110,7 +130,7 @@ public static class Audio
 
     /// <summary>BGM を再生する。既に鳴っている BGM があれば止めてから差し替える。</summary>
     public static void PlayBgm(BgmScore score, double volume = 1)
-        => _jobs.Enqueue(() =>
+        => Enqueue(() =>
         {
             string? path = AudioCache.GetOrRenderBgm(score);
             _bgm?.Stop();
@@ -120,17 +140,20 @@ public static class Audio
             _bgmWanted = path != null;
         });
 
-    public static void StopBgm() => _jobs.Enqueue(() =>
+    public static void StopBgm() => Enqueue(() =>
     {
         _bgm?.Stop();
         _bgmWanted = false;
     });
 
-    /// <summary>Draw の先頭から毎フレーム呼ぶこと。ジョブの掃き出しと BGM の PlayStream をここでまとめて行う。</summary>
+    /// <summary>メインループから自動で呼ばれる。独自ホストではメインスレッドから呼ぶ。</summary>
     public static void Update()
     {
-        while (_jobs.TryDequeue(out var job))
+        if (Environment.CurrentManagedThreadId != AstrumCore.MainThreadId) return;
+        int count = System.Math.Min(_jobs.Count, System.Math.Max(1, MaxJobsPerUpdate));
+        for (int i = 0; i < count && _jobs.TryDequeue(out var job); i++)
         {
+            Interlocked.Decrement(ref _queued);
             try { job(); }
             catch (Exception e) { Log.Error("Audio の操作に失敗しました: " + e.Message); }
         }
@@ -143,10 +166,6 @@ public static class Audio
     {
         if (_pending.Count == 0) return;
 
-        // Draw フレームの経過秒。フレーム数で数えると可変フレームレートの実機と --selftest（60Hz固定）で
-        // タイムアウトまでの実時間が変わってしまうため、必ず dt を積む（docs\INVARIANTS.md と同じ理由）。
-        double dt = AstrumCore.Platform.Time.DeltaTime;
-
         for (int i = _pending.Count - 1; i >= 0; i--)
         {
             var p = _pending[i];
@@ -157,11 +176,10 @@ public static class Audio
                 continue;
             }
 
-            double waited = p.Waited + dt;
+            double waited = System.Diagnostics.Stopwatch.GetElapsedTime(p.Started).TotalSeconds;
             if (waited >= PendingTimeoutSeconds)
                 _pending.RemoveAt(i); // 諦める。無限に溜めない。
-            else
-                _pending[i] = p with { Waited = waited };
+
         }
     }
 
@@ -181,7 +199,7 @@ public static class Audio
     /// <summary>全ボイス・BGM を破棄する。ゲーム終了時に呼ぶこと。</summary>
     public static void Shutdown()
     {
-        while (_jobs.TryDequeue(out _)) { }
+        while (_jobs.TryDequeue(out _)) Interlocked.Decrement(ref _queued);
         _pending.Clear();
 
         foreach (var voices in _voices.Values)

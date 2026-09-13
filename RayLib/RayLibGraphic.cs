@@ -68,6 +68,7 @@ internal sealed class RayLibGraphics : IGraphics
     public void Line(double x, double y, double dx, double dy,
         DrawOptions options)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
@@ -80,6 +81,7 @@ internal sealed class RayLibGraphics : IGraphics
     public void Box(double x, double y, double width, double height,
         DrawOptions options)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
@@ -93,6 +95,7 @@ internal sealed class RayLibGraphics : IGraphics
     public void Circle(double x, double y, double radius,
         DrawOptions options, int segments = 64)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
@@ -112,6 +115,7 @@ internal sealed class RayLibGraphics : IGraphics
     public void Oval(double x, double y, double rx, double ry,
         DrawOptions options, int segments = 64)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
@@ -136,6 +140,7 @@ internal sealed class RayLibGraphics : IGraphics
     public void Triangle(double x1, double y1, double x2, double y2, double x3, double y3,
         DrawOptions options)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         int thickness = Math.Max(1, options.Thickness);
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
         var col = ToRayColor(options.Color ?? Color.White, opacity);
@@ -168,6 +173,7 @@ internal sealed class RayLibGraphics : IGraphics
         int fontSize,
         DrawOptions options)
     {
+        using var blendScope = new PrimitiveBlendScope(options);
         if (string.IsNullOrEmpty(text)) return;
 
         double opacity = Math.Clamp(options.Opacity, 0.0, 1.0);
@@ -287,6 +293,10 @@ internal sealed class RayLibGraphics : IGraphics
 
         SetColorBlend(option.Blend, opacity, color);
     }
-    internal static void ResetColorBlend() => EndBlendMode();
+    private readonly struct PrimitiveBlendScope : IDisposable
+    {
+        public PrimitiveBlendScope(DrawOptions options) => SetOptions(options);
+        public void Dispose() => ResetColorBlend();
+    }    internal static void ResetColorBlend() => EndBlendMode();
     internal static void ResetOptions(DrawOptions option) => ResetColorBlend();
 }

@@ -27,8 +27,7 @@ public class Animation : AsyncLoadableBase, IMovie
     /// <summary>読み込みワーカースレッドから呼ばれる本体処理。ファイルの存在確認のみ行う。</summary>
     public bool LoadAnim()
     {
-        bool file = FileCheck(Path);
-        return file;
+        throw new NotSupportedException("Animation project playback is not implemented. Use ExoAnimation or Movie.");
     }
 
     ~Animation() { Dispose(); }
@@ -48,7 +47,7 @@ public class Animation : AsyncLoadableBase, IMovie
         PumpAsync();
         if (!IsMainThread) return; // メインスレッドでのみ触る
     }
-    public bool Enable => LoadFinished;
+    public bool Enable => LoadReady;
     public bool IsReady => LoadReady;
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;

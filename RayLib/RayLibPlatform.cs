@@ -79,6 +79,7 @@ public sealed class RayLibPlatform : IGamePlatform
         }
         // キー状態の更新
         Input.Buffer();
+        Mouse.Buffer();
         Controller.Buffer();
     }
 
@@ -92,6 +93,7 @@ public sealed class RayLibPlatform : IGamePlatform
         if (_disposed) return;
         _disposed = true;
 
+        if (IsAudioDeviceReady()) CloseAudioDevice();
         // ウィンドウが初期化済みのときだけ閉じる
         if (_ready)
         {
@@ -122,39 +124,15 @@ public sealed class RayLibPlatform : IGamePlatform
     /// <summary>
     /// 描画のソフトウェア上限を切り替える。更新レートは変更しない。
     /// </summary>
-    /// <remarks>
-    /// あえて ConfigFlags.VSyncHint（GLFW の SwapInterval(1)）は使わない。検証の結果、これは
-    /// UTime/Time の二重待ちとは別に、GLFW の SwapInterval(1) 自体がドライバ次第でモニタの
-    /// リフレッシュレートの半分でしかスワップを返さないことがあると判明したため（Intel Arc +
-    /// Windows のウィンドウモードで実機確認: raylib_cs だけの最小構成でも monitorFps=60 の環境で
-    /// 実測 32.8 FPS。SetTargetFPS(0) にしてAstrumLoom側の待機も外し、GLFWのvsync待ちだけに
-    /// した状態でも変わらず半分だった＝AstrumLoomのコードではなくGLFW/ドライバ側の挙動）。
-    /// 同じ環境で VSyncHint を使わず SetTargetFPS だけでフレーム待機させると正しく約60FPSになる
-    /// ことも確認済み。ここでは「見た目のティアリング抑止」より「指定FPSに実効フレームレートが
-    /// 一致すること」を優先し、raylib のネイティブvsyncには頼らず、AstrumLoom側のTime
-    /// （描画用のソフトウェアフレームリミッタ）だけでモニタのリフレッシュレートに合わせる。
-    /// </remarks>
     public void SetVSync(bool enabled)
     {
         if (!_ready || VSync == enabled) return;
         Log.Debug("VSync切替: " + enabled);
         VSync = enabled;
-        if (enabled)
-        {
-            int monitorFps = GetMonitorRefreshRate(GetCurrentMonitor());
-            int targetFps = _targetFps == 0 ? monitorFps : Math.Min(_targetFps, monitorFps);
-            // raylib 自身のフレーム待ちは使わず（Time とのペーシング二重化を避けるため）、
-            // AstrumLoom 側の HiResDelay だけでモニタのリフレッシュレートに揃える。
-            SetTargetFPS(0);
-            Time.TargetFps = targetFps;
-            // 更新レートはVSyncから独立。
-        }
-        else
-        {
-            SetTargetFPS(0);
-            Time.TargetFps = _targetFps;
-            // 更新レートはVSyncから独立。
-        }
+        if (enabled) SetWindowState(ConfigFlags.VSyncHint);
+        else ClearWindowState(ConfigFlags.VSyncHint);
+        SetTargetFPS(0);
+        Time.TargetFps = _targetFps;
     }
     private bool dragDrop = false;
     /// <summary>ドラッグ＆ドロップの受付フラグを切り替える。実際のraylib側APIは常時有効なので、DropFilesの読み出しを許可/禁止するだけの内部フラグ。</summary>

@@ -198,8 +198,8 @@ internal sealed class MovieDemoScene : Scene
         if (_main is { Enable: true })
         {
             // 動画の実サイズに関係なくステージへ収める。
-            double scale = Math.Min(StageW / Math.Max(1, _main?.Width ?? 1), StageH / Math.Max(1, _main?.Height ?? 1));
-            _main?.Draw(x + StageW / 2, y + StageH / 2, new DrawOptions
+            double scale = Math.Min(StageW / Math.Max(1, _main.Width), StageH / Math.Max(1, _main.Height));
+            _main.Draw(x + StageW / 2, y + StageH / 2, new DrawOptions
             {
                 Point = ReferencePoint.Center,
                 Scale = (scale, scale),

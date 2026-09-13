@@ -79,13 +79,14 @@ public class DxLibSound : AsyncLoadableBase, ISound
         WriteState((CheckHandleASyncLoad(Handle) == 0) ? State_Success : State_Loading);
         return true;
     }
-    public bool Enable => LoadFinished && Handle > 0;
+    public bool Enable => LoadReady && Handle > 0;
     public bool IsReady => LoadReady;
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;
 
     /// <summary>非同期ロード完了の確認と、まだ取れていなかった長さ・周波数の遅延取得を行う。毎フレーム呼ばれる想定。</summary>
-    public void Pump()
+    public void Pump() => Update();
+    private void PumpLoad()
     {
         PumpAsync();
         if (!IsMainThread) return; // メインスレッドでのみ触る
@@ -117,13 +118,15 @@ public class DxLibSound : AsyncLoadableBase, ISound
     // コンストラクタのstreaming引数を保持する。LoadSfxでSetCreateSoundDataTypeへ渡すのに使う。
     private readonly bool _streaming;
     private long _time;
+    private long? _startTime;
     private float _volume = 1.0f;
     private float _pan = 0.0f;
     private float _speed = 1.0f;
     /// <summary>再生中フラグに応じて現在の再生位置・実効速度を同期し、ループ再生時は再生停止を検知して_playedをリセットする。</summary>
     public void Update()
     {
-        Pump();
+        if (!IsMainThread) return;
+        PumpLoad();
         if (!Enable) return;
         if (_played)
         {
@@ -147,8 +150,10 @@ public class DxLibSound : AsyncLoadableBase, ISound
         get => _time;
         set
         {
-            if (Math.Abs(_time - value) < 16.0) return;
+            if (!Enable) return;
+            if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
             _time = (long)Math.Clamp(value, 0, Length);
+            _startTime = _played ? null : _time;
             SetSoundCurrentTime(_time, Handle);
         }
     }
@@ -198,7 +203,7 @@ public class DxLibSound : AsyncLoadableBase, ISound
         get => Speed; // DxLib does not support pitch control
         set => Speed = value;
     }
-    public bool IsPlaying => CheckSoundMem(Handle) != 0;
+    public bool IsPlaying => Enable && CheckSoundMem(Handle) == 1;
     public bool Loop { get; set; } = false;
     #endregion
 
@@ -208,6 +213,8 @@ public class DxLibSound : AsyncLoadableBase, ISound
     public void Play()
     {
         if (!Enable) return;
+        _time = _startTime ?? 0;
+        _startTime = null;
         int playType = Loop ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK;
         PlaySoundMem(Handle, playType, TRUE);
         if (_time > 0)
@@ -218,6 +225,8 @@ public class DxLibSound : AsyncLoadableBase, ISound
     {
         if (!Enable) return;
         StopSoundMem(Handle);
+        _time = 0;
+        _startTime = null;
         _played = false;
     }
     /// <summary>まだ再生していなければPlayし、既に再生中ならUpdateで状態同期のみ行う（BGM等を毎フレーム呼んでも重複再生しないための入口）。</summary>

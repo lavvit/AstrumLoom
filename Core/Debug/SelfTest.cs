@@ -5,8 +5,9 @@ namespace AstrumLoom;
 /// <summary>セルフテストの 1 項目の結果。</summary>
 public readonly record struct SelfTestResult(string Label, bool Passed, string Detail, long Frame)
 {
+    public bool Skipped { get; init; }
     public override string ToString()
-        => $"[{(Passed ? "PASS" : "FAIL")}] f{Frame,-6} {Label}{(string.IsNullOrEmpty(Detail) ? "" : $"  — {Detail}")}";
+        => $"[{(Skipped ? "SKIP" : Passed ? "PASS" : "FAIL")}] f{Frame,-6} {Label}{(string.IsNullOrEmpty(Detail) ? "" : $"  — {Detail}")}";
 }
 
 /// <summary>
@@ -54,6 +55,7 @@ public static class SelfTest
     {
         public required string Label;
         public required Func<bool> Predicate;
+        public Func<bool>? Available;
         public string Detail = "";
         public override void OnStart()
         {
@@ -61,6 +63,13 @@ public static class SelfTest
             string detail = Detail;
             try
             {
+                if (Available?.Invoke() == false)
+                {
+                    var result = new SelfTestResult(Label, false, "必要なリソースを利用できないため未検証", AstrumCore.FrameCount) { Skipped = true };
+                    _results.Add(result);
+                    Log.SelfTest(result.ToString());
+                    return;
+                }
                 ok = Predicate();
             }
             catch (Exception ex)
@@ -113,8 +122,9 @@ public static class SelfTest
     public static long FrameLimit { get; set; } = 60 * 60 * 5; // 5 分相当
 
     public static IReadOnlyList<SelfTestResult> Results => _results;
-    public static int Passed => _results.Count(r => r.Passed);
-    public static int Failed => _results.Count(r => !r.Passed);
+    public static int Passed => _results.Count(r => r.Passed && !r.Skipped);
+    public static int Skipped => _results.Count(r => r.Skipped);
+    public static int Failed => _results.Count(r => !r.Passed && !r.Skipped);
     public static bool HasPlan => _plan.Count > 0;
 
     #region 計画の組み立て
@@ -143,6 +153,9 @@ public static class SelfTest
         => _plan.Add(new CheckAction { Label = label, Predicate = predicate, Detail = detailOnFail, Frames = 0 });
 
     /// <summary>任意の処理を 1 回実行します。例外は FAIL として記録されます。</summary>
+    public static void CheckWhen(Func<bool> available, string label, Func<bool> predicate, string detailOnFail = "")
+        => _plan.Add(new CheckAction { Available = available, Label = label, Predicate = predicate, Detail = detailOnFail, Frames = 0 });
+
     public static void Do(string label, Action body)
         => _plan.Add(new DoAction { Label = label, Body = body, Frames = 0 });
 
@@ -155,6 +168,7 @@ public static class SelfTest
         _framesLeft = 0;
         _current = false;
         _finished = false;
+        _startFrame = 0;
     }
 
     #endregion
@@ -224,7 +238,7 @@ public static class SelfTest
         if (DebugSession.Options.LogOverlay != false) Log.DrawOnScreen = true;
 
         string summary = Failed == 0
-            ? $"セルフテスト成功: {Passed} 件すべて PASS"
+            ? $"セルフテスト完了: PASS {Passed} / SKIP {Skipped} / FAIL 0"
             : $"セルフテスト失敗: {Failed} 件 FAIL / 全 {_results.Count} 件";
         Log.Write(summary, Failed == 0 ? LogLevel.Info : LogLevel.Error);
         Environment.ExitCode = Failed == 0 ? 0 : 1;
@@ -248,7 +262,7 @@ public static class SelfTest
             };
             body.AddRange(_results.Select(r => r.ToString()));
             body.Add("");
-            body.Add($"PASS {Passed} / FAIL {Failed} / 合計 {_results.Count}");
+            body.Add($"PASS {Passed} / FAIL {Failed} / SKIP {Skipped} / 合計 {_results.Count}");
             File.WriteAllLines(path, body, new UTF8Encoding(true));
             Console.WriteLine($"結果を書き出しました: {path}");
         }

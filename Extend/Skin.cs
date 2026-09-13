@@ -15,6 +15,29 @@ namespace AstrumLoom.Extend;
 /// </summary>
 public class Skin
 {
+    static Skin() => AstrumCore.ShuttingDown += Unload;
+    private static IFont? _baseFont;
+    private static readonly HashSet<IFont> _ownedFonts = new(ReferenceEqualityComparer.Instance);
+    private static IFont? CreateOwnedFont(string path, int size = 16, int thick = 1, int edge = 0, int spacing = 0)
+    {
+        _baseFont ??= Drawing.DefaultFont;
+        var font = FHandle.Create(path, size, thick, edge, spacing);
+        if (font != null) _ownedFonts.Add(font);
+        return font;
+    }
+    public static void Unload()
+    {
+        foreach (var texture in Textures.Values) texture?.Dispose();
+        foreach (var sound in Sounds.Values) sound?.Dispose();
+        foreach (var number in Numbers.Values) number?.Dispose();
+        foreach (var exo in ExoDatas.Values) exo?.Dispose();
+        if (_baseFont != null && _ownedFonts.Contains(Drawing.DefaultFont)) Drawing.DefaultFont = _baseFont;
+        foreach (var font in _ownedFonts) AstrumCore.RequestDispose(font);
+        _ownedFonts.Clear();
+        Textures.Clear(); Sounds.Clear(); Numbers.Clear(); Fonts.Clear(); ExoDatas.Clear();
+        _textureCache.Clear(); _configCache.Clear(); SkinQue.Clear(); PathList.Clear();
+        _loading = false;
+    }
     public static Dictionary<string, Texture> Textures { get; set; } = [];
     public static Dictionary<string, Sound> Sounds { get; set; } = [];
     public static Dictionary<string, Number> Numbers { get; set; } = [];
@@ -74,13 +97,8 @@ public class Skin
             Log.Write($"Skin: {FilePath(skinPath)} のスキンを読み込みます...", true);
             var namedic = names;
             var numdic = nums;
-            Textures.Clear();
-            Sounds.Clear();
-            Numbers.Clear();
-            Fonts.Clear();
-            ExoDatas.Clear();
-            SkinQue.Clear();
-            PathList.Clear();
+            Unload();
+            _loading = true;
             //ResourceLoad();
             foreach (var name in namedic)
             {
@@ -115,7 +133,7 @@ public class Skin
                         SkinQue.Enqueue(("fon" + name.ToLower(), string.Join(',', [Path.Combine(skinPath, file), fontsize, thick, edge, space])));
                     else
                     {
-                        Fonts.TryAdd(name.ToLower(), FHandle.Create(
+                        Fonts.TryAdd(name.ToLower(), CreateOwnedFont(
                             Path.Combine(skinPath, file), fontsize) ?? Drawing.DefaultFont);
 
                         if (name == "default")
@@ -141,7 +159,7 @@ public class Skin
                         {
                             int.TryParse(set[0], out width);
                             int.TryParse(set[1], out height);
-                            int.TryParse(set[2], out space);
+                            if (set.Length > 2) int.TryParse(set[2], out space);
                             if (set.Length > 3) chars = set[3].ToCharArray();
                             if (set.Length > 4) int.TryParse(set[4], out startx);
                             if (set.Length > 5) int.TryParse(set[5], out starty);
@@ -248,7 +266,7 @@ public class Skin
     /// <summary>既定フォントを差し替えます。</summary>
     public static void SetFont(string font)
     {
-        var f = FHandle.Create(font, 12);
+        var f = CreateOwnedFont(font, 12);
         if (f != null)// && f.Enable
             Drawing.DefaultFont = f;
     }
@@ -356,7 +374,7 @@ public class Skin
                 case "fon":
                     {
                         string[] param = file.Split(',');
-                        Fonts.TryAdd(name, FHandle.Create(
+                        Fonts.TryAdd(name, CreateOwnedFont(
                             param[0],
                             size: int.Parse(param[1]),
                             thick: int.Parse(param[2]),
@@ -429,7 +447,7 @@ public class Skin
             var tex = Textures[key];
             // Pump may update internal state; keep minimal side effects
             tex?.Pump();
-            if (tex == null || !tex.Enable)
+            if (tex == null || tex.IsFailed)
             {
                 Textures[key]?.Dispose();
                 Textures.Remove(key);
@@ -443,7 +461,7 @@ public class Skin
         {
             var snd = Sounds[key];
             snd?.Pump();
-            if (snd == null || !snd.Enable)
+            if (snd == null || snd.IsFailed)
             {
                 Sounds[key]?.Dispose();
                 Sounds.Remove(key);

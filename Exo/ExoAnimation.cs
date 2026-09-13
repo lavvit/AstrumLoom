@@ -1,4 +1,4 @@
-using AstrumLoom.Exo.Loaders;
+﻿using AstrumLoom.Exo.Loaders;
 
 namespace AstrumLoom.Exo;
 
@@ -9,9 +9,15 @@ namespace AstrumLoom.Exo;
 /// パース処理そのものは <see cref="Loaders.IAnimeLoader"/> の実装（<see cref="ExoLoader"/> / <see cref="Aup2Loader"/>）に
 /// 委譲し、このクラスは「読み込んだ結果（<see cref="AnimeDocument"/>）を再生・描画する」ことだけに専念する。
 /// </summary>
-public class ExoAnimation
+public class ExoAnimation : IDisposable
 {
-    public string FilePath { get; set; } = "";
+    public void Dispose()
+    {
+        _isPlaying = false;
+        foreach (var image in imageObjects) image.Texture?.Dispose();
+        foreach (var sound in soundObjects) sound.Sound?.Dispose();
+        imageObjects.Clear(); soundObjects.Clear(); groupObjects.Clear();
+    }    public string FilePath { get; set; } = "";
     /// <summary>
     /// exeditのプロパティ
     /// </summary>

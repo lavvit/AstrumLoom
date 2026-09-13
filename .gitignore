@@ -4,8 +4,8 @@
 
 /.vs
 /.git
-*/obj
-*/bin
+**/obj/
+**/bin/
 /Debug
 /Release
 *.user
@@ -16,6 +16,6 @@
 debugout/
 # 実行中に書き換える調整用パラメータ。値は各自の手元のもの
 tuning.txt
-/tools
+/tools/*
+!/tools/playtest.ps1
 /tests/ThreadProbe
-/tests/ThreadingChecks

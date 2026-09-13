@@ -22,7 +22,7 @@ public static class TextureExtensions
 /// </summary>
 public class Texture : IDisposable
 {
-    private ITexture? _texture { get; set; } = null;
+    private ITexture? _texture;
     public Texture() { }
 
     /// <summary>drawAction（Action method）を焼き込むレンダーターゲットとしてテクスチャを作る。</summary>
@@ -85,26 +85,18 @@ public class Texture : IDisposable
     /// <summary>指定サイズにフィットするようScaleを一時的に変更して描画し、直後に元の値へ戻す。</summary>
     public void DrawSize(double x, double y, Size size)
     {
-        // 変更前の Scale を退避し、描画後に必ず戻す。DrawRect が Rectangle を
-        // 一時的に差し替えて戻しているのと同じやり方。ここを戻さないと、この呼び出し以降の
-        // 通常 Draw() まで縮尺が汚染されたままになってしまう。
-        var before = XYScale;
-        XYScale = (size.Width / Width, size.Height / Height);
-        // Draw(x, y) の 2 引数オーバーロード（TextureExtensions）は既定の DrawOptions を
-        // 生成して呼ぶだけなので、ここで設定した Scale を含め Color/Opacity/Point/Angle/Flip/
-        // Rectangle 等の既存設定が全部無視されていた。Option を渡す Draw(x, y, Option) 経由にする。
-        _texture?.Draw(x, y, Option);
-        XYScale = before;
+        if (Width <= 0 || Height <= 0) return;
+        var option = Option;
+        option.Scale = (size.Width / Width, size.Height / Height);
+        _texture?.Draw(x, y, option);
     }
-    /// <summary>テクスチャの一部矩形（切り出し範囲）だけを描画する。Rectangleを一時的に差し替えて元に戻す。</summary>
+    /// <summary>切り出し範囲をこの描画だけに指定する。</summary>
     public void DrawRect(double x, double y, Rect rectangle)
     {
-        Rect? before = Rectangle != null ? new Rect(Rectangle.Value.X, Rectangle.Value.Y, Rectangle.Value.Width, Rectangle.Value.Height) : null;
-        Rectangle = rectangle;
-        _texture?.Draw(x, y, Option);
-        Rectangle = before;
-    }
-    /// <summary>デバッグ用。テクスチャの外形と20px間隔のグリッド線を描く。</summary>
+        var option = Option;
+        option.Rectangle = rectangle;
+        _texture?.Draw(x, y, option);
+    }    /// <summary>デバッグ用。テクスチャの外形と20px間隔のグリッド線を描く。</summary>
     public void Grid(double x, double y)
     {
         var tplt = LayoutUtil.GetAnchorOffset(Point, Width * Scale, Height * Scale);
@@ -126,7 +118,8 @@ public class Texture : IDisposable
 
     public void Dispose()
     {
-        AstrumCore.RequestDispose(_texture!);
+        var texture = Interlocked.Exchange(ref _texture, null);
+        if (texture != null) AstrumCore.RequestDispose(texture);
         GC.SuppressFinalize(this);
     }
 
@@ -208,8 +201,8 @@ public class Texture : IDisposable
 
     public Size Size => new(Width, Height);
     public Size ScaledSize => new(
-        (int)(Width * Scale * Drawing.DefaultScale),
-        (int)(Height * Scale * Drawing.DefaultScale)
+        (int)(Width * Option.Scale.W * Drawing.DefaultScale),
+        (int)(Height * Option.Scale.H * Drawing.DefaultScale)
     );
 
     public void SetColor(Color color, Color? add = null)
@@ -222,11 +215,15 @@ public class Texture : IDisposable
     }
 
     public void Expand(double width, double height)
-        => XYScale = (width / Width, height / Height);
+        {
+        if (Width <= 0 || Height <= 0) return;
+        XYScale = (width / Width, height / Height);
+    }
 
     /// <summary>同じパスから新たにロードし直し、現在の描画オプション（色・スケール等）だけをコピーした別インスタンスを作る。</summary>
     public Texture Clone()
     {
+        if (string.IsNullOrEmpty(Path)) throw new NotSupportedException("Clone requires a file-backed texture.");
         var tex = new Texture(Path);
         tex.Import(Export());
         return tex;

@@ -52,6 +52,9 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     /// <summary>生のRGBA32ピクセル列（width*height*4バイト）からテクスチャを作る。</summary>
     public RayLibTexture(int width, int height, byte[] rgbaPixels)
     {
+        ArgumentNullException.ThrowIfNull(rgbaPixels);
+        if (width <= 0 || height <= 0 || (long)width * height * 4 != rgbaPixels.LongLength)
+            throw new ArgumentException("RGBA data must contain exactly width * height * 4 bytes.", nameof(rgbaPixels));
         _rawPixels = rgbaPixels;
         _rawWidth = width;
         _rawHeight = height;
@@ -85,6 +88,8 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
                 {
                     // RenderTexture の解放は内部の Texture も同時に解放される
                     Raylib.UnloadRenderTexture(_renderTex);
+                    if (RenderTexture2D.Id != 0 && RenderTexture2D.Id != _renderTex.Id)
+                        Raylib.BeginTextureMode(RenderTexture2D);
                     Native = default;
                     _renderTex = default;
                 }
@@ -125,14 +130,18 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     /// <summary>RenderTextureへの描画callback実行中、他のコード（RayLibFontのグラデーション描画等）がそこへ描き込めるよう公開する現在の描画先。</summary>
     internal static RenderTexture2D RenderTexture2D { get; private set; }
     /// <summary>非同期ロードを開始する。メインスレッドならLoadTxを即実行、そうでなければLoadBackGroundでバイト列だけ先に読んでおく。</summary>
-    public void Load() => LoadAsync(this, LoadTx, LoadBackGround);
+    public void Load() => LoadAsync(this, LoadTx, string.IsNullOrEmpty(Path) ? null : LoadBackGround);
     /// <summary>メインスレッドから直接パスまたはRenderTexture生成を行う経路。</summary>
     private bool LoadTx()
     {
-        bool file = FileCheck(Path);
-        if (_renderInfo == null && !file && _memoryBytes == null && _rawPixels == null)
-            return false;
-
+        if (_pendingBytes != null)
+        {
+            _memoryBytes = _pendingBytes;
+            _memoryExt = _pendingExt;
+            _pendingBytes = null;
+            _pendingExt = null;
+        }
+        if (_renderInfo == null && _memoryBytes == null && _rawPixels == null && !FileCheck(Path)) return false;
         if (_rawPixels != null)
         {
             // GenImageColorで箱だけ作ってGPUに上げ、その直後に中身を丸ごと差し替える。
@@ -152,12 +161,25 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
             if (width <= 0 || height <= 0)
                 return false;
             var renderTex = Raylib.LoadRenderTexture(width, height);
+            if (renderTex.Id == 0) return false;
+            var previous = RenderTexture2D;
+            bool completed = false;
             Raylib.BeginTextureMode(renderTex);
             RenderTexture2D = renderTex;
-            callback?.Invoke();
-            RenderTexture2D = default;
-            Raylib.EndTextureMode();
-            // RenderTexture を所有する RayLibTexture として返す
+            try
+            {
+                Raylib.ClearBackground(new Raylib_cs.Color(0, 0, 0, 0));
+                callback?.Invoke();
+                completed = true;
+            }
+            finally
+            {
+                Raylib.EndTextureMode();
+                RenderTexture2D = previous;
+                // UnloadRenderTexture unbinds the framebuffer; restore only after release.
+                if (!completed) Raylib.UnloadRenderTexture(renderTex);
+                if (previous.Id != 0) Raylib.BeginTextureMode(previous);
+            }
             _renderTex = renderTex;
             Native = renderTex.Texture;
         }
@@ -192,65 +214,16 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     /// <summary>バックグラウンドスレッドから呼ばれる経路。raylibのネイティブAPIはメインスレッド専用なので、ここではファイルをバイト列として読むだけに留める（RenderTexture生成時は対象外）。</summary>
     public bool LoadBackGround()
     {
-        bool file = FileCheck(Path);
-        bool pathLoad = file && _renderInfo == null;
-        if (pathLoad)
-        {
-            try
-            {
-                _pendingBytes = File.ReadAllBytes(Path);
-                _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
-            }
-            catch
-            {
-                _pendingBytes = null;
-            }
-            return true;
-        }
-        return false;
+        _pendingBytes = File.ReadAllBytes(Path);
+        _pendingExt = System.IO.Path.GetExtension(Path).ToLowerInvariant();
+        return true;
     }
 
-    /// <summary>毎フレーム呼び出す。バックグラウンドで読み込んだバイト列が届いていれば、ここでTexture2Dへ変換して読み込みを完了させる。</summary>
-    public void Pump()
-    {
-        PumpAsync();
-        if (!IsMainThread) return; // メインスレッドでのみ触る
-
-        // 非同期ロードの完了待ち
-        if (_pendingBytes != null)
-        {
-            try
-            {
-                // PumpAsync() 内の _deferred フォールバックで LoadTx が先に走り、
-                // 既に Native が生成されている場合がある。ここで二重にテクスチャを
-                // 作ってしまうと古いハンドルが二度と Unload されずリークするので、
-                // 上書きする前に解放しておく。
-                if (Native.Id != 0)
-                    Raylib.UnloadTexture(Native);
-
-                // すべてメインで：バイト列 → Image → Texture2D
-                var img = Raylib.LoadImageFromMemory(_pendingExt ?? ".png", _pendingBytes);
-                Native = Raylib.LoadTextureFromImage(img);
-                Raylib.UnloadImage(img);
-
-                WriteState(State_Success);
-            }
-            catch { WriteState(State_Failed); }
-            finally { _pendingBytes = null; _pendingExt = null; }
-            return;
-        }
-
-        if (Native.Id > 0 && Width + Height == 0)
-        {
-            int w = Native.Width, h = Native.Height;
-            Width = w;
-            Height = h;
-        }
-    }
+    public void Pump() => PumpAsync();
     private byte[]? _pendingBytes;
     private string? _pendingExt; // ".png" ".ogg" など
 
-    public bool Enable => LoadFinished && Native.Id > 0;
+    public bool Enable => LoadReady && Native.Id > 0;
     public bool IsReady => LoadReady;
     public bool IsFailed => LoadFailed;
     public bool Loaded => LoadFinished;
@@ -276,6 +249,7 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
         float fx = (float)(x * defscale);
         float fy = (float)(y * defscale);
         (double w, double h) = use.Scale;
+        w *= defscale; h *= defscale;
         double angle = use.Angle;
         int tx = use.Flip.X ? -1 : 1;
 

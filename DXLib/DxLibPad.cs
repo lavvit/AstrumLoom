@@ -7,10 +7,10 @@ namespace AstrumLoom.DXLib;
 /// <summary>DxLibバックエンドでの複数ゲームパッド管理。接続/切断を毎フレーム検知してIJoyPadを出し入れする。</summary>
 internal class DxLibController : IController
 {
-    public int Count => _joyPads.Count;
-    public string[] List => [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")];
+    public int Count { get { lock (_lock) return _joyPads.Count; } }
+    public string[] List { get { lock (_lock) return [.. _joyPads.Select(p => $"{p.Index}:{p.Name}")]; } }
     // IJoyPad.Index はRayLibバックエンドに合わせて0始まりに統一済み（DxLibPad側で変換している）ため、そのまま比較する。
-    public IJoyPad? GetJoyPad(int index) => _joyPads.FirstOrDefault(p => p.Index == index);
+    public IJoyPad? GetJoyPad(int index) { lock (_lock) return _joyPads.FirstOrDefault(p => p.Index == index); }
 
     private List<IJoyPad> _joyPads = [];
     private readonly object _lock = new();
@@ -85,7 +85,8 @@ internal class DxLibPad : IJoyPad
     public float[] Trigger { get; } = new float[2];
     public StickState[] Stick { get; } = new StickState[2];
 
-    private bool[] _pressed = [];
+    private bool[] _pressed = new bool[24];
+    private readonly KeyEdgeBuffer _edges = new(24);
     private float[] _axis = new float[6];
 
     public DxLibPad(int dxIndex)
@@ -119,15 +120,16 @@ internal class DxLibPad : IJoyPad
         // トリガーもボタンの1つとして扱えるよう、一定量踏み込んだらButtonビットにも反映する
         _pressed[14] |= _axis[4] > 0.1f;
         _pressed[15] |= _axis[5] > 0.1f;
+        for (int i = 0; i < Button.Length; i++) _edges.Sample(i, _pressed[i]);
     }
 
     /// <summary>Bufferで取得した生の押下状態からButton配列を1(押下開始)/2(保持)/-1(離鍵)/0(非押下)の状態遷移に変換する。</summary>
     public void Update()
     {
+        _edges.Commit();
         for (int i = 0; i < Button.Length; i++)
         {
-            bool pressed = _pressed[i];
-            Button[i] = pressed ? (Button[i] < 1 ? 1 : 2) : (Button[i] > 0 ? -1 : 0);
+            Button[i] = _edges.GetState(i);
         }
         Trigger[0] = _axis[4];
         Trigger[1] = _axis[5];
@@ -147,10 +149,10 @@ internal class DxLibPad : IJoyPad
         };
     }
 
-    public bool IsPushed(int buttonIndex) => Button[buttonIndex] == 1;
-    public bool IsHeld(int buttonIndex) => Button[buttonIndex] > 0;
-    public bool IsReleased(int buttonIndex) => Button[buttonIndex] < 0;
-    public int? NowPushedButton() => Button.ToList().FindIndex(b => b > 0) is int idx and >= 0 ? idx : null;
+    public bool IsPushed(int buttonIndex) => !InputStep.EdgesSuppressed && (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] == 1;
+    public bool IsHeld(int buttonIndex) => (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] > 0;
+    public bool IsReleased(int buttonIndex) => !InputStep.EdgesSuppressed && (uint)buttonIndex < (uint)Button.Length && Button[buttonIndex] < 0;
+    public int? NowPushedButton() => Array.FindIndex(Button, b => b > 0) is int idx and >= 0 ? idx : null;
 
     /// <summary>左右モーターの強さを計算するが、DxLibのStartJoypadVibrationは左右独立制御を持たないため、
     /// 左右の平均を実際の強さとして使うことでpanを近似的に反映する（中央から振るほど片側の寄与が0に近づき、全体の強さが弱まる）。</summary>

@@ -136,7 +136,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
                 {
                     PumpMainActions();
                     AstrumCore.ProcessPendingDisposals();
-                    try { platform.PollEvents(); }
+                    try { platform.PollEvents(); AstrumCore.ServiceMainFrame(); }
                     catch (Exception ex) { HandleFatal(ex, "ShutdownPoll"); }
                 }
             }
@@ -198,7 +198,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
             bool run = DebugControl.ShouldRunUpdate();
 
             // 入力の確定はループ 1 回につき 1 度だけ。
-            // キャッチアップで複数ステップ走る場合、それらは同じ入力を共有する。
+            // キャッチアップでは保持状態を共有し、押下・解放・ホイールは最初のステップだけ公開する。
             // 再生はフレーム番号で引くので、この反復で進む「最初の」論理フレームに合わせる。
             long frame = AstrumCore.FrameCount + 1;
             if (run) InputCapture.BeginFrame(frame);
@@ -292,18 +292,24 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         // 実時間の積み上げと上限の頭打ちは IsLogicStepDue で済ませてある。
         // ここで足すと 1 反復につき 2 回積むことになる。
         int steps = 0;
-        while (_accumulator >= fixedDt && steps < Math.Max(1, config.MaxCatchUpSteps))
+        try
         {
-            _accumulator -= fixedDt;
-            steps++;
-            LogicStep(game, fixedDt);
+            while (_accumulator >= fixedDt && steps < Math.Max(1, config.MaxCatchUpSteps))
+            {
+                InputStep.EdgesSuppressed = steps > 0;
+                _accumulator -= fixedDt;
+                steps++;
+                LogicStep(game, fixedDt);
+            }
         }
+        finally { InputStep.EdgesSuppressed = false; }
     }
 
     /// <summary>論理フレームを 1 回進めます。入力は呼び出し側で確定済みです。</summary>
     private void LogicStep(IGame game, float deltaTime)
     {
         AstrumCore.BeginLogicFrame(deltaTime);
+        KeyInput.AdvanceHoldTimes(deltaTime);
 
         if (AstrumCore.GameLock)
         {
@@ -382,7 +388,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
     public void MainUpdate(IGame game)
     {
         _polling = true;
-        try { platform.PollEvents(); }
+        try { platform.PollEvents(); AstrumCore.ServiceMainFrame(); }
         finally { _polling = false; }
     }
 

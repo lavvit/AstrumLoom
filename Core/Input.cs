@@ -20,6 +20,8 @@ public static class KeyInput
     private static TextEnter _textEnter { get; set; } = null!;
     internal static void Initialize(IInput input, TextEnter textEnter)
     {
+        _pressedFrameCounts.Clear();
+        _lastRepeatTimes.Clear();
         _input = input;
         _textEnter = textEnter;
     }
@@ -29,7 +31,7 @@ public static class KeyInput
     /// </summary>
     /// <param name="key">キー</param>
     /// <returns>押された瞬間であれば true、それ以外は false</returns>
-    public static bool Push(this Key key) => !Typing && _input.GetKeyDown(key);
+    public static bool Push(this Key key) => !InputStep.EdgesSuppressed && !Typing && _input.GetKeyDown(key);
     /// <summary>
     /// 指定したキーが押され続けているかどうかを取得します。
     /// </summary>
@@ -41,7 +43,7 @@ public static class KeyInput
     /// </summary>
     /// <param name="key">キー</param>
     /// <returns>離された瞬間であれば true、それ以外は false</returns>
-    public static bool Left(this Key key) => !Typing && _input.GetKeyUp(key);
+    public static bool Left(this Key key) => !InputStep.EdgesSuppressed && !Typing && _input.GetKeyUp(key);
     /// <summary>
     /// 指定したキーの状態を取得します。
     /// 0x01: 押され続けている、0x02: 押された瞬間、0x04: 離された瞬間
@@ -100,14 +102,8 @@ public static class KeyInput
     /// 全てのキーを列挙します（Key.None を除く）。
     /// </summary>
     /// <returns>全てのキーの列挙</returns>
-    public static IEnumerable<Key> GetAllKeys()
-    {
-        foreach (var key in Enum.GetValues<Key>())
-        {
-            if (key != Key.None)
-                yield return key;
-        }
-    }
+    private static readonly IReadOnlyList<Key> AllKeys = Array.AsReadOnly(Enum.GetValues<Key>().Where(k => k != Key.None).ToArray());
+    public static IEnumerable<Key> GetAllKeys() => AllKeys;
     /// <summary>
     /// 押されている全てのキーを列挙します。
     /// </summary>
@@ -129,6 +125,10 @@ public static class KeyInput
     internal static void Update(double deltaTime)
     {
         _input.Update();
+    }
+
+    internal static void AdvanceHoldTimes(double deltaTime)
+    {
         double time = deltaTime;
         // キー押下のTime処理
         foreach (var key in GetAllKeys())
@@ -175,6 +175,7 @@ public static class KeyInput
     /// <returns>リピートされる場合は true、それ以外は false</returns>
     public static bool Repeat(this Key key, int interval, int delay)
     {
+        if (InputStep.EdgesSuppressed) return false;
         if (!key.Hold()) return false;
         // 経過フレーム数を取得
         double frames = PressedFrameCount(key);

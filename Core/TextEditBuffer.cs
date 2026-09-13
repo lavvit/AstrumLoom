@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace AstrumLoom;
 
@@ -17,7 +17,7 @@ public sealed class TextEditBuffer
     /// <summary>選択の開始点。Caret と一致していれば選択なし。</summary>
     public int Anchor { get; private set; }
     /// <summary>入力可能な最大文字数（UTF-16 char 数）。</summary>
-    public int MaxLength { get; set; } = int.MaxValue;
+    public int MaxLength { get; set => field = System.Math.Max(0, value); } = int.MaxValue;
     /// <summary>改行を許可するか。false なら挿入時に改行を除去する。</summary>
     public bool MultiLine { get; set; }
     /// <summary>挿入時に文字を受け付けるかどうかのフィルタ。null なら全て許可。</summary>
@@ -35,7 +35,11 @@ public sealed class TextEditBuffer
         _sb.Clear();
         _sb.Append(text);
         if (!MultiLine) StripNewLines();
-        if (_sb.Length > MaxLength) _sb.Length = MaxLength;
+        if (_sb.Length > MaxLength)
+        {
+            _sb.Length = MaxLength;
+            if (_sb.Length > 0 && char.IsHighSurrogate(_sb[^1])) _sb.Length--;
+        }
         Caret = Anchor = _sb.Length;
     }
 
@@ -77,8 +81,6 @@ public sealed class TextEditBuffer
     public void Insert(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        DeleteSelection();
-
         var sb = new StringBuilder(text.Length);
         foreach (char c in text)
         {
@@ -94,7 +96,7 @@ public sealed class TextEditBuffer
         }
         if (sb.Length == 0) return;
 
-        int room = MaxLength - _sb.Length;
+        int room = MaxLength - (_sb.Length - (Selection.End - Selection.Start));
         if (room <= 0) return;
         if (sb.Length > room)
         {
@@ -104,6 +106,7 @@ public sealed class TextEditBuffer
             if (sb.Length == 0) return;
         }
 
+        DeleteSelection();
         _sb.Insert(Caret, sb);
         Caret += sb.Length;
         Anchor = Caret;

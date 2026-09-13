@@ -189,6 +189,7 @@ internal sealed class MouseBridge : IMouse
     public double WheelTotal => Replaying ? _wheelTotal : _inner.WheelTotal;
 
     public void Init(bool visible) => _inner.Init(visible);
+    public void Buffer() => _inner.Buffer();
 
     public void Update()
     {
@@ -205,9 +206,9 @@ internal sealed class MouseBridge : IMouse
         else
         {
             _buttons = 0;
-            if (_inner.Hold(MouseButton.Left)) _buttons |= 1;
-            if (_inner.Hold(MouseButton.Right)) _buttons |= 2;
-            if (_inner.Hold(MouseButton.Middle)) _buttons |= 4;
+            if (_inner.Push(MouseButton.Left) || _inner.Hold(MouseButton.Left)) _buttons |= 1;
+            if (_inner.Push(MouseButton.Right) || _inner.Hold(MouseButton.Right)) _buttons |= 2;
+            if (_inner.Push(MouseButton.Middle) || _inner.Hold(MouseButton.Middle)) _buttons |= 4;
             _recorder?.NoteMouse(_inner.X, _inner.Y, _inner.WheelTotal, _buttons);
         }
     }
@@ -307,6 +308,9 @@ internal sealed class InputPlayer
     internal long EndFrame { get; }
     internal double Hz { get; }
     internal int? Seed { get; }
+    internal GraphicsBackendKind? Backend { get; private set; }
+    internal int Width { get; private set; }
+    internal int Height { get; private set; }
     internal bool Finished { get; private set; }
 
     internal InputFrame Current { get; private set; }
@@ -317,7 +321,8 @@ internal sealed class InputPlayer
         EndFrame = endFrame;
         Hz = hz;
         Seed = seed;
-        Current = frames.Count > 0 ? frames[0] : InputCapture.Empty(0);
+        _cursor = -1;
+        Current = InputCapture.Empty(0);
     }
 
     /// <summary>読み込みに失敗したら null を返します。</summary>
@@ -336,6 +341,8 @@ internal sealed class InputPlayer
             long end = 0;
             double hz = 60;
             int? seed = null;
+            GraphicsBackendKind? backend = null;
+            int width = 0, height = 0;
 
             foreach (string raw in File.ReadAllLines(full))
             {
@@ -346,23 +353,42 @@ internal sealed class InputPlayer
                 {
                     if (double.TryParse(line[3..].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double h))
                         hz = h;
+                    else throw new InvalidDataException("Invalid recording Hz.");
                     continue;
                 }
                 if (line.StartsWith("seed ", StringComparison.Ordinal))
                 {
                     if (int.TryParse(line[5..].Trim(), out int s)) seed = s;
+                    else if (line[5..].Trim() != "-") throw new InvalidDataException("Invalid recording seed.");
                     continue;
                 }
                 if (line.StartsWith("end ", StringComparison.Ordinal))
                 {
-                    long.TryParse(line[4..].Trim(), out end);
+                    if (!long.TryParse(line[4..].Trim(), out end) || end < 0) throw new InvalidDataException("Invalid end frame.");
                     continue;
                 }
-                if (line.StartsWith('v') || line.StartsWith("backend", StringComparison.Ordinal)
-                    || line.StartsWith("size", StringComparison.Ordinal))
+                if (line.StartsWith("v ", StringComparison.Ordinal))
+                {
+                    if (line[2..].Trim() != InputCapture.FormatVersion.ToString(CultureInfo.InvariantCulture))
+                        throw new InvalidDataException("Unsupported input recording version.");
                     continue;
-
-                if (InputCapture.TryParseLine(line, out var f)) frames.Add(f);
+                }
+                if (line.StartsWith("backend ", StringComparison.Ordinal))
+                {
+                    if (!Enum.TryParse<GraphicsBackendKind>(line[8..].Trim(), true, out var kind) || !Enum.IsDefined(kind))
+                        throw new InvalidDataException("Invalid recording backend.");
+                    backend = kind;
+                    continue;
+                }
+                if (line.StartsWith("size ", StringComparison.Ordinal))
+                {
+                    var size = line[5..].Split('x');
+                    if (size.Length != 2 || !int.TryParse(size[0], out width) || !int.TryParse(size[1], out height) || width <= 0 || height <= 0)
+                        throw new InvalidDataException("Invalid recording size.");
+                    continue;
+                }
+                if (!InputCapture.TryParseLine(line, out var f)) throw new InvalidDataException("Invalid input frame: " + line);
+                frames.Add(f);
             }
 
             if (frames.Count == 0)
@@ -371,10 +397,13 @@ internal sealed class InputPlayer
                 return null;
             }
 
-            frames.Sort((a, b) => a.Frame.CompareTo(b.Frame));
+            for (int i = 1; i < frames.Count; i++)
+                if (frames[i].Frame <= frames[i - 1].Frame) throw new InvalidDataException("Input frames must increase.");
             if (end <= 0) end = frames[^1].Frame;
+            if (end < frames[^1].Frame) throw new InvalidDataException("End precedes final input.");
             Log.Write($"入力を再生します: {AstrumCore.FilePath(full)} ({frames.Count} 変化点 / {end} フレーム)");
-            return new InputPlayer(frames, end, hz, seed);
+            if (!double.IsFinite(hz) || hz <= 0) throw new InvalidDataException("Invalid recording Hz.");
+            return new InputPlayer(frames, end, hz, seed) { Backend = backend, Width = width, Height = height };
         }
         catch (Exception ex)
         {
@@ -388,7 +417,7 @@ internal sealed class InputPlayer
     {
         while (_cursor + 1 < _frames.Count && _frames[_cursor + 1].Frame <= frame)
             _cursor++;
-        Current = _frames[_cursor];
+        Current = _cursor >= 0 ? _frames[_cursor] : InputCapture.Empty(frame);
         if (frame >= EndFrame) Finished = true;
     }
 }
@@ -397,6 +426,26 @@ internal sealed class InputPlayer
 internal static class InputCapture
 {
     internal const int FormatVersion = 1;
+    internal static void ConfigureSession(GameConfig config, LaunchOptions options)
+    {
+        if (options.ReplayPath != null)
+        {
+            var recording = InputPlayer.Load(options.ReplayPath)
+                ?? throw new InvalidDataException("Cannot load input recording: " + options.ReplayPath);
+            if (options.FixedUpdateHz.HasValue && options.FixedUpdateHz.Value != recording.Hz)
+                throw new InvalidDataException("Replay Hz conflicts with --hz.");
+            if (options.Seed.HasValue && recording.Seed.HasValue && options.Seed != recording.Seed)
+                throw new InvalidDataException("Replay seed conflicts with --seed.");
+            config.FixedUpdateHz = recording.Hz;
+            if (recording.Seed.HasValue) config.Seed = recording.Seed;
+            else Log.Warning("Legacy recording has no seed; random results cannot be reproduced.");
+            if (recording.Width > 0) config.Width = recording.Width;
+            if (recording.Height > 0) config.Height = recording.Height;
+            // Explicit backend overrides remain useful for backend comparison.
+        }
+        if (options.RecordPath != null && !config.Seed.HasValue)
+            config.Seed = System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue);
+    }
 
     internal static InputBridge? Bridge { get; private set; }
     internal static MouseBridge? MouseWrapper { get; private set; }
@@ -471,26 +520,30 @@ internal static class InputCapture
     {
         frame = default;
         string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 5) return false; // frame keys pos wheel buttons の 5 トークン必須
+        if (parts.Length != 5) return false; // frame keys pos wheel buttons の 5 トークン必須
         var ci = CultureInfo.InvariantCulture;
 
-        if (!long.TryParse(parts[0], out long f)) return false;
+        if (!long.TryParse(parts[0], out long f) || f < 0) return false;
 
         Key[] keys = [];
         if (parts[1] != "-")
         {
             var list = new List<Key>();
             foreach (string name in parts[1].Split(',', StringSplitOptions.RemoveEmptyEntries))
-                if (KeyInput.TryParse(name, out var k)) list.Add(k);
+            {
+                if (!KeyInput.TryParse(name, out var k) || k == Key.None || !Enum.IsDefined(k) || list.Contains(k)) return false;
+                list.Add(k);
+            }
             keys = [.. list];
         }
 
         string[] pos = parts[2].Split(',');
-        if (pos.Length < 2) return false;
+        if (pos.Length != 2) return false;
         if (!double.TryParse(pos[0], NumberStyles.Float, ci, out double mx)) return false;
         if (!double.TryParse(pos[1], NumberStyles.Float, ci, out double my)) return false;
         if (!double.TryParse(parts[3], NumberStyles.Float, ci, out double wheel)) return false;
-        if (!int.TryParse(parts[4], out int buttons)) return false;
+        if (!int.TryParse(parts[4], out int buttons) || buttons < 0 || buttons > 7) return false;
+        if (!double.IsFinite(mx) || !double.IsFinite(my) || !double.IsFinite(wheel)) return false;
 
         frame = new InputFrame
         {

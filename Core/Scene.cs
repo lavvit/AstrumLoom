@@ -112,7 +112,6 @@ return;
     /// <summary>起動時に最初のシーンを設定する。Enableはまだ呼ばない（Startで別途呼ぶ）。</summary>
     public static void Set(Scene scene, Scene[]? child = null)
     {
-        GC.Collect();
         NowScene = scene;
         if (child != null)
         {
@@ -126,22 +125,21 @@ return;
     /// <summary>現在のシーンから別のシーンへ切り替える（同一インスタンスへの「リスタート」も可）。</summary>
     public static void Change(Scene scene, Scene[]? child = null)
     {
-        GC.Collect();
         // scene と NowScene が同一インスタンス（「今のシーンをリスタートする」用途）のときは
         // 旧シーンの Disable を呼ばない。Disable は ChildScene.Clear() まで行うので、素直に
         // 呼ぶと直前の scene.Enable() で組み立てた子シーンをその場で全部消してしまう。
         // 別インスタンスへの遷移では今まで通り、新シーンを Enable してから旧シーンを Disable する。
         bool sameScene = ReferenceEquals(scene, NowScene);
-        scene.Enable();
-        if (!sameScene) NowScene.Disable();
-        NowScene = scene;
         if (child != null)
         {
             foreach (var c in child)
             {
-                NowScene.AddChildScene(c);
+                scene.AddChildScene(c);
             }
         }
+        scene.Enable();
+        if (!sameScene) NowScene.Disable();
+        NowScene = scene;
     }
     public static Scene NowScene { get; private set; } = new Scene();
 }

@@ -6,8 +6,8 @@
 /// </summary>
 public class TextSprite : IDisposable
 {
-    public string Text { get; set; } = "";
-    public IFont? Font { get; set; } = null;
+    public string Text { get; set { if (field == value) return; field = value; _dirty = true; } } = "";
+    public IFont? Font { get; set { if (ReferenceEquals(field, value)) return; field = value; _dirty = true; } } = null;
 
     private Texture? _texture = null;
     private bool _dirty;
@@ -85,6 +85,7 @@ public class TextSprite : IDisposable
     {
         _texture?.Dispose();
         _texture = null;
+        _dirty = true;
         GC.SuppressFinalize(this);
     }
     /// <summary>
@@ -93,7 +94,8 @@ public class TextSprite : IDisposable
     private void RecreateRenderTextureIfNeeded()
     {
         // テキストの想定サイズ
-        var (width, height) = Font?.Measure(Text) ?? (0, 0);
+        Font ??= Drawing.DefaultFont;
+        var (width, height) = Font.Measure(Text);
         int e = Font?.Spec.Edge ?? 0;
         int w = (int)MathF.Ceiling(width + e * 2);
         int h = (int)MathF.Ceiling(height + e * 2);
@@ -123,6 +125,7 @@ public class TextSprite : IDisposable
         LayoutUtil.Size size = new(_width, _height);
 
         // レンダーテクスチャに描画
+        _texture?.Dispose();
         _texture = new Texture(new LayoutUtil.Size(_width, _height), () =>
         {
             Drawing.Fill(Color.Transparent);
@@ -135,7 +138,7 @@ public class TextSprite : IDisposable
 
         _dirty = false;
     }
-    public Color Color { get; set; } = Color.White;
+    public Color Color { get; set { if (field == value) return; field = value; _dirty = true; } } = Color.White;
     private Color? _edgeColor = null;
     /// <summary>
     /// 縁取り色。変更時にキャッシュ済みテクスチャへ反映されるよう _dirty を立てる
@@ -152,7 +155,7 @@ public class TextSprite : IDisposable
             _dirty = true;
         }
     }
-    public DecorateText.DecorateOption? DecoOption { get; set; } = null;
+    public DecorateText.DecorateOption? DecoOption { get; set { field = value; _dirty = true; } } = null;
     public ReferencePoint Point { get; set; } = ReferencePoint.TopLeft;
     public BlendMode Blend { get; set; } = BlendMode.None;
     public double Opacity { get; set; } = 1.0;

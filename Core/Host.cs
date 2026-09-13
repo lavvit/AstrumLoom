@@ -36,185 +36,155 @@ public sealed class GameHost : IDisposable
 /// </summary>
 public abstract class AsyncLoadableBase
 {
-    // IResource 状態管理 (-1=Failed/Disposed, 0=Loading, 1=Ready)
-    private int _asyncState = (int)LoadState.Failed;
-    private bool _deferred;
+    private readonly object _gate = new();
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<AsyncLoadableBase> Pending = new();
+    private int _queued;
+    private int _asyncState = State_Failed;
+    private bool _disposeRequested, _released, _started, _loadInvoked, _explicitLoading;
     private long _startTicks;
-    private const int DefaultTimeoutMs = 60000;
-    public int TimeoutMs { get; set; } = DefaultTimeoutMs;
+    private IDisposable? _obj;
+    private Func<bool>? _loadfunc, _disposefunc, _background, _backgroundCheck;
+    private Task<bool>? _preparation;
+    public int TimeoutMs { get; set; } = 60000;
     protected static bool IsMainThread => Environment.CurrentManagedThreadId == AstrumCore.MainThreadId;
-
     protected enum LoadState { Failed = -1, Loading = 0, Ready = 1, Disposed = -2 }
-    protected LoadState State
-    {
-        get
-        {
-            PumpAsync(); // 呼び忘れ対策
-            return (LoadState)_state;
-        }
-    }
-    private int _state => Volatile.Read(ref _asyncState);
+    protected const int State_Failed = -1, State_Loading = 0, State_Success = 1, State_Disposed = -2;
+    protected LoadState State => (LoadState)Volatile.Read(ref _asyncState);
     protected bool LoadReady => State == LoadState.Ready;
     protected bool LoadFailed => State == LoadState.Failed;
-    protected bool LoadFinished => State != LoadState.Loading && !Disposed;
-    protected bool Disposed => (LoadState)_state == LoadState.Disposed;
-    protected bool Loading => (LoadState)_state == LoadState.Loading;
+    // Loaded means the request has settled; callers must use IsReady to test success.
+    protected bool LoadFinished => State is LoadState.Ready or LoadState.Failed;
+    protected bool Disposed => State == LoadState.Disposed;
+    protected bool Loading => State == LoadState.Loading;
 
-    protected const int State_Failed = (int)LoadState.Failed;
-    protected const int State_Loading = (int)LoadState.Loading;
-    protected const int State_Success = (int)LoadState.Ready;
-    protected const int State_Disposed = (int)LoadState.Disposed;
-    protected void WriteState(int state) => Volatile.Write(ref _asyncState, state);
-
-    private IDisposable? _obj;
-    private Func<bool>? _disposefunc;
-    /// <summary>リソースを破棄する。メインスレッド以外から呼ばれた場合はAstrumCore.RequestDisposeへ回し、実際の破棄は次のメインスレッド処理まで遅延する。</summary>
-    protected void DisposeAsync(Func<bool>? disposeAction = null)
+    protected void WriteState(int state)
     {
-        if (disposeAction != null)
-            _disposefunc = disposeAction;
-
-        if (_obj == null || Disposed) return;
-        if (!IsMainThread)
+        lock (_gate)
         {
-            // メインスレッドで後から Dispose
-            //Log.Debug(GetType().Name + " Disposing on Main thread.");
-            AstrumCore.RequestDispose(_obj);
-            return;
-        }
-        // Dispose 処理をここに実装
-        try
-        {
-            if (_disposefunc != null)
-            {
-                bool result = _disposefunc();
-                if (!result)
-                {
-                    Log.Warning(GetType().Name + " Dispose returned false.");
-                    WriteState(State_Failed);
-                    return;
-                }
-            }
-            //Log.Debug(GetType().Name + " Disposed.");
-            WriteState(State_Disposed);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(GetType().Name + " Dispose Failed: " + ex.Message);
-            WriteState(State_Failed);
+            if (_disposeRequested) return;
+            if (state == State_Loading && _loadInvoked) _explicitLoading = true;
+            Volatile.Write(ref _asyncState, state);
         }
     }
 
-    private Func<bool>? _loadfunc;
-    private (Func<bool>? Load, Func<bool>? Check)? _bgloadfuncs;
-    protected void LoadAsync(IDisposable obj, Func<bool>? loadAction,
-        Func<bool>? bgloadAction, Func<bool>? bgcheckFunc = null)
+    protected void DisposeAsync(Func<bool>? disposeAction = null)
     {
-        _bgloadfuncs = (bgloadAction, bgcheckFunc);
+        lock (_gate)
+        {
+            if (disposeAction != null) _disposefunc = disposeAction;
+            _disposeRequested = true;
+            Volatile.Write(ref _asyncState, State_Disposed);
+            if (_released) return;
+            if (!IsMainThread)
+            {
+                if (_obj != null) AstrumCore.RequestDispose(_obj);
+                return;
+            }
+            _released = true;
+            try
+            {
+                if (_disposefunc?.Invoke() == false) Log.Warning(GetType().Name + " Dispose returned false.");
+            }
+            catch (Exception ex) { Log.Error(GetType().Name + " Dispose failed: " + ex.Message); }
+        }
+    }
+
+    protected void LoadAsync(IDisposable obj, Func<bool>? loadAction, Func<bool>? bgloadAction, Func<bool>? bgcheckFunc = null)
+    {
+        lock (_gate) { _background = bgloadAction; _backgroundCheck = bgcheckFunc; }
         LoadAsync(obj, loadAction);
     }
     protected void LoadAsync(IDisposable obj, Func<bool>? loadAction = null)
     {
-        _obj = obj;
+        lock (_gate) _obj = obj;
         LoadAsync(loadAction);
     }
-    /// <summary>
-    /// リソースをロードする。メインスレッド以外から呼ばれた場合、バックグラウンド読み込み関数があれば
-    /// Task.Runで先行実行しつつ、本体のロードは「次にメインスレッドから来たとき」まで遅延させる（_deferred）。
-    /// </summary>
     public void LoadAsync(Func<bool>? loadAction = null)
     {
-        if (loadAction != null)
-            _loadfunc = loadAction;
-
-        if (LoadReady) return; // 既に Ready
-        if (!IsMainThread)
+        lock (_gate)
         {
-            // メインスレッドで後からロード
-            if (_bgloadfuncs != null && _bgloadfuncs?.Load != null)
+            if (_started || _disposeRequested) return;
+            _started = true;
+            _loadfunc = loadAction;
+            _startTicks = Environment.TickCount64;
+            Volatile.Write(ref _asyncState, State_Loading);
+            if (!IsMainThread && _background != null && AstrumCore.WindowConfig?.AsyncResourceLoad != false)
             {
-                Task.Run(() =>
+                var prepare = _background;
+                _preparation = Task.Run(() =>
                 {
-                    bool result = _bgloadfuncs?.Load() ?? false;
-                    if (result)
-                    {
-                        WriteState(State_Loading); // Loading
-                        return;
-                    }
+                    try { return prepare(); }
+                    catch (Exception ex) { Log.Error(GetType().Name + " Preparation failed: " + ex.Message); return false; }
                 });
             }
-            if (!_deferred)
+        }
+        PumpAsync();
+        if (Loading) Schedule();
+    }
+    private void Schedule()
+    {
+        if (Interlocked.Exchange(ref _queued, 1) == 0) Pending.Enqueue(this);
+    }
+    /// <summary>状態getterとは独立して、メインループが保留中リソースを進める。</summary>
+    internal static void PumpPending()
+    {
+        if (!IsMainThread) return;
+        int count = System.Math.Min(Pending.Count, System.Math.Max(1, AstrumCore.WindowConfig?.MainThreadActionsPerFrame ?? 128));
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
+        for (int i = 0; i < count && Pending.TryDequeue(out var resource); i++)
+        {
+            Interlocked.Exchange(ref resource._queued, 0);
+            if (resource.Loading)
             {
-                _deferred = true;
-                WriteState(State_Loading); // Loading
+                if (resource._obj is IResourse r) r.Pump(); else resource.PumpAsync();
+                if (resource.Loading) resource.Schedule();
             }
-            return;
-        }
-
-        if (_loadfunc == null)
-        {
-            WriteState(State_Success);
-            return;
-        }
-        // 実際のロード処理をここに実装
-        // 例: テクスチャの読み込み、サイズの設定など
-        try
-        {
-            _startTicks = Environment.TickCount64;
-            bool result = _loadfunc();
-            if (!result)
-            {
-                WriteState(State_Failed);
-                return;
-            }
-            if (_state != State_Loading)
-                WriteState(State_Success);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(GetType().Name + " Load Failed: " + ex.Message);
-            WriteState(State_Failed);
-            return;
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds >=
+                (AstrumCore.WindowConfig?.MainThreadActionBudgetMs ?? 2)) break;
         }
     }
-
-    /// <summary>毎フレーム（メインスレッドから）呼び、遅延ロードの実行とタイムアウト監視を行う。State取得のたびに内部で呼ばれる（呼び忘れ対策）。</summary>
+    internal static void CancelPending()
+    {
+        while (Pending.TryDequeue(out var resource)) resource.Cancel();
+    }
+    private void Cancel()
+    {
+        if (_obj != null) _obj.Dispose(); else DisposeAsync();
+    }
     protected void PumpAsync()
     {
-        // メインスレッドのみが状態更新
         if (!IsMainThread) return;
-
-        // Deferred ロード実行
-        if (_deferred)
+        lock (_gate)
         {
-            _deferred = false;
-            LoadAsync();
-            return;
-        }
-
-        // Loading 中のタイムアウト監視
-        if (Volatile.Read(ref _asyncState) == 0)
-        {
-            long elapsed = Environment.TickCount64 - _startTicks;
-            if (TimeoutMs > 0 && elapsed >= TimeoutMs)
+            if (_disposeRequested || !Loading) return;
+            if (TimeoutMs > 0 && Environment.TickCount64 - _startTicks >= TimeoutMs)
             {
-                DisposeAsync();
+                Cancel();
+                return;
             }
+            if (_loadInvoked) return;
+            if (_preparation != null)
+            {
+                if (!_preparation.IsCompleted) return;
+                if (!_preparation.GetAwaiter().GetResult()) { WriteState(State_Failed); return; }
+            }
+            try
+            {
+                if (_backgroundCheck?.Invoke() == false) return;
+                _loadInvoked = true;
+                _explicitLoading = false;
+                bool ok = _loadfunc?.Invoke() ?? true;
+                if (!ok) WriteState(State_Failed);
+                else if (!_explicitLoading) WriteState(State_Success);
+            }
+            catch (Exception ex) { WriteState(State_Failed); Log.Error(GetType().Name + " Load failed: " + ex.Message); }
         }
     }
-
     protected bool FileCheck(string path)
     {
-        if (string.IsNullOrEmpty(path)) return false;
-        if (File.Exists(path))
-            return true;
-        else
-        {
-            if (Path.GetFileName(path).Length > 0)
-                Log.Debug($"{GetType().Name}: not found: {path}");
-            WriteState(State_Failed);
-            return false;
-        }
+        if (!string.IsNullOrEmpty(path) && File.Exists(path)) return true;
+        if (!string.IsNullOrEmpty(path)) Log.Debug($"{GetType().Name}: not found: {path}");
+        return false;
     }
 }
 /// <summary>Texture/Soundなど、非同期ロード可能なリソースが実装する共通インターフェース。</summary>

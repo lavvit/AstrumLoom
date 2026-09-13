@@ -69,7 +69,7 @@ public class AstrumCore
         WindowConfig = config;
         _updateCancellation.Dispose();
         _updateCancellation = new CancellationTokenSource();
-        if (config.Seed.HasValue) Randomize.Seed(config.Seed.Value);
+        if (config.Seed.HasValue && Randomize.CurrentSeed != config.Seed) Randomize.Seed(config.Seed.Value);
         var game = new BaseProgram();
 
         using var host = new GameHost(config, platform, game);
@@ -86,6 +86,11 @@ public class AstrumCore
             try { Scene.NowScene?.Disable(); }
             finally
             {
+                if (ShuttingDown != null)
+                    foreach (Action handler in ShuttingDown.GetInvocationList())
+                        try { handler(); } catch (Exception ex) { Log.Error("Shutdown: " + ex.Message); }
+                Sound.DisposeAll();
+                AsyncLoadableBase.CancelPending();
                 while (!_disposeQueue.IsEmpty) ProcessPendingDisposals();
                 try { DebugSession.Shutdown(); }
                 finally { GameRunner.ResetActions(); }
@@ -119,6 +124,16 @@ public class AstrumCore
     internal static void CountDrawFrame() => Interlocked.Increment(ref _drawFrameCount);
 
     #endregion
+    /// <summary>メインスレッドのイベント採取後。描画を呼ばなくても実行される。</summary>
+    public static event Action? MainThreadTick;
+    /// <summary>ネイティブデバイスを閉じる前の終了通知。</summary>
+    public static event Action? ShuttingDown;
+    internal static void ServiceMainFrame()
+    {
+        AsyncLoadableBase.PumpPending();
+        Sound.PumpAll();
+        MainThreadTick?.Invoke();
+    }
     public static void End() => Platform.Close();
     public static FpsCounter DrawFPS = new();
     public static FpsCounter UpdateFPS = new();
