@@ -23,6 +23,7 @@ internal sealed class SimpleTestGame : Scene
         ("装飾文字コスト比較（AstrumLoom vs Skiaキャッシュ）", () => new SkiaTextCompareDemoScene()),
         // 11 番目以降は数字キーが足りないので、メニューバーのクリック（または --scene）で選ぶ。
         ("Audio の見本帳（音の工房）", () => new AudioGameScene()),
+        ("Rhythm timing / D F J K", () => new RhythmDemoScene()),
     ];
 
     public override void Enable()

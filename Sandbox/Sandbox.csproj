@@ -22,6 +22,7 @@
   <ItemGroup>
     <!-- GameUtil が Core / DXLib / RayLib / Extend をまとめて連れてくる。 -->
     <ProjectReference Include="..\Game\AstrumLoom.GameUtil.csproj" />
+    <ProjectReference Include="..\Rhythm\AstrumLoom.Rhythm.csproj" />
   </ItemGroup>
 
   <ItemGroup>
