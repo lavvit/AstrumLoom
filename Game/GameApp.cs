@@ -51,8 +51,11 @@ public static class GameApp
 
         // WinExe でも PowerShell から起動したときにログが見えるようにする。
         ConsoleBridge.Attach();
+        BootTimer.Mark("コンソール接続");
 
         var options = Startup.Parse(args);
+        if (options.BootTiming) BootTimer.Enabled = true;
+        BootTimer.Mark("引数の解釈");
 
         if (options.ShowHelp)
         {
@@ -81,7 +84,12 @@ public static class GameApp
             config.Apply(options);
             if (config.Seed.HasValue) Randomize.Seed(config.Seed.Value);
             platform = CreatePlatform(config);
-            AstrumCore.Boot(config, platform, sceneFactory(), options);
+            BootTimer.Mark("バックエンドの初期化（ウィンドウ生成まで）");
+            Scene first = sceneFactory();
+            BootTimer.Mark("最初のシーンの生成");
+            Scene entry = config.ShowStartupSplash && !options.AutomationMode
+                ? new AstrumSplashScene(first) : first;
+            AstrumCore.Boot(config, platform, entry, options);
         }
         catch (Exception ex)
         {

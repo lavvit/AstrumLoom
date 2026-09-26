@@ -17,6 +17,7 @@ static class NativeChecks
         var file = Path.Combine(Path.GetTempPath(), "AstrumLoom-silence-" + Guid.NewGuid().ToString("N") + ".wav");
         try
         {
+            CheckTexturePixels(platform, Check);
             using (var output = new BinaryWriter(File.Create(file)))
             {
                 const int bytes = 48000 * 2;
@@ -87,5 +88,81 @@ static class NativeChecks
             Console.WriteLine($"NATIVE {backend} PASS {passed} / FAIL 0");
         }
         finally { Sound.DisposeAll(); AsyncLoadableBase.CancelPending(); AstrumCore.ProcessPendingDisposals(); File.Delete(file); }
+    }
+
+    private static void CheckTexturePixels(IGamePlatform platform, Action<bool, string> check)
+    {
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYSURBVBhXY/jPwPCf4T9DAwME/IcCBkYAf6QLd1+A/YYAAAAASUVORK5CYII=");
+        var path = Path.Combine(Path.GetTempPath(), "AstrumLoom-pixels-" + Guid.NewGuid().ToString("N") + ".png");
+        File.WriteAllBytes(path, png);
+        try
+        {
+            using var texture = new Texture(path);
+            check(texture.IsReady, "pixel fixture loads");
+            check(texture.GetPixel(0, 0) == Color.Red && texture.GetPixel(0, 1) == Color.Blue, "file RGB and top-left orientation");
+            var half = texture.GetPixel(1, 0);
+            Console.WriteLine($"HALF RGBA {half.R},{half.G},{half.B},{half.A}");
+            check(half.G == 255 && half.R == 0 && half.B == 0 && half.A == 128, "file retains half alpha and unmultiplied RGB");
+            check(texture.GetPixel(2, 0).A == 0 && texture.GetPixel(2, 1).A == 1, "file retains transparent and low-alpha pixels");
+            check(!texture.HitTest(2.5, .5) && texture.HitTest(2.5, 1.5), "native alpha hit testing distinguishes transparent pixels");
+            check(Task.Run(() => texture.GetPixel(1, 0)).GetAwaiter().GetResult() == half, "cached pixel can be read on update thread");
+
+            using var delayed = new Texture(path);
+            check(!Task.Run(() => delayed.TryGetPixel(0, 0, out _)).GetAwaiter().GetResult(), "first update-thread read is deferred");
+            var pump = typeof(GameRunner).GetMethod("PumpMainActions", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var runner = new GameRunner(platform, new PixelGame(), new GameConfig());
+            pump.Invoke(runner, null);
+            check(Task.Run(() => delayed.GetPixel(0, 0)).GetAwaiter().GetResult() == Color.Red, "queued pixel read completes on main thread");
+
+            if (platform.BackendKind == GraphicsBackendKind.RayLib)
+            {
+                using var memory = new Texture(png);
+                using var raw = new Texture(2, 1, new byte[] { 12, 34, 56, 128, 0, 0, 0, 0 });
+                check(memory.GetPixel(0, 1) == Color.Blue && raw.GetPixel(0, 0) == new Color(12, 34, 56, 128), "encoded and raw memory textures expose pixels");
+            }
+            platform.Graphics.BeginFrame();
+            try
+            {
+                using var baked = new Texture(new LayoutUtil.Size(8, 8), () => Drawing.Box(0, 0, 4, 4, Color.Red));
+                check(baked.GetPixel(1, 1) == Color.Red && baked.GetPixel(6, 6).A == 0, "baked pixel orientation and transparent background");
+                // ReadPixels must leave the current render target intact, including nested callbacks.
+                using var nested = new Texture(new LayoutUtil.Size(8, 8), () =>
+                {
+                    using var readDuringDraw = new Texture(path);
+                    check(readDuringDraw.GetPixel(0, 0) == Color.Red, "pixel read works inside render callback");
+                    Drawing.Box(0, 0, 8, 8, Color.Blue);
+                });
+                check(nested.GetPixel(4, 4) == Color.Blue, "pixel read restores render target");
+                foreach (var opt in new[]
+                {
+                    new DrawOption { Scale = (4, 6), Point = ReferencePoint.Center, Angle = .25 },
+                    new DrawOption { Scale = (4, 6), Point = ReferencePoint.TopLeft, Flip = (true, true) },
+                    new DrawOption { Scale = (4, 6), Position = (-1, -2), Rectangle = new(1, 0, 2, 2), Flip = (true, false) },
+                })
+                {
+                    using var drawn = new Texture(new LayoutUtil.Size(48, 48), () => texture.Draw(20, 20, opt));
+                    bool matches = true;
+                    // 整数倍率のピクセル中央を採取し、補間境界を避けて実際の描画と照合する。
+                    for (int y = 1; y < 47; y += 2)
+                        for (int x = 1; x < 47; x += 2)
+                        {
+                            bool hit = texture.HitTest(x + .5, y + .5, 20, 20, 200, opt);
+                            bool visible = drawn.GetPixel(x, y).A > 200;
+                            if (hit != visible) { matches = false; Console.WriteLine($"HIT MISMATCH {x},{y} hit={hit} A={drawn.GetPixel(x, y).A}"); }
+                        }
+                    check(matches, "transformed hit test agrees with rendered alpha");
+                }
+            }
+            finally { platform.Graphics.EndFrame(); }
+        }
+        finally { File.Delete(path); AstrumCore.ProcessPendingDisposals(); }
+    }
+
+    private sealed class PixelGame : IGame
+    {
+        public void Initialize() { }
+        public void Update(float deltaTime) { }
+        public void Draw() { }
+        public void Dispose() { }
     }
 }

@@ -56,7 +56,7 @@ internal sealed class RayLibFont : IFont
 
         // Raylib: size は "baseSize" として渡す
         // 焼くグリフは ASCII + 日本語の常用範囲（CommonJpCodePoints）に絞る。
-        // 0x20〜0xFFFF を丸ごと（65504個、サロゲート単体まで含む）焼こうとすると、
+        // 0x20〜0xFFFF を丸ごと（65504字、サロゲート単体まで含む）焼こうとすると、
         // サイズ24でもアトラスが8192四方級になり、確保に失敗して豆腐落ちする。
         int[] cps = BuildCodePoints(spec.ExtraGlyphs);
 
@@ -67,7 +67,9 @@ internal sealed class RayLibFont : IFont
 
             if (ext == ".font" || ext is ".ttf" or ".otf" or ".ttc" or ".otc")
             {
-                byte[] bytes = File.ReadAllBytes(path);
+                byte[] bytes = ReadFontFile(path);
+                // 拡張子だけでは中身が分からない ".font" のために、先頭バイトから形式を見ておく。
+                // ここで見たいのは「これは TrueType/OpenType か、それともコレクションか」だけ。
                 string hint = ext == ".font" ? GuessFontHint(bytes) : ext;
 
                 // 'ttcf'（TrueType/OpenType Collection）は raylib 内部の stb_truetype が
@@ -75,7 +77,7 @@ internal sealed class RayLibFont : IFont
                 // 拡張子ではなく中身のマジックで判定し、中の1本を単体sfntに組み直してから渡す。
                 if (IsTtcHeader(bytes))
                 {
-                    byte[]? extracted = ExtractSubFontFromCollection(bytes, 0, out int chosen, out int total);
+                    byte[]? extracted = ExtractCached(path, bytes, out int chosen, out int total);
                     if (extracted == null)
                     {
                         Log.Warning($"font: '{path}' は TrueType/OpenType Collection ですが分解に失敗しました。内蔵フォントにフォールバックします。");
@@ -90,7 +92,14 @@ internal sealed class RayLibFont : IFont
 
                 _pixelSize = EmHeightToPixelSize(bytes, spec.Size);
                 _lineHeight = EmHeightToLineHeight(bytes, spec.Size, _pixelSize);
-                _font = Raylib.LoadFontFromMemory(hint, bytes, _pixelSize, cps, cps.Length);
+
+                // 焼き上がりは（同じフォント・大きさ・字の集合なら）毎回同じなので、
+                // 1 回焼いたらディスクへ置いて次回からは読むだけにする。焼くと 60〜75 ms、
+                // 読むと 10 ms 前後で、raylib バックエンドの起動で一番大きく削れる部分。
+                string cacheKey = FontAtlasCache.KeyFor(path, _pixelSize, cps);
+                if (!FontAtlasCache.TryLoad(cacheKey, out _font))
+                    _font = BakeAtlas(bytes, cps, cacheKey);
+
                 Raylib.SetTextureFilter(_font.Texture, TextureFilter.Bilinear);
 
                 if (_font.Texture.Id <= 0)
@@ -113,6 +122,95 @@ internal sealed class RayLibFont : IFont
             _font = Raylib.GetFontDefault();
         }
     }
+
+    /// <summary>グリフアトラスを焼いて、結果をキャッシュへ残します。</summary>
+    /// <remarks>
+    /// <c>LoadFontFromMemory</c> ではなく中の 3 手順（字を起こす → 1 枚に詰める → GPU へ載せる）を
+    /// 自分で踏んでいるのは、詰め上がった画像をキャッシュへ書き出すためです。
+    /// 詰め方（padding と pack 方法）は raylib の既定と同じ値を使うので、見た目は変わりません。
+    /// </remarks>
+    private unsafe Font BakeAtlas(byte[] bytes, int[] cps, string cacheKey)
+    {
+        GlyphInfo* glyphs;
+        Rectangle* recs = null;
+        Image atlas;
+
+        using (BootTimer.Measure("アトラスを焼く"))
+        {
+            fixed (byte* data = bytes)
+            fixed (int* cpsPtr = cps)
+            {
+                glyphs = Raylib.LoadFontData(data, bytes.Length, _pixelSize, cpsPtr, cps.Length, FontType.Default);
+                if (glyphs == null)
+                {
+                    Log.Warning($"font: '{Spec.NameOrPath}' のグリフを起こせませんでした。内蔵フォントにフォールバックします。");
+                    return Raylib.GetFontDefault();
+                }
+                atlas = Raylib.GenImageFontAtlas(glyphs, &recs, cps.Length, _pixelSize,
+                                                 FontAtlasCache.GlyphPadding, FontAtlasCache.PackMethod);
+            }
+        }
+
+        var font = new Font
+        {
+            BaseSize = _pixelSize,
+            GlyphCount = cps.Length,
+            GlyphPadding = FontAtlasCache.GlyphPadding,
+            Texture = Raylib.LoadTextureFromImage(atlas),
+            Recs = recs,
+            Glyphs = glyphs,
+        };
+
+        // 画面に出す分にはアトラスのテクスチャだけあればよいので、CPU 側の画像はここで手放す。
+        if (font.Texture.Id > 0) FontAtlasCache.Save(cacheKey, font, atlas);
+        Raylib.UnloadImage(atlas);
+        return font;
+    }
+
+    #region フォントファイルの読み込みを 1 回で済ませる
+
+    // 同じフォントから別サイズを作ることは普通にあり（UI 用 13px と本文 16px など）、
+    // そのたびに数 MB〜十数 MB のファイルを読み直していた。Yu Gothic の .ttc は 13 MB あり、
+    // 1 本あたり 0.2〜1.2 秒かかっていて、これが起動時間の実際の主役だった（--boot-timing で確認）。
+    // 中身は読み取り専用にしか使わないので、パスごとに 1 回だけ読んで使い回す。
+    private static readonly Dictionary<string, byte[]> FileCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, byte[]?> ExtractCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object FileCacheLock = new();
+
+    private static byte[] ReadFontFile(string path)
+    {
+        lock (FileCacheLock)
+        {
+            if (FileCache.TryGetValue(path, out byte[]? cached)) return cached;
+            byte[] bytes;
+            using (BootTimer.Measure("フォントファイルを読む"))
+                bytes = File.ReadAllBytes(path);
+            FileCache[path] = bytes;
+            return bytes;
+        }
+    }
+
+    /// <summary>.ttc からの取り出しも同じパスなら 1 回で済ませる。</summary>
+    private static byte[]? ExtractCached(string path, byte[] bytes, out int chosenIndex, out int totalFonts)
+    {
+        lock (FileCacheLock)
+        {
+            if (ExtractCache.TryGetValue(path, out byte[]? cached))
+            {
+                // 取り出し済み。番号と本数はログ用なので、2 回目は黙って通す。
+                chosenIndex = 0;
+                totalFonts = cached == null ? 0 : 1;
+                return cached;
+            }
+            byte[]? extracted;
+            using (BootTimer.Measure("ttc から 1 本取り出す"))
+                extracted = ExtractSubFontFromCollection(bytes, 0, out chosenIndex, out totalFonts);
+            ExtractCache[path] = extracted;
+            return extracted;
+        }
+    }
+
+    #endregion
 
     // 拡張子だけでは中身が分からない ".font" ファイル用に、先頭バイトからフォーマットを推測する。
     private static string GuessFontHint(byte[] b)
@@ -326,6 +424,7 @@ internal sealed class RayLibFont : IFont
     {
         b[o] = (byte)(v >> 8); b[o + 1] = (byte)v;
     }
+
 
     /// <summary>指定テキストをこのフォントで描画したときの幅・高さを計測します。</summary>
     public (int width, int height) Measure(string text)

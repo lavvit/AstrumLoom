@@ -15,6 +15,8 @@ public sealed class GameConfig
     public bool RunInBackground { get; set; } = true; // 非アクティブでも動かすか
     public bool Fullscreen { get; set; } = false;
     public bool ShowMouse { get; set; } = true;
+    /// <summary>GameApp.Run の起動時に AstrumLoom のロゴアニメーションを表示する。自動化モードでは省略。</summary>
+    public bool ShowStartupSplash { get; set; } = true;
 
     // --- Timing / Performance ---
     public int TargetFps { get; set; } = 60;

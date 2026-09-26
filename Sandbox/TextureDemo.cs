@@ -386,7 +386,16 @@ internal sealed class TextureDemoScene : Scene
         _ring.Color = tint;
         _ring.BlendMode = BlendMode.Add;
         _ring.Angle = ((-_time * 48) % 360) / 360.0;   // 単位は回転数（3)  を参照）
-        _ring.Draw(x + CardW / 2.0, y + 58);
+        _ring.Draw(x + CardW / 2.0, y + 50);
+
+        // Drawと同じ座標・オプションで判定。中央の穴や透明な外側には反応しない。
+        bool touching = _ring.HitTest(Mouse.X, Mouse.Y,
+            x + CardW / 2.0, y + 50);
+        if (touching)
+            Drawing.Circle(x + CardW / 2.0, y + 50, 46, new Color(100, 255, 180), 2);
+        DemoUi.NoteFont.Draw(x + Pad, y + 98,
+            touching ? "HIT / 不透明な部分に触れています" : "環にマウスを重ねる / 透明部分は反応なし",
+            touching ? new Color(100, 255, 180) : new Color(152, 170, 202));
 
         // 不透明度の段階見本。数値と見た目を並べておくと、疑ったときに確かめられる。
         double[] steps = [0.15, 0.35, 0.6, 1.0];

@@ -40,7 +40,9 @@ public sealed class RayLibPlatform : IGamePlatform
             flags |= ConfigFlags.ResizableWindow;
         }
         SetConfigFlags(flags);
+        BootTimer.Mark("raylib の設定");
         InitWindow(config.Width, config.Height, config.Title);
+        BootTimer.Mark("InitWindow");
 
         // AstrumLoom 側で FPS を管理するので、Raylib 側のターゲットFPSは 0 にしておく
         _targetFps = config.TargetFps;
@@ -50,6 +52,7 @@ public sealed class RayLibPlatform : IGamePlatform
         {
             InitAudioDevice();
         }
+        BootTimer.Mark("InitAudioDevice");
 
         // Hostが描画と更新それぞれの上限を設定する。
         Time = new SimpleTime();
@@ -63,6 +66,7 @@ public sealed class RayLibPlatform : IGamePlatform
         TextInput = TextInputFactory.Create(WindowHandle, new RayLibTextInput(rayInput), Time, config.UseSystemIme);
         Mouse = new RayLibMouse();
         Controller = new RayLibController();
+        BootTimer.Mark("raylib のサブシステム生成");
     }
 
     /// <summary>毎フレーム冒頭で呼び出し、ウィンドウの閉じる要求を確認したうえでキー/パッドの生入力バッファを更新します。</summary>

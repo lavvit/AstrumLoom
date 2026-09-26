@@ -1,5 +1,7 @@
 ﻿# AstrumLoom
 
+<p align="center"><img src="branding/astrumloom-splash.png" alt="AstrumLoom — 星を織り上げるロゴ" width="800"></p>
+
 **AstrumLoom** は、C# / .NET 向けに開発しているマルチメディア・ゲームライブラリです。
 
 DXLib、Raylib、MonoGame などのゲームライブラリでよく使われる機能を参考にしつつ、描画・音声・入力・フォントなどをひとつの扱いやすい API にまとめることを目的としています。
@@ -7,6 +9,8 @@ DXLib、Raylib、MonoGame などのゲームライブラリでよく使われる
 > **「使いやすさ」と「拡張性」を両立し、ゲーム側がバックエンドの細かな違いを意識しなくても使えるライブラリを作る。**
 
 現在は開発中です。
+
+ロゴは星の光と織機の糸を組み合わせたものです。[スプラッシュのSVG](branding/astrumloom-splash.svg)と[背景透過のロゴSVG](branding/astrumloom-logo.svg)も用意しています。`GameApp.Run` で起動するアプリでは、糸が交差して星が灯るアニメーションを表示します（Enter / Space / Esc でスキップ）。画像は `AstrumLoom.GameUtil.dll` に埋め込まれているため、実行時に外部のロゴ画像は不要です。自動テスト・記録・再生では省略し、アプリ側で `GameConfig.ShowStartupSplash = false` に設定すると無効にできます。
 
 ---
 

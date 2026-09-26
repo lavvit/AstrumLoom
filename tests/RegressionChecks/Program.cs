@@ -112,6 +112,32 @@ using (var texture = new Texture("fake"))
     Check(!texture.Enable && native.Disposals == 1, "texture disposal is idempotent and invalidates wrapper");
 }
 var font = new TestFont();
+using (var texture = new Texture("pixels"))
+{
+    var native = proxy.LastTexture!;
+    Check(texture.TryGetPixel(2, 3, out var pixel) && pixel == new Color(12, 34, 56, 128), "pixel reads RGBA");
+    Check(!texture.TryGetPixel(-1, 0, out _) && !texture.TryGetPixel(10, 0, out _) && texture.GetPixel(0, 20).A == 0, "pixel bounds are safe");
+    Check(texture.GetPixel(2, 3).A == 128 && native.PixelReads == 1, "pixel snapshot is cached");
+    Check(texture.HitTest(102.5, 203.5, 100, 200) && !texture.HitTest(100, 200, 100, 200), "hit ignores transparent pixels");
+    Check(texture.HitTest(2.5, 3.5, alphaThreshold: 127) && !texture.HitTest(2.5, 3.5, alphaThreshold: 128), "alpha threshold boundary");
+    texture.Rectangle = new(2, 3, 4, 6); texture.Point = ReferencePoint.Center;
+    texture.XYScale = (2, 3); texture.Angle = .25;
+    Check(texture.HitTest(107.5, 197, 100, 200), "crop center nonuniform scale and rotation map to source pixel");
+    texture.ResetOption(); texture.Flip = (true, true);
+    Check(texture.HitTest(7.5, 16.5) && !texture.HitTest(10, 20), "flip maps source and excludes far edges");
+    texture.ResetOption(); texture.Position = (-2, -3);
+    Check(texture.HitTest(4.5, 6.5), "negative custom pivot is preserved");
+    texture.ResetOption(); Drawing.DefaultScale = 2;
+    Check(texture.HitTest(205, 407, 100, 200), "hit accepts screen coordinates with DefaultScale");
+    Drawing.DefaultScale = 1;
+    Check(texture.HitTest(5, 7, option: new DrawOption { Scale = (2, 2) }) && texture.Scale == 1, "temporary hit options preserve texture state");
+    texture.Opacity = 0; Check(!texture.HitTest(2.5, 3.5), "invisible texture does not hit");
+    texture.ResetOption(); texture.Scale = 0;
+    Check(!texture.HitTest(2.5, 3.5), "zero scale does not hit");
+    texture.ResetOption(); Check(!texture.HitTest(double.NaN, 0), "nonfinite point does not hit");
+    texture.Dispose(); Check(!texture.TryGetPixel(2, 3, out _) && !texture.HitTest(2.5, 3.5), "disposed pixel cache cannot be read");
+}
+
 using (var sprite = new TextSprite("one", font))
 {
     sprite.Draw(0, 0); var first = proxy.LastTexture!;
@@ -181,6 +207,8 @@ public class PlatformProxy : DispatchProxy
 }
 public sealed class TestTexture : ITexture
 {
+    public int PixelReads;
+    public Color[] ReadPixels() { PixelReads++; var pixels = new Color[Width * Height]; pixels[3 * Width + 2] = new Color(12, 34, 56, 128); return pixels; }
     public int Disposals; public bool Throw; public DrawOptions Last;
     public string Path => "fake"; public int Width => 10; public int Height => 20;
     public bool Enable => Disposals == 0; public bool IsReady => Enable; public bool IsFailed => false; public bool Loaded => true;

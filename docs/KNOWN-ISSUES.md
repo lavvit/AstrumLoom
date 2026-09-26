@@ -6,6 +6,35 @@
 - ✅ … 修正済み
 - ⬜ … 未着手
 
+## 2026-09-17 の修正（自動化が届かない経路）
+
+Icrysta（DxLib 固定・`GameApp.Run` を使わない構成・`Scale = 1.5`）で自動化が使えなかった件を追った結果、
+ライブラリ側に 2 件あった。どちらも Sandbox（Scale=1・`GameApp.Run` 経由）では踏まないため長く気付かれていない。
+
+#### ✅ 拡大率（`GameConfig.Scale`）を使っている台では DxLib のスクリーンショットが 1 枚も撮れない
+
+`DXLib/DxLibGraphic.cs:198`
+
+`SaveScreenshot` が保存する矩形の大きさを `GetWindowSize` から採っていた。`SetWindowSizeExtendRate`
+（`GameConfig.Scale`）を使っていると、これは拡大後のウィンドウの大きさ（1280x720 を 1.5 倍した 1920x1080）
+を返すので、裏画面より大きい矩形を `SaveDrawScreen` に渡すことになり必ず失敗する。
+`Snapshot` 側はそれを「このバックエンドはスクリーンショットに対応していません (DxLib)」と報告するため、
+原因がバックエンドの未実装に見えていた。実際には実装はあり、大きさの採り方だけが誤り。
+大きさを `GetDrawScreenSize`（現在の描画対象そのもの）から採るように修正。
+`Scale = 1.5` の実機（Icrysta）で `--selftest` のスクショ 3 枚が保存されることを確認済み。
+
+#### ✅ `AstrumCore.Boot(config, platform, scene, options)` が `config.Apply(options)` を呼ばない
+
+`Core/AstrumCore.cs:61`
+
+doc には「options を渡すと自動化機能が有効になります」と書いてあるが、決定論の設定（固定ステップ・
+ロックステップ・単一スレッド・seed・ターボ）と再生ファイルの読み込みは `GameConfig.Apply` の中にあり、
+呼んでいるのは `GameApp.Run` だけだった。自前でプラットフォームを作って `Boot` する構成でドキュメントどおりに
+options を渡すと、`--shot-every` や `--quit-after` は効くのに **`--replay` だけが可変 dt のまま走って静かにズレる**。
+`Boot` 側で未適用なら適用するようにし、ウィンドウ生成時に読まれてしまう指定（`--width` `--scale` `--fps`
+`--vsync` `--turbo` など）は手遅れなので名指しで警告するようにした（`LaunchOptions.Applied` / `LateOptionNames`）。
+正しい順番は `Startup.Parse` → `config.Apply` →（プラットフォーム生成）→ `Boot`。docs/DEBUG.md に手順を追加。
+
 ## 2026-08-20 の一斉修正
 
 未着手だった 65 件のうち **58 件を修正**しました。両バックエンド（RayLib / DxLib）で

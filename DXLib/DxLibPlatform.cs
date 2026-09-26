@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using static DxLibDLL.DX;
@@ -57,8 +58,10 @@ public sealed class DxLibPlatform : IGamePlatform
         SetUseSoftwareRenderModeFlag(0);
 
         // 必要な設定いろいろ…
+        BootTimer.Mark("DxLib の設定");
         if (DxLib_Init() < 0)
             throw new Exception("DxLib_Init failed");
+        BootTimer.Mark("DxLib_Init");
 
         Time = new SimpleTime();
         UTime = new SimpleTime();
@@ -74,6 +77,7 @@ public sealed class DxLibPlatform : IGamePlatform
         // ままなので、config.VSync=false ならそのまま早期 return（WaitVSync(0) の空振りのみ）、
         // config.VSync=true なら SetWaitVSyncFlag(1) とモニタ Hz に基づく TargetFps 設定まで
         // ちゃんと通る。
+        BootTimer.Mark("DxLib のサブシステム生成");
         SetVSync(config.VSync);
     }
 
@@ -102,6 +106,29 @@ public sealed class DxLibPlatform : IGamePlatform
 
     public ITexture LoadTexture(string path) =>
         new DxLibTexture(path);
+    public ITexture LoadTextureFromMemory(byte[] data, string ext)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Length == 0) throw new ArgumentException("画像データが空です。", nameof(data));
+        SetUseTransColor(FALSE);
+        SetUsePremulAlphaConvertLoad(TRUE);
+        // 非同期読込中に pin を解くとネイティブ側が移動済みの配列を読む可能性がある。
+        int asyncLoad = GetUseASyncLoadFlag();
+        SetUseASyncLoadFlag(FALSE);
+        GCHandle pinned = default;
+        try
+        {
+            pinned = GCHandle.Alloc(data, GCHandleType.Pinned);
+            int handle = CreateGraphFromMem(pinned.AddrOfPinnedObject(), data.Length);
+            if (handle < 0) throw new InvalidOperationException("メモリ上の画像を読み込めませんでした。");
+            return new DxLibTexture(handle, fromMemory: true);
+        }
+        finally
+        {
+            if (pinned.IsAllocated) pinned.Free();
+            SetUseASyncLoadFlag(asyncLoad);
+        }
+    }
     public ISound LoadSound(string path, bool streaming) =>
         new DxLibSound(path, streaming);
     public IMovie LoadMovie(string path) =>

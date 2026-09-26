@@ -17,7 +17,7 @@ internal class LoadCheckScene : Scene
     {
         // 計測用のフォントとテクスチャを準備
         _font = FontHandle.Create("ＤＦ太丸ゴシック体 Pro-5", 20, edge: 1);
-        _tex = new Texture("Assets/font.png");
+        _tex = new Texture("Assets/compass.png");
         Drawing.DefaultFont = _font!;
     }
 

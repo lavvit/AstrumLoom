@@ -9,6 +9,9 @@ public interface ITexture : IResourse
     int Height { get; }
 
     void Draw(double x, double y, DrawOptions option);
+
+    /// <summary>左上から行順のRGBAスナップショット。メインスレッド専用。未対応・取得失敗はnull。</summary>
+    Color[]? ReadPixels() => null;
 }
 
 public static class TextureExtensions
@@ -41,6 +44,82 @@ public class Texture : IDisposable
         => _texture = AstrumCore.Platform?.LoadTextureFromPixels(width, height, rgbaPixels);
 
     public ITexture Interface => _texture!;
+
+    private readonly object _pixelGate = new();
+    private Color[]? _pixels;
+    private bool _pixelReadPending;
+
+    /// <summary>
+    /// 元画像のピクセルを取得する。範囲外・未ロード・取得待ちはfalse。
+    /// 初回のみ全画像を読み出し、以降はCPUキャッシュを使う。
+    /// 更新スレッドからの初回呼び出しは読み出しを予約し、完了までfalseを返す。
+    /// 色づけ・Opacity・補間・背景合成は含まない。DxLibでは半透明RGBに丸め誤差があり得る。
+    /// </summary>
+    public bool TryGetPixel(int x, int y, out Color color)
+    {
+        color = default;
+        lock (_pixelGate)
+        {
+            var texture = _texture;
+            if (texture is not { IsReady: true } || (uint)x >= (uint)texture.Width || (uint)y >= (uint)texture.Height)
+                return false;
+            if (_pixels == null && !_pixelReadPending)
+            {
+                if (Environment.CurrentManagedThreadId == AstrumCore.MainThreadId)
+                    _pixels = texture.ReadPixels();
+                else
+                {
+                    _pixelReadPending = true;
+                    if (!AstrumCore.TryRequestToMainThread(() =>
+                    {
+                        lock (_pixelGate)
+                        {
+                            try { if (ReferenceEquals(texture, _texture) && texture.IsReady) _pixels = texture.ReadPixels(); }
+                            finally { _pixelReadPending = false; }
+                        }
+                    })) _pixelReadPending = false;
+                }
+            }
+            if (_pixels == null || _pixels.LongLength != (long)texture.Width * texture.Height) return false;
+            color = _pixels[y * texture.Width + x];
+            return true;
+        }
+    }
+
+    /// <summary>元画像の色。取得できない場合は透明色。取得待ちと透明を区別する場合はTryGetPixelを使う。</summary>
+    public Color GetPixel(int x, int y) => TryGetPixel(x, y, out var color) ? color : default;
+
+    /// <summary>
+    /// Draw(drawX, drawY, option)で描く画像の不透明部分に、画面座標(x,y)の点が触れているか。
+    /// x/yにはMouse.X/Yをそのまま渡せる。drawX/drawYはDrawと同じ座標で、DefaultScaleも考慮する。
+    /// 拡大・回転・基準点・切り抜き・Flipを反映する。alphaThresholdは0〜254で、元画像のAがこれを超えると反応。
+    /// Opacity/Color.Aが0なら反応しない。背景合成や他の画像による遮蔽は判定しない。
+    /// 負のScaleはバックエンド間で描画が異なるため未対応（false）。反転にはFlipを使う。
+    /// </summary>
+    public bool HitTest(double x, double y, double drawX = 0, double drawY = 0,
+        int alphaThreshold = 0, DrawOption? option = null)
+    {
+        if ((uint)alphaThreshold > 254) throw new ArgumentOutOfRangeException(nameof(alphaThreshold));
+        var use = Option.Temp(option);
+        var rect = use.Rectangle ?? new Rect(0, 0, Width, Height);
+        var (sx, sy) = use.Scale;
+        if (!Enable || !double.IsFinite(sx) || !double.IsFinite(sy) || sx <= 0 || sy <= 0 ||
+            !(use.Opacity > 0) || (use.Color?.A ?? 255) == 0 ||
+            !(rect.Width > 0) || !(rect.Height > 0) || !(Drawing.DefaultScale > 0)) return false;
+        var pivot = use.Position ?? (GetAnchorOffset(use.Point, rect.Width, rect.Height) * -1);
+        double angle = use.Angle * Math.Tau;
+        double dx = x / Drawing.DefaultScale - drawX, dy = y / Drawing.DefaultScale - drawY;
+        double localX = (dx * Math.Cos(angle) + dy * Math.Sin(angle)) / sx + pivot.X;
+        double localY = (-dx * Math.Sin(angle) + dy * Math.Cos(angle)) / sy + pivot.Y;
+        if (!double.IsFinite(localX) || !double.IsFinite(localY) ||
+            localX < 0 || localY < 0 || localX >= rect.Width || localY >= rect.Height) return false;
+        // 離散ピクセルを反転するため、右端ちょうどを範囲外へ送らない。
+        double sourceX = rect.X + (use.Flip.X ? Math.Ceiling(rect.Width) - 1 - Math.Floor(localX) : Math.Floor(localX));
+        double sourceY = rect.Y + (use.Flip.Y ? Math.Ceiling(rect.Height) - 1 - Math.Floor(localY) : Math.Floor(localY));
+        if (!double.IsFinite(sourceX) || !double.IsFinite(sourceY) ||
+            sourceX < 0 || sourceY < 0 || sourceX >= Width || sourceY >= Height) return false;
+        return TryGetPixel((int)sourceX, (int)sourceY, out var color) && color.A > alphaThreshold;
+    }
 
     public void Draw(double x = 0, double y = 0)
         => _texture?.Draw(x, y, Option);
@@ -118,7 +197,12 @@ public class Texture : IDisposable
 
     public void Dispose()
     {
-        var texture = Interlocked.Exchange(ref _texture, null);
+        ITexture? texture;
+        lock (_pixelGate)
+        {
+            texture = Interlocked.Exchange(ref _texture, null);
+            _pixels = null;
+        }
         if (texture != null) AstrumCore.RequestDispose(texture);
         GC.SuppressFinalize(this);
     }

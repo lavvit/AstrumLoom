@@ -45,7 +45,13 @@ public static class FontHandle
     // フォント作成
     /// <summary>プラットフォームのグラフィックスにフォント生成を委譲する。Boot前など未初期化ならnull。</summary>
     public static IFont? Create(FontSpec spec)
-        => AstrumCore.Graphic?.CreateFont(spec) ?? null;
+    {
+        if (AstrumCore.Graphic == null) return null;
+        // 日本語のグリフを焼くのは起動時間の主役になりうるので、1 本ごとに記録する。
+        IFont? font = AstrumCore.Graphic.CreateFont(spec);
+        BootTimer.Mark($"フォント生成 '{spec.NameOrPath}' {spec.Size}px");
+        return font;
+    }
     public static IFont? Create(string nameOrPath, int size = 16, int thick = 1, int edge = 0, int spacing = 0, bool bold = false, bool italic = false)
         => Create(new FontSpec(nameOrPath, size, thick, edge, spacing, bold, italic));
 

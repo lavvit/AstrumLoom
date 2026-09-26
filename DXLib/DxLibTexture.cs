@@ -12,8 +12,9 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
     public int Height { get; private set; } = 0;
 
     /// <summary>既に作成済みのDxLibグラフィックハンドル（MakeScreen等）をそのままラップするコンストラクタ。DxLibPlatform.CreateTextureのレンダーターゲット用途で使う。</summary>
-    public DxLibTexture(int handle)
+    public DxLibTexture(int handle, bool fromMemory = false)
     {
+        if (fromMemory) Path = "<memory>";
         // サイズ取得
         if (GetGraphSize(handle, out int w, out int h) != 0)
         {
@@ -138,6 +139,58 @@ internal sealed class DxLibTexture : AsyncLoadableBase, ITexture
         }
     }
     #endregion
+
+    public Color[]? ReadPixels()
+    {
+        if (!IsMainThread || !IsReady || Handle < 0) return null;
+        int previous = GetDrawScreen();
+        GetDrawArea(out var area);
+        GetDrawBlendMode(out int blend, out int blendParam);
+        GetDrawBright(out int brightR, out int brightG, out int brightB);
+        GetDrawAddColor(out int addR, out int addG, out int addB);
+        int screen = -1, soft = -1;
+        try
+        {
+            soft = MakeARGB8ColorSoftImage(Width, Height);
+            if (soft < 0) return null;
+            if (string.IsNullOrEmpty(Path))
+            {
+                if (SetDrawScreen(Handle) < 0) return null;
+            }
+            else
+            {
+                // ファイルテクスチャは描画先にできないので、RGBAを無合成で一時画面へコピーする。
+                screen = MakeScreen(Width, Height, TRUE);
+                if (screen < 0 || SetDrawScreen(screen) < 0) return null;
+                SetDrawBlendMode(DX_BLENDMODE_SRCCOLOR, 255);
+                SetDrawBright(255, 255, 255);
+                SetDrawAddColor(0, 0, 0);
+                if (DrawGraph(0, 0, Handle, TRUE) < 0) return null;
+            }
+            if (GetDrawScreenSoftImage(0, 0, Width, Height, soft) < 0) return null;
+            var pixels = new Color[checked(Width * Height)];
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                {
+                    if (GetPixelSoftImage(soft, x, y, out int r, out int g, out int b, out int a) < 0) return null;
+                    // ファイル画像はLoadTxで乗算済みアルファに変換している。
+                    if (!string.IsNullOrEmpty(Path) && a > 0)
+                    { r = (r * 255 + a / 2) / a; g = (g * 255 + a / 2) / a; b = (b * 255 + a / 2) / a; }
+                    pixels[y * Width + x] = new Color(r, g, b, a);
+                }
+            return pixels;
+        }
+        finally
+        {
+            SetDrawScreen(previous);
+            SetDrawArea(area.left, area.top, area.right, area.bottom);
+            SetDrawBlendMode(blend, blendParam);
+            SetDrawBright(brightR, brightG, brightB);
+            SetDrawAddColor(addR, addG, addB);
+            if (screen >= 0) DeleteGraph(screen);
+            if (soft >= 0) DeleteSoftImage(soft);
+        }
+    }
 
     /// <summary>
     /// DrawOptionsをDxLibのDrawRotaGraph3F/DrawRectRotaGraph3Fの引数へ変換して描画する。

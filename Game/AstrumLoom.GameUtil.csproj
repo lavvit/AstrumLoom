@@ -26,4 +26,8 @@
     <ProjectReference Include="..\Audio\AstrumLoom.Audio.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\branding\astrumloom-splash.png" LogicalName="AstrumLoom.astrumloom-splash.png" />
+  </ItemGroup>
+
 </Project>

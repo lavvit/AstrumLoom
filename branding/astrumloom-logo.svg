@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-label="AstrumLoom logo: a star woven from luminous threads">
+  <defs>
+    <linearGradient id="a" x1="180" y1="90" x2="820" y2="385" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7891e8"/><stop offset=".43" stop-color="#91e8e9"/><stop offset="1" stop-color="#d5adf4"/>
+    </linearGradient>
+    <linearGradient id="b" x1="180" y1="385" x2="820" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#82dfe4"/><stop offset=".55" stop-color="#c7b8f7"/><stop offset="1" stop-color="#9ddce9"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(0 -35) scale(1 .95)">
+    <path d="M245 290 C345 298 373 105 500 105 S655 298 755 290" fill="none" stroke="url(#a)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M245 150 C345 142 373 335 500 335 S655 142 755 150" fill="none" stroke="url(#b)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M330 220 C403 220 426 160 500 160 S597 220 670 220 M330 220 C403 220 426 280 500 280 S597 220 670 220" fill="none" stroke="#b3dafa" stroke-opacity=".55" stroke-width="2"/>
+    <path d="M446 118 Q474 105 500 105 Q526 105 554 118" fill="none" stroke="#a4e9ee" stroke-width="8" stroke-linecap="round"/>
+    <path d="M446 322 Q474 335 500 335 Q526 335 554 322" fill="none" stroke="#b5aaf3" stroke-width="8" stroke-linecap="round"/>
+    <path d="M500 177 Q508 212 543 220 Q508 228 500 263 Q492 228 457 220 Q492 212 500 177Z" fill="#ecfff6"/>
+    <circle cx="500" cy="220" r="4" fill="white"/>
+    <g fill="#b9d9ee"><circle cx="245" cy="290" r="4"/><circle cx="755" cy="290" r="4"/><circle cx="245" cy="150" r="4"/><circle cx="755" cy="150" r="4"/></g>
+  </g>
+  <text x="500" y="465" text-anchor="middle" font-family="Segoe UI, Avenir Next, Arial, sans-serif" font-weight="300" font-size="76" letter-spacing="3" fill="#f0f6ff">Astrum<tspan fill="#a8e9eb">Loom</tspan></text>
+</svg>

@@ -58,11 +58,37 @@ public class AstrumCore
     /// ゲームを起動します。<paramref name="options"/> にコマンドライン由来の起動オプションを渡すと、
     /// スクリーンショットや記録・再生などの自動化機能が有効になります。
     /// </summary>
+    /// <remarks>
+    /// <paramref name="options"/> がまだ <see cref="Startup.Apply"/> されていなければ、ここで適用します。
+    /// ただし解像度・拡大率・FPS 上限のように<b>プラットフォーム生成時に読まれる指定は手遅れ</b>なので、
+    /// それらを使うなら <c>config.Apply(options)</c> →（プラットフォーム生成）→ <c>Boot</c> の順で呼んでください。
+    /// <code>
+    /// var options = Startup.Parse(args);
+    /// config.Apply(options);                      // ウィンドウに関わる指定はここで反映する
+    /// var platform = new DxLibPlatform(config);
+    /// AstrumCore.Boot(config, platform, scene, options);
+    /// </code>
+    /// </remarks>
     public static void Boot(GameConfig config, IGamePlatform platform, Scene scene, LaunchOptions? options)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(platform);
         ArgumentNullException.ThrowIfNull(scene);
+
+        // GameApp.Run を通らず、自前でプラットフォームを作って Boot する構成では
+        // ここまで config.Apply(options) が呼ばれていない。適用しないと決定論の設定
+        // （固定ステップ・ロックステップ・単一スレッド・seed）と再生ファイルの読み込みが
+        // 丸ごと抜け落ち、--replay が可変 dt のまま走って静かにズレる。ここで拾っておく。
+        if (options != null && !options.Applied)
+        {
+            // ウィンドウはもう作られているので、生成時に読まれる指定はもう効かない。
+            // 黙って無視すると「--width が効かない」と誤解するため、名指しで警告する。
+            string late = String.Join(" ", options.LateOptionNames());
+            if (late.Length > 0)
+                Log.Warning($"起動オプション {late} は、プラットフォームを作る前に config.Apply(options) を"
+                    + "呼ばないと反映されません（ウィンドウ生成時に読まれるため）。");
+            config.Apply(options);
+        }
 
         MainThreadId = Environment.CurrentManagedThreadId;
         Platform = platform;
@@ -74,6 +100,7 @@ public class AstrumCore
 
         using var host = new GameHost(config, platform, game);
         Scene.Set(scene);
+        BootTimer.Mark("GameHost の生成");
         try
         {
             DebugSession.Initialize(config, options);

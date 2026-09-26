@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="AstrumLoom splash screen: a star woven from luminous threads">
+  <defs>
+    <radialGradient id="night" cx="50%" cy="47%" r="75%">
+      <stop stop-color="#162944"/>
+      <stop offset=".53" stop-color="#0b162b"/>
+      <stop offset="1" stop-color="#070e1d"/>
+    </radialGradient>
+    <radialGradient id="aura">
+      <stop stop-color="#54cce3" stop-opacity=".17"/>
+      <stop offset=".44" stop-color="#6f73de" stop-opacity=".075"/>
+      <stop offset="1" stop-color="#6f73de" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="thread" x1="574" y1="240" x2="1026" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7891e8"/><stop offset=".43" stop-color="#91e8e9"/><stop offset="1" stop-color="#d5adf4"/>
+    </linearGradient>
+    <linearGradient id="thread2" x1="550" y1="467" x2="1030" y2="245" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#82dfe4"/><stop offset=".55" stop-color="#c7b8f7"/><stop offset="1" stop-color="#9ddce9"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="619" y1="205" x2="992" y2="497" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#75c7e3" stop-opacity=".08"/><stop offset=".5" stop-color="#9dc7f2" stop-opacity=".48"/><stop offset="1" stop-color="#bc92e7" stop-opacity=".12"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="sparkGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#night)"/>
+  <ellipse cx="800" cy="380" rx="490" ry="400" fill="url(#aura)"/>
+
+  <!-- A quiet orbital frame leaves generous space around the mark. -->
+  <circle cx="800" cy="351" r="204" fill="none" stroke="#a5bde9" stroke-opacity=".065"/>
+  <circle cx="800" cy="351" r="170" fill="none" stroke="#a5bde9" stroke-opacity=".075" stroke-dasharray="1 14" stroke-linecap="round"/>
+  <path d="M649 235 A194 194 0 0 1 945 224 M960 463 A194 194 0 0 1 657 475" fill="none" stroke="url(#orbit)" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Four independent filaments meet at the same bright origin. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g filter="url(#glow)" opacity=".48" stroke-width="18">
+      <path d="M600 412 C686 419 698 251 801 251 S918 417 1000 412" stroke="#61dce6"/>
+      <path d="M600 290 C686 282 699 450 801 450 S917 283 1000 290" stroke="#988af3"/>
+    </g>
+    <path d="M600 412 C686 419 698 251 801 251 S918 417 1000 412" stroke="url(#thread)" stroke-width="5.5"/>
+    <path d="M600 290 C686 282 699 450 801 450 S917 283 1000 290" stroke="url(#thread2)" stroke-width="5.5"/>
+    <path d="M661 351 C722 351 741 298 801 298 S880 351 939 351" stroke="#90c4ea" stroke-opacity=".4" stroke-width="1.4"/>
+    <path d="M661 351 C722 351 741 403 801 403 S880 351 939 351" stroke="#a6b5f0" stroke-opacity=".4" stroke-width="1.4"/>
+  </g>
+
+  <!-- Small overpasses make the intersection read as woven, not merely crossed. -->
+  <path d="M754 263 C774 255 786 251 801 251 C817 251 832 256 846 263" fill="none" stroke="#14263e" stroke-width="10" stroke-linecap="round"/>
+  <path d="M754 263 C774 255 786 251 801 251 C817 251 832 256 846 263" fill="none" stroke="#a4e9ee" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M754 438 C774 446 786 450 801 450 C817 450 832 445 846 438" fill="none" stroke="#14263e" stroke-width="10" stroke-linecap="round"/>
+  <path d="M754 438 C774 446 786 450 801 450 C817 450 832 445 846 438" fill="none" stroke="#b5aaf3" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- The star is the shuttle at the centre of the loom. -->
+  <path d="M800 318 Q806 344 833 351 Q806 357 800 384 Q794 357 767 351 Q794 344 800 318Z" fill="#d9fbf5" opacity=".85" filter="url(#sparkGlow)"/>
+  <path d="M800 320 Q806 345 831 351 Q806 357 800 382 Q794 357 769 351 Q794 345 800 320Z" fill="#ecfff6"/>
+  <circle cx="800" cy="351" r="3.2" fill="#ffffff"/>
+  <g fill="#b9d9ee">
+    <circle cx="600" cy="412" r="3"/><circle cx="1000" cy="412" r="3"/>
+    <circle cx="600" cy="290" r="3"/><circle cx="1000" cy="290" r="3"/>
+  </g>
+  <g fill="#b4d5e9" opacity=".52">
+    <circle cx="543" cy="351" r="1.5"/><circle cx="1057" cy="351" r="1.5"/>
+    <circle cx="800" cy="137" r="1.5"/><circle cx="800" cy="565" r="1.5"/>
+  </g>
+
+  <text x="800" y="628" text-anchor="middle" font-family="Segoe UI, Avenir Next, Arial, sans-serif" font-weight="300" font-size="66" letter-spacing="2.5" fill="#f0f6ff">Astrum<tspan fill="#a8e9eb">Loom</tspan></text>
+</svg>

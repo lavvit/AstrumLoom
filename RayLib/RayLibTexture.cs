@@ -229,6 +229,26 @@ internal sealed class RayLibTexture : AsyncLoadableBase, ITexture
     public bool Loaded => LoadFinished;
 
     #endregion
+    public Color[]? ReadPixels()
+    {
+        if (!IsMainThread || !IsReady) return null;
+        var image = Raylib.LoadImageFromTexture(Native);
+        try
+        {
+            unsafe { if (image.Data == null) return null; }
+            if (_renderTex.Id != 0) Raylib.ImageFlipVertical(ref image);
+            var pixels = new Color[checked(Width * Height)];
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                {
+                    var color = Raylib.GetImageColor(image, x, y);
+                    pixels[y * Width + x] = new Color(color.R, color.G, color.B, color.A);
+                }
+            return pixels;
+        }
+        finally { Raylib.UnloadImage(image); }
+    }
+
     /// <summary>
     /// DrawOptions（切り出し矩形/基準点/スケール/回転/反転/色/ブレンド）を反映してテクスチャを描画する。
     /// RenderTexture由来のテクスチャはOpenGLのUV原点がファイルテクスチャと上下逆になるため、その場合だけ src矩形を反転して補正する。

@@ -199,13 +199,18 @@ internal sealed class DxLibGraphics : IGraphics
     {
         // SaveDrawScreen は「現在の描画対象」を保存するので、裏画面に戻してから撮る。
         // BeginFrame と EndFrame の間から呼ばれる前提。
-        GetWindowSize(out int w, out int h);
-        if (w <= 0 || h <= 0) return false;
-
         int previous = GetDrawScreen();
         SetDrawScreen(DX_SCREEN_BACK);
         try
         {
+            // 大きさは GetWindowSize ではなく描画対象そのものから採る。
+            // SetWindowSizeExtendRate（GameConfig.Scale）を使っている台では GetWindowSize が
+            // 拡大後のウィンドウの大きさを返すため、裏画面（論理解像度）より大きい矩形を
+            // 指定することになり SaveDrawScreen が必ず失敗する。Scale=1.5 の台で
+            // スクリーンショットが 1 枚も撮れなかったのはこれ。
+            GetDrawScreenSize(out int w, out int h);
+            if (w <= 0 || h <= 0) return false;
+
             int type = Path.GetExtension(path).ToLowerInvariant() switch
             {
                 ".bmp" => DX_IMAGESAVETYPE_BMP,

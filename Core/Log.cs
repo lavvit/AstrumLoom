@@ -141,8 +141,46 @@ public class Log
     /// </summary>
     public static bool UseSystemFont { get; set; } = true;
 
-    /// <summary>ログ表示のフォントサイズ。システムフォント/組み込みフォントのどちらにも効く。</summary>
-    public static int FontSize { get; set; } = 16;
+    /// <summary>
+    /// ログ表示のフォントサイズ。システムフォント/組み込みフォントのどちらにも効く。
+    /// 明示的にセットしなければ <see cref="AutoFontSize"/>（画面サイズ追従）を返す。
+    /// <see cref="ResetFontSize"/> で自動に戻せる。
+    /// </summary>
+    public static int FontSize
+    {
+        get => _fontSize ?? AutoFontSize;
+        set => _fontSize = value;
+    }
+
+    /// <summary><see cref="FontSize"/> の明示指定を捨てて、画面サイズ追従に戻す。</summary>
+    public static void ResetFontSize() => _fontSize = null;
+
+    /// <summary>自動サイズの基準。<see cref="BaseFontSize"/> がちょうど出る画面の高さ。</summary>
+    public static int BaseScreenHeight { get; set; } = 720;
+
+    /// <summary>自動サイズの基準フォントサイズ（画面高さが <see cref="BaseScreenHeight"/> のとき）。</summary>
+    public static int BaseFontSize { get; set; } = 16;
+
+    /// <summary>自動サイズの下限/上限。極端な解像度でも読める大きさに収める。</summary>
+    public static int MinFontSize { get; set; } = 12;
+    public static int MaxFontSize { get; set; } = 48;
+
+    /// <summary>
+    /// 画面高さから割り出した既定のフォントサイズ。4K でも豆粒にならず、小さいウィンドウでも
+    /// ログが画面を埋め尽くさないように、基準解像度からの比率で決めて上下限で挟む。
+    /// </summary>
+    public static int AutoFontSize
+    {
+        get
+        {
+            int height = AstrumCore.Height;
+            if (height <= 0 || BaseScreenHeight <= 0) return BaseFontSize;
+            int size = (int)Math.Round(BaseFontSize * (double)height / BaseScreenHeight);
+            return Math.Clamp(size, MinFontSize, MaxFontSize);
+        }
+    }
+
+    private static int? _fontSize;
 
     private static IFont? _font;
     private static bool _fontAssigned;
@@ -227,9 +265,11 @@ public class Log
 
         if (_lines.Count == 0) return;
 
-        int x = 10, y = 10;
+        // 余白もフォントサイズに合わせて伸縮させる。固定 10px だと高解像度で文字だけ大きくなって窮屈に見える。
+        int margin = Math.Max(4, FontSize * 10 / 16);
+        int x = margin, y = margin;
         int size = _cachedLineHeight;
-        Drawing.Box(0, 0, x + _cachedWidth + 10, y + _cachedHeight + 10, Color.Black, opacity: 0.5);
+        Drawing.Box(0, 0, x + _cachedWidth + margin * 2, y + _cachedHeight + margin, Color.Black, opacity: 0.5);
 
         double pulse = 0.6 + 0.4 * Math.Sin(tick / 180.0);
         int h = 0;
@@ -239,7 +279,7 @@ public class Log
             if (line.Level == LogLevel.Warning || line.Level == LogLevel.Error)
             {
                 double bgOpacity = line.Level == LogLevel.Error ? 0.25 + 0.25 * pulse : 0.25;
-                Drawing.Box(x - 4, y + h * size - 2, _cachedWidth + 8, size * line.Lines,
+                Drawing.Box(x - margin / 2, y + h * size - 2, _cachedWidth + margin, size * line.Lines,
                     line.Level == LogLevel.Error ? Color.Red : Color.Yellow, opacity: bgOpacity);
             }
 
@@ -275,7 +315,8 @@ public class Log
             loglist.RemoveRange(0, loglist.Count - MaxLogCount);
         if (loglist.Count == 0) return;
 
-        _cachedLineHeight = Math.Max(8, MeasureText("Ag").height);
+        // 行間を少し空ける。"Ag" の実測高さそのままだと、サイズが大きいほど行が詰まって重なって見える。
+        _cachedLineHeight = Math.Max(8, MeasureText("Ag").height + Math.Max(1, setting.size / 8));
 
         int total = 0;
         foreach (var log in loglist)

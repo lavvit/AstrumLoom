@@ -49,6 +49,7 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
 
         KeyInput.Initialize(input, platform.TextInput);
         Mouse.Init(mouse, config.ShowMouse);
+        BootTimer.Mark("入力まわりの初期化");
 
         // 初期化中（Initialize/Scene.Start）の例外は Loop() の try に乗らないため、
         // ここで捕まえて HandleFatal に回さないと Boot を突き抜けて素の未処理例外になる。
@@ -56,7 +57,9 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
         {
             game.Initialize();
             AstrumCore.InitCompleted = true;
+            BootTimer.Mark("game.Initialize");
             Scene.Start();
+            BootTimer.Mark("最初のシーンの Enable");
         }
         catch (Exception ex)
         {
@@ -379,6 +382,13 @@ public sealed class GameRunner(IGamePlatform platform, IGame game, GameConfig co
                 AstrumCore.CountDrawFrame();
             }
             finally { _drawing = false; }
+        }
+
+        // 最初の 1 枚が出た時点が「起動が終わった」と感じる瞬間なので、ここで締める。
+        if (AstrumCore.DrawFrameCount == 1)
+        {
+            BootTimer.Mark("最初の描画");
+            BootTimer.Report();
         }
 
         if (_fatalTriggered)

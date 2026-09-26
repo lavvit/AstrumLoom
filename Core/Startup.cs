@@ -36,6 +36,8 @@ public sealed class LaunchOptions
     public double QuitAfterSeconds { get; set; }
     /// <summary>登録済みのセルフテスト計画を自動走行する。</summary>
     public bool SelfTest { get; set; }
+    /// <summary>起動時間の内訳を最初の描画のあとに出力する。</summary>
+    public bool BootTiming { get; set; }
     /// <summary>入力を記録するファイルパス。</summary>
     public string? RecordPath { get; set; }
     /// <summary>入力を再生するファイルパス。</summary>
@@ -93,6 +95,29 @@ public sealed class LaunchOptions
     /// <summary>何らかの自動化フラグが付いているかどうか。</summary>
     public bool AutomationMode
         => DeterministicMode || ShotEvery > 0 || QuitAfterFrames > 0 || QuitAfterSeconds > 0;
+
+    /// <summary>
+    /// <see cref="Startup.Apply"/> で <see cref="GameConfig"/> に反映済みか。
+    /// <see cref="AstrumCore.Boot"/> が二重適用（＝再生ファイルの二重読み込み）を避けるために見ます。
+    /// </summary>
+    public bool Applied { get; internal set; }
+
+    /// <summary>
+    /// プラットフォーム（ウィンドウ）を作ったあとに <see cref="Startup.Apply"/> しても、もう効かない指定の名前。
+    /// これらは生成時に読まれてネイティブ側へ焼き付くので、順番を間違えると黙って無視される。
+    /// </summary>
+    internal IEnumerable<string> LateOptionNames()
+    {
+        if (Backend.HasValue) yield return "--backend";
+        if (Width is > 0) yield return "--width";
+        if (Height is > 0) yield return "--height";
+        if (Scale is > 0) yield return "--scale";
+        if (Fullscreen.HasValue) yield return "--fullscreen";
+        if (TargetFps is >= 0) yield return "--fps";
+        if (VSync.HasValue) yield return "--vsync";
+        // ターボは TargetFps=0 と VSync=false に倒す。どちらも生成時に読まれる値なので同じく手遅れになる。
+        if ((Turbo ?? SelfTest) && !TargetFps.HasValue) yield return "--turbo";
+    }
 }
 
 /// <summary>
@@ -130,6 +155,7 @@ public static class Startup
           --out <ディレクトリ>       スクショ・ログの出力先 (既定 debugout)
           --overlay / --no-overlay   デバッグオーバーレイの初期状態
           --no-log-overlay           画面左上のログ表示を消す（スクショを綺麗に撮る用）
+          --boot-timing              起動時間の内訳を最初の描画のあとに出す
           --no-hotkeys               F1〜F6 のデバッグホットキーを無効化
           --hotkeys <direct|modifier|menu|off>
                                       デバッグホットキーの受け付け方
@@ -207,7 +233,7 @@ public static class Startup
         or "no-mt" or "single-thread" or "fixed" or "no-fixed" or "hz" or "seed"
         or "lockstep" or "no-lockstep"
         or "shot-every" or "quit-after" or "quit-after-sec" or "quit-after-seconds"
-        or "selftest" or "self-test" or "turbo" or "no-turbo" or "record" or "replay" or "tuning"
+        or "selftest" or "self-test" or "boot-timing" or "turbo" or "no-turbo" or "record" or "replay" or "tuning"
         or "out" or "outdir" or "overlay" or "no-overlay"
         or "no-log-overlay" or "log-overlay" or "no-hotkeys" or "hotkeys" => true,
         _ => false,
@@ -290,6 +316,7 @@ public static class Startup
                     o.QuitAfterSeconds = ParseDouble(o, name, Value()) ?? 0;
                     break;
                 case "selftest" or "self-test": o.SelfTest = true; break;
+                case "boot-timing": o.BootTiming = true; break;
                 case "turbo": o.Turbo = true; break;
                 case "no-turbo": o.Turbo = false; break;
                 case "record": o.RecordPath = Value(); break;
@@ -409,6 +436,7 @@ public static class Startup
         }
 
         InputCapture.ConfigureSession(config, o);
+        o.Applied = true;
         return config;
     }
 
